@@ -4,7 +4,21 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DFC</title>
+    <title>Digital Filing Cabinet - CCC PLC</title>
+    <!-- Theme initialization script - runs before React to prevent flash -->
+    <script>
+      (function() {
+        // Get stored theme or default to light
+        const theme = localStorage.getItem('theme') || 'light';
+
+        // Apply theme immediately to prevent flash
+        if (theme === 'dark') {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
