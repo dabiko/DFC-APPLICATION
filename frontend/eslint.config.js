@@ -54,4 +54,28 @@ export default defineConfig([
       'prettier/prettier': 'error',
     },
   },
+  // Storybook-specific configuration
+  {
+    files: ['**/*.stories.{ts,tsx}'],
+    rules: {
+      // Allow React Hooks in Storybook render functions
+      'react-hooks/rules-of-hooks': 'off',
+
+      // Allow any types in stories for demonstration purposes
+      '@typescript-eslint/no-explicit-any': 'off',
+
+      // Allow console.log in stories for demonstration
+      'no-console': 'off',
+
+      // Storybook stories don't need to be exported as components
+      'react-refresh/only-export-components': 'off',
+    },
+  },
+  // Component files - allow empty interfaces for prop types
+  {
+    files: ['src/components/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-empty-object-type': 'off',
+    },
+  },
 ])
