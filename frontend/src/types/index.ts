@@ -13,21 +13,25 @@ export interface User {
   mfaEnabled: boolean
 }
 
-export enum UserRole {
-  VIEWER = 'viewer',
-  EDITOR = 'editor',
-  MANAGER = 'manager',
-  ADMIN = 'admin',
-}
+export const UserRole = {
+  VIEWER: 'viewer',
+  EDITOR: 'editor',
+  MANAGER: 'manager',
+  ADMIN: 'admin',
+} as const
 
-export enum Department {
-  ENGAGEMENTS = 'engagements',
-  ACCOUNTING = 'accounting',
-  IT = 'it',
-  COMPLIANCE = 'compliance',
-  RISK = 'risk',
-  AUDIT = 'audit',
-}
+export type UserRole = (typeof UserRole)[keyof typeof UserRole]
+
+export const Department = {
+  ENGAGEMENTS: 'engagements',
+  ACCOUNTING: 'accounting',
+  IT: 'it',
+  COMPLIANCE: 'compliance',
+  RISK: 'risk',
+  AUDIT: 'audit',
+} as const
+
+export type Department = (typeof Department)[keyof typeof Department]
 
 // Document types
 export interface Document {
@@ -51,22 +55,26 @@ export interface Document {
   retentionEndDate?: string
 }
 
-export enum DocumentType {
-  INVOICE = 'invoice',
-  CONTRACT = 'contract',
-  REPORT = 'report',
-  KYC_RECORD = 'kyc_record',
-  COMPLIANCE_DOCUMENT = 'compliance_document',
-  FINANCIAL_STATEMENT = 'financial_statement',
-  OTHER = 'other',
-}
+export const DocumentType = {
+  INVOICE: 'invoice',
+  CONTRACT: 'contract',
+  REPORT: 'report',
+  KYC_RECORD: 'kyc_record',
+  COMPLIANCE_DOCUMENT: 'compliance_document',
+  FINANCIAL_STATEMENT: 'financial_statement',
+  OTHER: 'other',
+} as const
 
-export enum ConfidentialityLevel {
-  PUBLIC = 'public',
-  INTERNAL = 'internal',
-  CONFIDENTIAL = 'confidential',
-  HIGHLY_CONFIDENTIAL = 'highly_confidential',
-}
+export type DocumentType = (typeof DocumentType)[keyof typeof DocumentType]
+
+export const ConfidentialityLevel = {
+  PUBLIC: 'public',
+  INTERNAL: 'internal',
+  CONFIDENTIAL: 'confidential',
+  HIGHLY_CONFIDENTIAL: 'highly_confidential',
+} as const
+
+export type ConfidentialityLevel = (typeof ConfidentialityLevel)[keyof typeof ConfidentialityLevel]
 
 export interface DocumentMetadata {
   identifier?: string
@@ -98,12 +106,14 @@ export interface Permission {
   inheritedFrom?: string
 }
 
-export enum PermissionLevel {
-  VIEW = 'view',
-  EDIT = 'edit',
-  SHARE = 'share',
-  MANAGE = 'manage',
-}
+export const PermissionLevel = {
+  VIEW: 'view',
+  EDIT: 'edit',
+  SHARE: 'share',
+  MANAGE: 'manage',
+} as const
+
+export type PermissionLevel = (typeof PermissionLevel)[keyof typeof PermissionLevel]
 
 // API Response types
 export interface ApiResponse<T> {
