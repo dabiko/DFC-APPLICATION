@@ -1,4 +1,4 @@
-import { InputHTMLAttributes, forwardRef, ReactNode, useState } from 'react'
+import { type InputHTMLAttributes, forwardRef, type ReactNode, useState } from 'react'
 import { cn } from '@utils/cn'
 import { EyeIcon, EyeSlashIcon, XMarkIcon } from '@heroicons/react/24/outline'
 
