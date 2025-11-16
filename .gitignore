@@ -48,6 +48,8 @@ frontend/cypress/screenshots/
 # yarn.lock
 # pnpm-lock.yaml
 
+
 # Build info
 frontend/.tsbuildinfo
 frontend/node_modules/.cache/
+frontend/.env.local
