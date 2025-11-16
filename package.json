@@ -1,0 +1,15 @@
+{
+  "name": "dfc-application",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Digital Filing Cabinet - Document Management System",
+  "scripts": {
+    "prepare": "husky"
+  },
+  "workspaces": [
+    "frontend"
+  ],
+  "devDependencies": {
+    "husky": "^9.1.7"
+  }
+}
