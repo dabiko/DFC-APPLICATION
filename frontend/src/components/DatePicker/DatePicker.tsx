@@ -1,4 +1,5 @@
-import { DayPicker, DateRange } from 'react-day-picker'
+import { DayPicker } from 'react-day-picker'
+import type { DateRange } from 'react-day-picker'
 import { format } from 'date-fns'
 import { CalendarIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { Popover, PopoverButton, PopoverPanel } from '@headlessui/react'

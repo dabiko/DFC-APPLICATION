@@ -1,6 +1,7 @@
 import { configureStore } from '@reduxjs/toolkit'
 import { type TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux'
 import authReducer from './slices/authSlice'
+import folderReducer from './slices/folderSlice'
 
 // Import your reducers here as you create them
 // import documentsReducer from './slices/documentsSlice'
@@ -8,6 +9,7 @@ import authReducer from './slices/authSlice'
 export const store = configureStore({
   reducer: {
     auth: authReducer,
+    folder: folderReducer,
     // Add more reducers here as you create them
     // documents: documentsReducer,
   },
@@ -19,7 +21,7 @@ export const store = configureStore({
         // Ignore these field paths in all actions
         ignoredActionPaths: ['meta.arg', 'payload.timestamp'],
         // Ignore these paths in the state
-        ignoredPaths: ['items.dates'],
+        ignoredPaths: ['folder.expandedFolderIds'],
       },
     }),
   devTools: process.env.NODE_ENV !== 'production',

@@ -3,59 +3,175 @@ import { http, HttpResponse } from 'msw'
 // Define your API mock handlers here
 // Example handlers for the DFC application
 
+// Track failed login attempts per email
+const loginAttempts = new Map<string, { count: number; lockedUntil?: number }>()
+const MAX_ATTEMPTS = 5
+const LOCKOUT_DURATION = 15 * 60 * 1000 // 15 minutes
+
+// Mock users database
+const mockUsers = [
+  {
+    id: '1',
+    username: 'admin',
+    email: 'admin@cccplc.net',
+    password: 'password',
+    firstName: 'Admin',
+    lastName: 'User',
+    role: 'admin',
+    department: 'IT',
+    mfaEnabled: false,
+  },
+  {
+    id: '2',
+    username: 'editor',
+    email: 'editor@cccplc.net',
+    password: 'password',
+    firstName: 'John',
+    lastName: 'Editor',
+    role: 'editor',
+    department: 'Accounting',
+    mfaEnabled: false,
+  },
+  {
+    id: '3',
+    username: 'viewer',
+    email: 'viewer@cccplc.net',
+    password: 'password',
+    firstName: 'Jane',
+    lastName: 'Viewer',
+    role: 'viewer',
+    department: 'Compliance',
+    mfaEnabled: false,
+  },
+]
+
 export const handlers = [
   // Authentication endpoints
   http.post('/api/v1/auth/login/', async ({ request }) => {
     const { email, password } = (await request.json()) as { email: string; password: string }
 
-    // Mock users for testing
-    if (email === 'admin@example.com' && password === 'password') {
-      return HttpResponse.json({
-        success: true,
-        data: {
-          access: 'mock-access-token-' + Date.now(),
-          refresh: 'mock-refresh-token-' + Date.now(),
-          user: {
-            id: '1',
-            username: 'admin',
-            email: 'admin@example.com',
-            firstName: 'Admin',
-            lastName: 'User',
-            role: 'admin',
-            department: 'IT',
-            mfaEnabled: false,
-          },
+    // Domain validation - only @cccplc.net emails allowed
+    const emailDomain = email.split('@')[1]
+    if (emailDomain !== 'cccplc.net') {
+      return HttpResponse.json(
+        {
+          success: false,
+          message: 'Access denied. Only CCC PLC email addresses (@cccplc.net) are allowed to access this system.',
+          error: 'INVALID_DOMAIN',
         },
-      })
+        { status: 403 }
+      )
     }
 
-    if (email === 'editor@example.com' && password === 'password') {
-      return HttpResponse.json({
-        success: true,
-        data: {
-          access: 'mock-access-token-' + Date.now(),
-          refresh: 'mock-refresh-token-' + Date.now(),
-          user: {
-            id: '2',
-            username: 'editor',
-            email: 'editor@example.com',
-            firstName: 'John',
-            lastName: 'Editor',
-            role: 'editor',
-            department: 'Accounting',
-            mfaEnabled: true,
-          },
+    // Check if account is locked due to too many failed attempts
+    const attempts = loginAttempts.get(email)
+    if (attempts?.lockedUntil && Date.now() < attempts.lockedUntil) {
+      const remainingTime = Math.ceil((attempts.lockedUntil - Date.now()) / 60000)
+      return HttpResponse.json(
+        {
+          success: false,
+          message: `Account temporarily locked due to multiple failed login attempts. Please try again in ${remainingTime} minutes.`,
+          error: 'ACCOUNT_LOCKED',
+          lockedUntil: attempts.lockedUntil,
         },
-      })
+        { status: 423 }
+      )
     }
 
-    return HttpResponse.json(
-      {
-        success: false,
-        message: 'Invalid email or password',
+    // Find user
+    const user = mockUsers.find((u) => u.email === email)
+
+    if (!user) {
+      // Track failed attempt
+      const currentAttempts = loginAttempts.get(email) || { count: 0 }
+      currentAttempts.count += 1
+      loginAttempts.set(email, currentAttempts)
+
+      const remaining = MAX_ATTEMPTS - currentAttempts.count
+
+      if (remaining <= 0) {
+        // Lock the account
+        currentAttempts.lockedUntil = Date.now() + LOCKOUT_DURATION
+        loginAttempts.set(email, currentAttempts)
+
+        return HttpResponse.json(
+          {
+            success: false,
+            message: `Account locked due to ${MAX_ATTEMPTS} failed login attempts. Please try again in 15 minutes.`,
+            error: 'ACCOUNT_LOCKED',
+            remainingAttempts: 0,
+          },
+          { status: 423 }
+        )
+      }
+
+      return HttpResponse.json(
+        {
+          success: false,
+          message: `Invalid email or password. ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining.`,
+          error: 'INVALID_CREDENTIALS',
+          remainingAttempts: remaining,
+        },
+        { status: 401 }
+      )
+    }
+
+    // Check password
+    if (user.password !== password) {
+      // Track failed attempt
+      const currentAttempts = loginAttempts.get(email) || { count: 0 }
+      currentAttempts.count += 1
+      loginAttempts.set(email, currentAttempts)
+
+      const remaining = MAX_ATTEMPTS - currentAttempts.count
+
+      if (remaining <= 0) {
+        // Lock the account
+        currentAttempts.lockedUntil = Date.now() + LOCKOUT_DURATION
+        loginAttempts.set(email, currentAttempts)
+
+        return HttpResponse.json(
+          {
+            success: false,
+            message: `Account locked due to ${MAX_ATTEMPTS} failed login attempts. Please try again in 15 minutes.`,
+            error: 'ACCOUNT_LOCKED',
+            remainingAttempts: 0,
+          },
+          { status: 423 }
+        )
+      }
+
+      return HttpResponse.json(
+        {
+          success: false,
+          message: `Invalid email or password. ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining.`,
+          error: 'INVALID_CREDENTIALS',
+          remainingAttempts: remaining,
+        },
+        { status: 401 }
+      )
+    }
+
+    // Successful login - reset attempts
+    loginAttempts.delete(email)
+
+    return HttpResponse.json({
+      success: true,
+      data: {
+        access: 'mock-access-token-' + Date.now(),
+        refresh: 'mock-refresh-token-' + Date.now(),
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+          department: user.department,
+          mfaEnabled: user.mfaEnabled,
+        },
       },
-      { status: 401 }
-    )
+    })
   }),
 
   // Logout endpoint
@@ -107,7 +223,7 @@ export const handlers = [
       data: {
         id: '1',
         username: 'admin',
-        email: 'admin@example.com',
+        email: 'admin@cccplc.net',
         firstName: 'Admin',
         lastName: 'User',
         role: 'admin',
