@@ -9,9 +9,12 @@ import {
   CloudArrowUpIcon,
   ClockIcon,
 } from '@heroicons/react/24/outline'
+import { useNavigate } from 'react-router-dom'
 import { Button } from '@components/Button'
 
 export function LandingPage() {
+  const navigate = useNavigate()
+
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id)
     element?.scrollIntoView({ behavior: 'smooth' })
@@ -92,25 +95,25 @@ export function LandingPage() {
             <nav className="hidden md:flex items-center gap-8">
               <button
                 onClick={() => scrollToSection('features')}
-                className="text-sm font-medium text-gray-700 hover:text-[#304C8D] :text-[#304C8D] transition-colors"
+                className="text-sm font-medium text-gray-700 hover:text-[#304C8D] :text-[#60a5fa] transition-colors"
               >
                 Features
               </button>
               <button
                 onClick={() => scrollToSection('security')}
-                className="text-sm font-medium text-gray-700 hover:text-[#304C8D] :text-[#304C8D] transition-colors"
+                className="text-sm font-medium text-gray-700 hover:text-[#304C8D] :text-[#60a5fa] transition-colors"
               >
                 Security
               </button>
               <button
                 onClick={() => scrollToSection('departments')}
-                className="text-sm font-medium text-gray-700 hover:text-[#304C8D] :text-[#304C8D] transition-colors"
+                className="text-sm font-medium text-gray-700 hover:text-[#304C8D] :text-[#60a5fa] transition-colors"
               >
                 Departments
               </button>
               <button
                 onClick={() => scrollToSection('benefits')}
-                className="text-sm font-medium text-gray-700 hover:text-[#304C8D] :text-[#304C8D] transition-colors"
+                className="text-sm font-medium text-gray-700 hover:text-[#304C8D] :text-[#60a5fa] transition-colors"
               >
                 Benefits
               </button>
@@ -118,7 +121,7 @@ export function LandingPage() {
 
             {/* Actions */}
             <div className="flex items-center gap-4">
-              <Button variant="primary" size="sm">
+              <Button variant="primary" size="sm" onClick={() => navigate('/login')}>
                 Login
               </Button>
             </div>
@@ -140,10 +143,10 @@ export function LandingPage() {
               enterprise-grade encryption, compliance, and intelligent search.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Button variant="primary" size="lg">
+              <Button variant="primary" size="lg" onClick={() => navigate('/login')}>
                 Get Started
               </Button>
-              <Button variant="outline" size="lg">
+              <Button variant="tertiary" size="lg" onClick={() => scrollToSection('features')}>
                 Watch Demo
               </Button>
             </div>
@@ -472,11 +475,11 @@ export function LandingPage() {
             Join leading financial institutions using DFC to secure and streamline their operations
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Button variant="secondary" size="lg">
+            <Button variant="secondary" size="lg" onClick={() => navigate('/login')}>
               Get Started Free
             </Button>
             <Button
-              variant="outline"
+              variant="tertiary"
               size="lg"
               className="border-white text-white hover:bg-white/10"
             >

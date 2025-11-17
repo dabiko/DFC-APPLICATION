@@ -5,14 +5,16 @@ import { http, HttpResponse } from 'msw'
 
 export const handlers = [
   // Authentication endpoints
-  http.post('/api/v1/auth/login', async ({ request }) => {
-    const { username, password } = (await request.json()) as { username: string; password: string }
+  http.post('/api/v1/auth/login/', async ({ request }) => {
+    const { email, password } = (await request.json()) as { email: string; password: string }
 
-    if (username === 'admin@example.com' && password === 'password') {
+    // Mock users for testing
+    if (email === 'admin@example.com' && password === 'password') {
       return HttpResponse.json({
         success: true,
         data: {
-          token: 'mock-jwt-token',
+          access: 'mock-access-token-' + Date.now(),
+          refresh: 'mock-refresh-token-' + Date.now(),
           user: {
             id: '1',
             username: 'admin',
@@ -20,7 +22,28 @@ export const handlers = [
             firstName: 'Admin',
             lastName: 'User',
             role: 'admin',
-            department: 'it',
+            department: 'IT',
+            mfaEnabled: false,
+          },
+        },
+      })
+    }
+
+    if (email === 'editor@example.com' && password === 'password') {
+      return HttpResponse.json({
+        success: true,
+        data: {
+          access: 'mock-access-token-' + Date.now(),
+          refresh: 'mock-refresh-token-' + Date.now(),
+          user: {
+            id: '2',
+            username: 'editor',
+            email: 'editor@example.com',
+            firstName: 'John',
+            lastName: 'Editor',
+            role: 'editor',
+            department: 'Accounting',
+            mfaEnabled: true,
           },
         },
       })
@@ -29,10 +52,69 @@ export const handlers = [
     return HttpResponse.json(
       {
         success: false,
-        message: 'Invalid credentials',
+        message: 'Invalid email or password',
       },
       { status: 401 }
     )
+  }),
+
+  // Logout endpoint
+  http.post('/api/v1/auth/logout/', async () => {
+    return HttpResponse.json({
+      success: true,
+      message: 'Logged out successfully',
+    })
+  }),
+
+  // Token refresh endpoint
+  http.post('/api/v1/auth/refresh/', async ({ request }) => {
+    const { refresh } = (await request.json()) as { refresh: string }
+
+    if (refresh && refresh.startsWith('mock-refresh-token')) {
+      return HttpResponse.json({
+        success: true,
+        data: {
+          access: 'mock-access-token-refreshed-' + Date.now(),
+        },
+      })
+    }
+
+    return HttpResponse.json(
+      {
+        success: false,
+        message: 'Invalid refresh token',
+      },
+      { status: 401 }
+    )
+  }),
+
+  // Get current user profile
+  http.get('/api/v1/auth/profile/', ({ request }) => {
+    const authHeader = request.headers.get('Authorization')
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return HttpResponse.json(
+        {
+          success: false,
+          message: 'Authentication required',
+        },
+        { status: 401 }
+      )
+    }
+
+    return HttpResponse.json({
+      success: true,
+      data: {
+        id: '1',
+        username: 'admin',
+        email: 'admin@example.com',
+        firstName: 'Admin',
+        lastName: 'User',
+        role: 'admin',
+        department: 'IT',
+        mfaEnabled: false,
+      },
+    })
   }),
 
   // Example: Get documents

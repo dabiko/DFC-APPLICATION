@@ -8,11 +8,20 @@
     <!-- Theme initialization script - runs before React to prevent flash -->
     <script>
       (function() {
-        // Get stored theme or default to light
-        const theme = localStorage.getItem('theme') || 'light';
+        // Get stored theme or default to system
+        const theme = localStorage.getItem('theme') || 'system';
+
+        // Determine which theme to apply
+        let appliedTheme = theme;
+
+        if (theme === 'system') {
+          // Check system preference
+          const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          appliedTheme = systemPrefersDark ? 'dark' : 'light';
+        }
 
         // Apply theme immediately to prevent flash
-        if (theme === 'dark') {
+        if (appliedTheme === 'dark') {
           document.documentElement.classList.add('dark');
         } else {
           document.documentElement.classList.remove('dark');

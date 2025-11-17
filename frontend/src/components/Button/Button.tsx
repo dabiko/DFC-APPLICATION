@@ -1,7 +1,7 @@
 import { type ButtonHTMLAttributes, forwardRef, type ReactNode } from 'react'
 import { cn } from '@utils/cn'
 
-export type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'danger' | 'ghost'
+export type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'danger' | 'ghost' | 'outline'
 export type ButtonSize = 'sm' | 'md' | 'lg'
 export type IconPosition = 'left' | 'right'
 
@@ -38,6 +38,8 @@ const variantStyles: Record<ButtonVariant, string> = {
     'bg-error-600 text-white hover:bg-error-700 active:bg-error-800 focus-visible:ring-error-500',
   ghost:
     'text-gray-700 hover:bg-gray-100 active:bg-gray-200 focus-visible:ring-gray-500 dark:text-gray-300 dark:hover:bg-gray-800',
+  outline:
+    'border-2 border-gray-300 text-gray-700 hover:bg-gray-50 active:bg-gray-100 focus-visible:ring-gray-500 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800',
 }
 
 const sizeStyles: Record<ButtonSize, string> = {

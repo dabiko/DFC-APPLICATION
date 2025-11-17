@@ -1,0 +1,24 @@
+# Django Core - Latest stable version
+Django
+
+# Django REST Framework - Latest
+djangorestframework
+
+# JWT Authentication - Latest
+djangorestframework-simplejwt
+
+# CORS handling - Latest
+django-cors-headers
+
+# Environment variables - Latest
+django-environ
+
+# PostgreSQL adapter - Latest (psycopg3 with binary wheels)
+psycopg[binary]
+
+# API Documentation - Latest
+drf-spectacular
+
+# Additional utilities
+python-decouple
+Pillow

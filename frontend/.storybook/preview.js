@@ -1,7 +1,7 @@
-import type { Preview } from '@storybook/react/dist'
 import '../src/index.css' // Import Tailwind CSS
 
-const preview: Preview = {
+/** @type { import('@storybook/react').Preview } */
+const preview = {
   parameters: {
     controls: {
       matchers: {
