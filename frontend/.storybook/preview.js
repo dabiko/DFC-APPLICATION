@@ -39,7 +39,7 @@ const preview = {
         root.classList.add(theme)
       }
 
-      return <Story />
+      return Story()
     },
   ],
 }
