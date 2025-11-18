@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'drf_spectacular',
+    'django_elasticsearch_dsl',
 
     # Local apps
     'apps.users',
@@ -219,9 +220,29 @@ AWS_S3_FILE_OVERWRITE = False
 # Elasticsearch Configuration
 ELASTICSEARCH_DSL = {
     'default': {
-        'hosts': f"{os.getenv('ELASTICSEARCH_HOST', 'localhost')}:{os.getenv('ELASTICSEARCH_PORT', '9200')}"
+        'hosts': [f"{os.getenv('ELASTICSEARCH_HOST', 'localhost')}:{os.getenv('ELASTICSEARCH_PORT', '9200')}"],
+        'http_auth': (
+            os.getenv('ELASTICSEARCH_USER', ''),
+            os.getenv('ELASTICSEARCH_PASSWORD', ''),
+        ) if os.getenv('ELASTICSEARCH_USER') else None,
+        'timeout': 30,
+        'max_retries': 3,
+        'retry_on_timeout': True,
     },
 }
+
+# Tesseract OCR Configuration
+# Path to Tesseract executable
+# Windows: Usually 'C:\\Program Files\\Tesseract-OCR\\tesseract.exe'
+# Linux/Ubuntu: Usually '/usr/bin/tesseract'
+# macOS: Usually '/usr/local/bin/tesseract'
+TESSERACT_CMD = os.getenv('TESSERACT_CMD', '/usr/bin/tesseract')
+
+# Tesseract language packs (default: English)
+# Additional languages can be installed:
+# - Ubuntu/Debian: sudo apt-get install tesseract-ocr-fra tesseract-ocr-spa
+# - Languages: eng (English), fra (French), spa (Spanish), deu (German), etc.
+TESSERACT_LANGUAGES = os.getenv('TESSERACT_LANGUAGES', 'eng')
 
 # Email Configuration
 EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')

@@ -33,6 +33,9 @@ from apps.documents.views import (
     DocumentGenerateThumbnailView,
     DocumentConvertToPDFView,
     DocumentThumbnailView,
+    DocumentExtractTextView,
+    DocumentOCRView,
+    DocumentExtractedTextView,
 )
 
 app_name = 'documents'
@@ -83,4 +86,9 @@ urlpatterns = [
     path('<uuid:id>/generate-thumbnail/', DocumentGenerateThumbnailView.as_view(), name='generate_thumbnail'),
     path('<uuid:id>/convert-to-pdf/', DocumentConvertToPDFView.as_view(), name='convert_to_pdf'),
     path('<uuid:id>/thumbnail/', DocumentThumbnailView.as_view(), name='get_thumbnail'),
+
+    # Text extraction endpoints
+    path('<uuid:id>/extract-text/', DocumentExtractTextView.as_view(), name='extract_text'),
+    path('<uuid:id>/ocr/', DocumentOCRView.as_view(), name='ocr_document'),
+    path('<uuid:id>/extracted-text/', DocumentExtractedTextView.as_view(), name='get_extracted_text'),
 ]

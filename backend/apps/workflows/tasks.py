@@ -399,3 +399,381 @@ def batch_generate_thumbnails(document_ids):
 
     logger.info(f"Batch thumbnail generation completed: {results}")
     return results
+
+
+# ========================================
+# Text Extraction Tasks
+# ========================================
+
+@shared_task(bind=True, max_retries=3)
+def extract_document_text(self, document_id):
+    """
+    Extract text from document asynchronously.
+
+    Supported formats:
+    - PDF (PyPDF2)
+    - Word (.docx)
+    - Excel (.xlsx)
+    - Plain text (.txt)
+
+    After extraction, text is:
+    1. Saved to document.extracted_text field
+    2. Indexed in Elasticsearch for searchability
+
+    Args:
+        document_id: UUID of document to extract text from
+
+    Returns:
+        dict: Result summary with success status and extracted text length
+    """
+    from apps.documents.models import Document
+    from apps.workflows.extractors import TextExtractor, OCRDetector
+    import tempfile
+
+    try:
+        # Get document
+        document = Document.objects.get(id=document_id)
+        logger.info(f"Starting text extraction for document {document_id} ({document.file_name})")
+
+        # Create temporary file for extraction
+        with tempfile.NamedTemporaryFile(delete=False, suffix=Path(document.file_name).suffix) as temp_file:
+            temp_path = temp_file.name
+
+            # Download file from MinIO to temp location
+            document.file.open('rb')
+            temp_file.write(document.file.read())
+            document.file.close()
+
+        try:
+            # Extract text based on file type
+            extracted_text = TextExtractor.extract_text(temp_path, document.file_type)
+
+            # Check if extraction yielded any text
+            if extracted_text and len(extracted_text.strip()) > 0:
+                # Save extracted text to document
+                document.extracted_text = extracted_text
+                document.is_indexed = False  # Mark for re-indexing
+                document.save(update_fields=['extracted_text', 'is_indexed'])
+
+                logger.info(
+                    f"Extracted {len(extracted_text)} characters from document {document_id}"
+                )
+
+                # Update Elasticsearch index (signal will handle this automatically)
+                # But we can also force update here
+                try:
+                    from apps.search.documents import DocumentDocument
+                    doc_index = DocumentDocument()
+                    doc_index.update(document)
+                    logger.info(f"Updated Elasticsearch index for document {document_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to update Elasticsearch index: {e}")
+
+                return {
+                    'success': True,
+                    'document_id': str(document_id),
+                    'extracted_length': len(extracted_text),
+                    'message': 'Text extraction successful'
+                }
+
+            else:
+                # No text extracted - might be scanned document
+                logger.warning(f"No text extracted from document {document_id}")
+
+                # Check if it's a scanned PDF that needs OCR
+                if document.file_type == 'application/pdf':
+                    is_scanned = OCRDetector.is_scanned_document(temp_path, document.file_type)
+
+                    if is_scanned:
+                        logger.info(f"Document {document_id} appears to be scanned, scheduling OCR")
+                        # Schedule OCR task
+                        ocr_document.delay(str(document_id))
+
+                        return {
+                            'success': True,
+                            'document_id': str(document_id),
+                            'message': 'Scanned document detected, OCR scheduled'
+                        }
+
+                return {
+                    'success': False,
+                    'document_id': str(document_id),
+                    'message': 'No text extracted from document'
+                }
+
+        finally:
+            # Clean up temporary file
+            try:
+                os.unlink(temp_path)
+            except Exception:
+                pass
+
+    except Document.DoesNotExist:
+        logger.error(f"Document {document_id} not found")
+        return {
+            'success': False,
+            'message': 'Document not found'
+        }
+
+    except Exception as e:
+        logger.error(f"Text extraction failed for {document_id}: {e}", exc_info=True)
+
+        # Retry with exponential backoff
+        try:
+            raise self.retry(exc=e, countdown=60 * (2 ** self.request.retries))
+        except self.MaxRetriesExceededError:
+            return {
+                'success': False,
+                'message': f'Text extraction failed after {self.max_retries} retries: {str(e)}'
+            }
+
+
+@shared_task(bind=True, max_retries=2)
+def ocr_document(self, document_id):
+    """
+    Perform OCR on scanned document.
+
+    Uses Tesseract OCR to extract text from image-based PDFs.
+    Includes image preprocessing for better accuracy.
+
+    Process:
+    1. Convert PDF pages to images (300 DPI)
+    2. Preprocess images (grayscale, contrast, denoise)
+    3. Perform OCR with confidence scoring
+    4. Save extracted text and confidence score
+
+    Args:
+        document_id: UUID of document to OCR
+
+    Returns:
+        dict: Result with OCR text length and average confidence
+    """
+    from apps.documents.models import Document
+    from apps.workflows.extractors import ImagePreprocessor
+    from pdf2image import convert_from_bytes
+    from pdf2image.exceptions import PDFPageCountError
+    import pytesseract
+    import tempfile
+
+    try:
+        # Get document
+        document = Document.objects.get(id=document_id)
+        logger.info(f"Starting OCR for document {document_id} ({document.file_name})")
+
+        # Only process PDFs
+        if document.file_type != 'application/pdf':
+            logger.warning(f"OCR only supported for PDFs, skipping {document_id}")
+            return {
+                'success': False,
+                'message': 'OCR only supported for PDF documents'
+            }
+
+        # Read PDF file
+        document.file.open('rb')
+        pdf_bytes = document.file.read()
+        document.file.close()
+
+        try:
+            # Convert PDF to images (300 DPI for good quality)
+            logger.info(f"Converting PDF to images for OCR")
+            images = convert_from_bytes(
+                pdf_bytes,
+                dpi=300,
+                fmt='jpeg',
+                thread_count=2
+            )
+
+            logger.info(f"Converted PDF to {len(images)} images")
+
+            # Perform OCR on each page
+            ocr_text = ""
+            confidences = []
+
+            for i, image in enumerate(images):
+                logger.debug(f"Processing page {i+1}/{len(images)} for OCR")
+
+                # Preprocess image for better OCR
+                processed_image = ImagePreprocessor.preprocess_for_ocr(image)
+
+                # Get OCR data with confidence scores
+                try:
+                    page_data = pytesseract.image_to_data(
+                        processed_image,
+                        output_type=pytesseract.Output.DICT,
+                        lang='eng'
+                    )
+
+                    # Extract text
+                    page_text = pytesseract.image_to_string(processed_image, lang='eng')
+
+                    if page_text.strip():
+                        ocr_text += f"\n--- Page {i+1} ---\n{page_text}"
+
+                    # Collect confidence scores (filter out -1 which means no text)
+                    page_confidences = [
+                        int(conf) for conf in page_data['conf']
+                        if conf != '-1' and isinstance(conf, (int, str)) and str(conf).isdigit()
+                    ]
+
+                    if page_confidences:
+                        confidences.extend(page_confidences)
+                        avg_page_conf = sum(page_confidences) / len(page_confidences)
+                        logger.debug(
+                            f"Page {i+1} OCR confidence: {avg_page_conf:.1f}% "
+                            f"({len(page_text)} characters extracted)"
+                        )
+
+                except Exception as e:
+                    logger.warning(f"OCR failed for page {i+1}: {e}")
+                    continue
+
+            # Calculate overall confidence
+            if confidences:
+                avg_confidence = sum(confidences) / len(confidences) / 100.0  # Convert to 0-1 scale
+            else:
+                avg_confidence = 0.0
+
+            # Save OCR results
+            if ocr_text.strip():
+                document.extracted_text = ocr_text.strip()
+                document.ocr_confidence = avg_confidence
+                document.is_indexed = False
+                document.save(update_fields=['extracted_text', 'ocr_confidence', 'is_indexed'])
+
+                logger.info(
+                    f"OCR completed for document {document_id}: "
+                    f"{len(ocr_text)} characters, {avg_confidence*100:.1f}% confidence"
+                )
+
+                # Update Elasticsearch index
+                try:
+                    from apps.search.documents import DocumentDocument
+                    doc_index = DocumentDocument()
+                    doc_index.update(document)
+                    logger.info(f"Updated Elasticsearch index after OCR for document {document_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to update Elasticsearch index: {e}")
+
+                return {
+                    'success': True,
+                    'document_id': str(document_id),
+                    'extracted_length': len(ocr_text),
+                    'confidence': round(avg_confidence * 100, 1),
+                    'pages_processed': len(images),
+                    'message': 'OCR completed successfully'
+                }
+            else:
+                logger.warning(f"No text extracted via OCR from document {document_id}")
+                return {
+                    'success': False,
+                    'document_id': str(document_id),
+                    'message': 'No text extracted via OCR'
+                }
+
+        except PDFPageCountError:
+            logger.warning(f"PDF {document_id} has no pages")
+            return {
+                'success': False,
+                'message': 'PDF has no pages'
+            }
+
+    except Document.DoesNotExist:
+        logger.error(f"Document {document_id} not found")
+        return {
+            'success': False,
+            'message': 'Document not found'
+        }
+
+    except Exception as e:
+        logger.error(f"OCR failed for {document_id}: {e}", exc_info=True)
+
+        # Retry with exponential backoff (longer countdown for OCR)
+        try:
+            raise self.retry(exc=e, countdown=120 * (2 ** self.request.retries))
+        except self.MaxRetriesExceededError:
+            return {
+                'success': False,
+                'message': f'OCR failed after {self.max_retries} retries: {str(e)}'
+            }
+
+
+@shared_task
+def extract_text_and_index(document_id):
+    """
+    Combined task: extract text (or perform OCR), then index.
+
+    This is the main entry point for text extraction after document upload.
+    It intelligently decides whether to use standard extraction or OCR.
+
+    Process:
+    1. Try standard text extraction first
+    2. If no text found and document is PDF, check if scanned
+    3. If scanned, perform OCR
+    4. Index extracted text in Elasticsearch
+
+    Args:
+        document_id: UUID of document
+
+    Returns:
+        dict: Summary of extraction and indexing results
+    """
+    logger.info(f"Starting combined extraction and indexing for document {document_id}")
+
+    # Start text extraction task
+    result = extract_document_text.delay(str(document_id))
+
+    return {
+        'task_id': result.id,
+        'document_id': str(document_id),
+        'message': 'Text extraction task started'
+    }
+
+
+@shared_task
+def batch_extract_text(document_ids):
+    """
+    Extract text from multiple documents in batch.
+
+    Args:
+        document_ids: List of document UUIDs
+
+    Returns:
+        dict: Summary of batch extraction results
+    """
+    from apps.documents.models import Document
+
+    results = {
+        'total': len(document_ids),
+        'success': 0,
+        'failed': 0,
+        'skipped': 0
+    }
+
+    for doc_id in document_ids:
+        try:
+            # Check if document exists and needs extraction
+            document = Document.objects.get(id=doc_id, is_deleted=False)
+
+            # Skip if already has extracted text
+            if document.extracted_text:
+                results['skipped'] += 1
+                logger.info(f"Skipping document {doc_id} (already has extracted text)")
+                continue
+
+            # Start extraction
+            result = extract_document_text.delay(str(doc_id))
+
+            if result:
+                results['success'] += 1
+            else:
+                results['failed'] += 1
+
+        except Document.DoesNotExist:
+            results['failed'] += 1
+            logger.warning(f"Document {doc_id} not found")
+        except Exception as e:
+            results['failed'] += 1
+            logger.error(f"Error in batch extraction for {doc_id}: {e}")
+
+    logger.info(f"Batch text extraction completed: {results}")
+    return results

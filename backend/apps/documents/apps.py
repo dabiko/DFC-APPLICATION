@@ -10,10 +10,11 @@ class DocumentsConfig(AppConfig):
 
     def ready(self):
         """
-        Initialize MinIO bucket on application startup.
+        Initialize MinIO bucket and register signals on application startup.
         """
         # Import here to avoid circular imports
         from apps.documents.storage import initialize_minio_bucket
+        import apps.documents.signals  # noqa: F401 - register signals
 
         try:
             initialize_minio_bucket()

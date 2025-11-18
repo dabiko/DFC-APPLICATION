@@ -67,6 +67,15 @@ class DocumentUploadView(generics.CreateAPIView):
             f"Document uploaded: {document.id} by user {request.user.username}"
         )
 
+        # Trigger background text extraction
+        try:
+            from apps.workflows.tasks import extract_text_and_index
+            extract_text_and_index.delay(str(document.id))
+            logger.info(f"Text extraction task queued for document {document.id}")
+        except Exception as e:
+            logger.error(f"Failed to queue text extraction task: {e}")
+            # Don't fail the upload if background task queuing fails
+
         # Return full document details
         response_serializer = DocumentDetailSerializer(document)
         return Response(
@@ -2101,3 +2110,200 @@ class DocumentThumbnailView(APIView):
             'task_id': task.id,
             'status': 'generating'
         }, status=status.HTTP_202_ACCEPTED)
+
+
+class DocumentExtractTextView(APIView):
+    """
+    Trigger text extraction for a document.
+
+    Can be used to:
+    - Re-extract text after document update
+    - Extract text from documents uploaded before this feature
+    - Force re-extraction if previous attempt failed
+
+    POST /api/v1/documents/{id}/extract-text/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, id):
+        """
+        Trigger text extraction task.
+        """
+        try:
+            # Get document
+            document = get_object_or_404(Document, pk=id, is_deleted=False)
+
+            # Check permissions
+            if not request.user.is_staff and document.department != request.user.department:
+                return Response(
+                    {'error': 'You do not have permission to extract text from this document'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            # Check if document type supports text extraction
+            supported_types = [
+                'application/pdf',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'application/msword',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'application/vnd.ms-excel',
+                'text/plain',
+                'text/csv',
+                'application/csv',
+            ]
+
+            if document.file_type not in supported_types:
+                return Response({
+                    'error': f'Text extraction not supported for {document.file_type}',
+                    'supported_types': supported_types
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Trigger extraction task
+            from apps.workflows.tasks import extract_document_text
+            task = extract_document_text.delay(str(document.id))
+
+            logger.info(
+                f"Text extraction triggered for document {document.id} by user {request.user.username}"
+            )
+
+            return Response({
+                'message': 'Text extraction started',
+                'task_id': task.id,
+                'document_id': str(document.id),
+                'document_name': document.file_name,
+                'file_type': document.file_type,
+                'status': 'processing'
+            }, status=status.HTTP_202_ACCEPTED)
+
+        except Document.DoesNotExist:
+            return Response(
+                {'error': 'Document not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Failed to trigger text extraction: {e}", exc_info=True)
+            return Response(
+                {'error': 'Failed to start text extraction'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class DocumentOCRView(APIView):
+    """
+    Trigger OCR for a scanned document.
+
+    Used for documents that are scanned images or image-based PDFs.
+
+    POST /api/v1/documents/{id}/ocr/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, id):
+        """
+        Trigger OCR task.
+        """
+        try:
+            # Get document
+            document = get_object_or_404(Document, pk=id, is_deleted=False)
+
+            # Check permissions
+            if not request.user.is_staff and document.department != request.user.department:
+                return Response(
+                    {'error': 'You do not have permission to perform OCR on this document'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            # Only PDFs support OCR currently
+            if document.file_type != 'application/pdf':
+                return Response({
+                    'error': 'OCR is currently only supported for PDF documents',
+                    'document_type': document.file_type
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Trigger OCR task
+            from apps.workflows.tasks import ocr_document
+            task = ocr_document.delay(str(document.id))
+
+            logger.info(
+                f"OCR triggered for document {document.id} by user {request.user.username}"
+            )
+
+            return Response({
+                'message': 'OCR processing started',
+                'task_id': task.id,
+                'document_id': str(document.id),
+                'document_name': document.file_name,
+                'status': 'processing',
+                'note': 'OCR may take several minutes depending on document size'
+            }, status=status.HTTP_202_ACCEPTED)
+
+        except Document.DoesNotExist:
+            return Response(
+                {'error': 'Document not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Failed to trigger OCR: {e}", exc_info=True)
+            return Response(
+                {'error': 'Failed to start OCR processing'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class DocumentExtractedTextView(APIView):
+    """
+    Get extracted text from a document.
+
+    Returns the text that was extracted via text extraction or OCR.
+
+    GET /api/v1/documents/{id}/extracted-text/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, id):
+        """
+        Retrieve extracted text.
+        """
+        try:
+            # Get document
+            document = get_object_or_404(Document, pk=id, is_deleted=False)
+
+            # Check permissions
+            if not request.user.is_staff and document.department != request.user.department:
+                return Response(
+                    {'error': 'You do not have permission to view this document'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            # Check if text has been extracted
+            if not document.extracted_text:
+                return Response({
+                    'message': 'No extracted text available',
+                    'document_id': str(document.id),
+                    'has_text': False,
+                    'suggestion': 'Trigger text extraction using POST /documents/{id}/extract-text/'
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            # Return extracted text with metadata
+            return Response({
+                'document_id': str(document.id),
+                'document_name': document.file_name,
+                'file_type': document.file_type,
+                'extracted_text': document.extracted_text,
+                'text_length': len(document.extracted_text),
+                'ocr_confidence': document.ocr_confidence,
+                'was_ocr': document.ocr_confidence is not None,
+                'has_text': True
+            })
+
+        except Document.DoesNotExist:
+            return Response(
+                {'error': 'Document not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Failed to retrieve extracted text: {e}", exc_info=True)
+            return Response(
+                {'error': 'Failed to retrieve extracted text'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

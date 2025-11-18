@@ -29,6 +29,9 @@ urlpatterns = [
     # API v1 - Folders
     path('api/v1/folders/', include('apps.folders.urls', namespace='folders')),
 
+    # API v1 - Search
+    path('api/v1/search/', include('apps.search.urls', namespace='search')),
+
     # API Documentation
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
