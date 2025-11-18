@@ -1,6 +1,38 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@theme {
+  /* Confidentiality level colors */
+  --color-confidentiality-public: #6b7280;
+  --color-confidentiality-internal: #3b82f6;
+  --color-confidentiality-confidential: #f97316;
+  --color-confidentiality-highly-confidential: #ef4444;
+
+  /* Primary brand colors (Blue) */
+  --color-primary-50: #eff6ff;
+  --color-primary-100: #dbeafe;
+  --color-primary-200: #bfdbfe;
+  --color-primary-300: #93c5fd;
+  --color-primary-400: #60a5fa;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb;
+  --color-primary-700: #1d4ed8;
+  --color-primary-800: #1e40af;
+  --color-primary-900: #1e3a8a;
+  --color-primary-950: #172554;
+
+  /* Font families */
+  --font-sans:
+    'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'Fira Code', 'Courier New', monospace;
+
+  /* Animations */
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+
+  /* Dark mode configuration */
+  --color-scheme: light dark;
+}
 
 @layer base {
   /* Base styles */
@@ -11,28 +43,8 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Light mode (default) */
+  /* Light mode semantic colors (default) */
   :root {
-    /* Confidentiality level colors */
-    --color-confidentiality-public: 107 114 128;
-    --color-confidentiality-internal: 59 130 246;
-    --color-confidentiality-confidential: 249 115 22;
-    --color-confidentiality-highly-confidential: 239 68 68;
-
-    /* Primary brand colors (Blue) */
-    --color-primary-50: 239 246 255;
-    --color-primary-100: 219 234 254;
-    --color-primary-200: 191 219 254;
-    --color-primary-300: 147 197 253;
-    --color-primary-400: 96 165 250;
-    --color-primary-500: 59 130 246;
-    --color-primary-600: 37 99 235;
-    --color-primary-700: 29 78 216;
-    --color-primary-800: 30 64 175;
-    --color-primary-900: 30 58 138;
-    --color-primary-950: 23 37 84;
-
-    /* Semantic background colors */
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
@@ -48,12 +60,10 @@
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
   }
 
-  /* Dark mode */
+  /* Dark mode semantic colors */
   .dark {
-    /* Semantic background colors for dark mode */
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
     --card: 222.2 84% 4.9%;
@@ -71,7 +81,7 @@
     --ring: 224.3 76.3% 48%;
   }
 
-  /* Apply background and foreground colors */
+  /* Body styles */
   body {
     min-height: 100vh;
     background-color: hsl(var(--background));
@@ -79,15 +89,7 @@
     transition:
       background-color 0.3s ease,
       color 0.3s ease;
-    font-family:
-      'Inter',
-      system-ui,
-      -apple-system,
-      'Segoe UI',
-      Roboto,
-      'Helvetica Neue',
-      Arial,
-      sans-serif;
+    font-family: var(--font-sans);
   }
 
   * {
@@ -101,7 +103,7 @@
 }
 
 @layer utilities {
-  /* Custom utility classes */
+  /* Custom animation utilities */
   .animate-progress-indeterminate {
     animation: progress-indeterminate 1.5s ease-in-out infinite;
   }
@@ -125,7 +127,7 @@
   }
 }
 
-/* Custom animations */
+/* Custom keyframe animations */
 @keyframes progress-indeterminate {
   0% {
     transform: translateX(-100%);
