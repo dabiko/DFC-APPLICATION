@@ -9,3 +9,6 @@ export type { PaginationProps, SimplePaginationProps } from './Pagination'
 
 export { TreeView } from './TreeView'
 export type { TreeViewProps, TreeNode } from './TreeView'
+
+export { HorizontalMenu, HorizontalMenuDivider } from './HorizontalMenu'
+export type { HorizontalMenuProps, HorizontalMenuItemProps } from './HorizontalMenu'
