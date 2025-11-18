@@ -1,0 +1,15 @@
+-r base.txt
+
+# Production Server
+gunicorn==23.0.0
+gevent==24.11.1
+
+# Production Database
+psycopg2==2.9.10  # C implementation (faster than psycopg2-binary)
+
+# Monitoring
+flower==2.0.1  # Celery monitoring
+
+# Performance
+django-redis==5.4.0  # Redis cache backend
+hiredis==3.0.0  # Redis C parser for performance
