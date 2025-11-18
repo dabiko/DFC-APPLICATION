@@ -90,7 +90,9 @@ const ContextMenuWrapper = (props: any) => {
   if (!isOpen) {
     return (
       <div className="p-4">
-        <p className="text-sm text-gray-600 mb-4">Context menu was closed. Reload the story to see it again.</p>
+        <p className="text-sm text-gray-600 mb-4">
+          Context menu was closed. Reload the story to see it again.
+        </p>
         <button
           className="px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700"
           onClick={() => setIsOpen(true)}
@@ -155,10 +157,23 @@ export const KeyboardNavigation: Story = {
         <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded">
           <h3 className="font-semibold text-sm mb-2">Keyboard Navigation Instructions:</h3>
           <ul className="text-sm space-y-1 text-gray-700 dark:text-gray-300">
-            <li><kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-xs">↓</kbd> Move down</li>
-            <li><kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-xs">↑</kbd> Move up</li>
-            <li><kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-xs">Enter</kbd> or <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-xs">Space</kbd> Activate item</li>
-            <li><kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-xs">Esc</kbd> Close menu</li>
+            <li>
+              <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-xs">↓</kbd> Move
+              down
+            </li>
+            <li>
+              <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-xs">↑</kbd> Move
+              up
+            </li>
+            <li>
+              <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-xs">Enter</kbd> or{' '}
+              <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-xs">Space</kbd>{' '}
+              Activate item
+            </li>
+            <li>
+              <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-xs">Esc</kbd>{' '}
+              Close menu
+            </li>
           </ul>
         </div>
         <ContextMenuWrapper folder={mockFolder} />

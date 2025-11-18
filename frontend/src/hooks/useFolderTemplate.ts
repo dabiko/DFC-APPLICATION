@@ -4,7 +4,11 @@
  */
 
 import { useState } from 'react'
-import type { FolderTemplate, TemplateApplicationResult, FolderTemplateStructure } from '@/types/folderTemplate'
+import type {
+  FolderTemplate,
+  TemplateApplicationResult,
+  FolderTemplateStructure,
+} from '@/types/folderTemplate'
 import type { Folder, CreateFolderData } from '@/types/folder'
 import folderService from '@/services/folderService'
 
@@ -39,7 +43,13 @@ export const useFolderTemplate = () => {
       setProgress((prev) => ({ ...prev, current: prev.current + 1 }))
 
       // Apply structure recursively
-      await applyStructure(template.structure, rootFolder.id, template.defaultConfidentiality, createdFolderIds, errors)
+      await applyStructure(
+        template.structure,
+        rootFolder.id,
+        template.defaultConfidentiality,
+        createdFolderIds,
+        errors
+      )
 
       return {
         rootFolderId: rootFolder.id,
@@ -74,7 +84,13 @@ export const useFolderTemplate = () => {
         setProgress((prev) => ({ ...prev, current: prev.current + 1 }))
 
         if (folderDef.children && folderDef.children.length > 0) {
-          await applyStructure(folderDef.children, folder.id, defaultConfidentiality, createdIds, errors)
+          await applyStructure(
+            folderDef.children,
+            folder.id,
+            defaultConfidentiality,
+            createdIds,
+            errors
+          )
         }
       } catch (err) {
         errors.push({

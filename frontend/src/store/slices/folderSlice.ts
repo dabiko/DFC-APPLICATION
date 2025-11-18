@@ -120,7 +120,10 @@ export const moveFolder = createAsyncThunk(
 // Delete folder
 export const deleteFolder = createAsyncThunk(
   'folder/deleteFolder',
-  async ({ folderId, force = false }: { folderId: string; force?: boolean }, { rejectWithValue }) => {
+  async (
+    { folderId, force = false }: { folderId: string; force?: boolean },
+    { rejectWithValue }
+  ) => {
     try {
       await folderService.deleteFolder(folderId, force)
       return folderId
@@ -385,9 +388,11 @@ export const {
 // Export selectors
 export const selectFolders = (state: { folder: FolderState }) => state.folder.folders
 export const selectFolderTree = (state: { folder: FolderState }) => state.folder.folderTree
-export const selectSelectedFolderId = (state: { folder: FolderState }) => state.folder.selectedFolderId
+export const selectSelectedFolderId = (state: { folder: FolderState }) =>
+  state.folder.selectedFolderId
 export const selectSelectedFolder = (state: { folder: FolderState }) => state.folder.selectedFolder
-export const selectExpandedFolderIds = (state: { folder: FolderState }) => state.folder.expandedFolderIds
+export const selectExpandedFolderIds = (state: { folder: FolderState }) =>
+  state.folder.expandedFolderIds
 export const selectFolderLoading = (state: { folder: FolderState }) => state.folder.loading
 export const selectFolderError = (state: { folder: FolderState }) => state.folder.error
 export const selectFolderFilters = (state: { folder: FolderState }) => state.folder.filters

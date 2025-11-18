@@ -50,7 +50,8 @@ export const EditMode: Story = {
       confidentialityLevel: 'confidential',
       retentionPeriod: '7_years',
       tags: ['financial', 'quarterly', 'report', 'fy2024'],
-      description: 'Quarterly financial statement for Q4 2024 including balance sheet, income statement, and cash flow analysis.',
+      description:
+        'Quarterly financial statement for Q4 2024 including balance sheet, income statement, and cash flow analysis.',
       fiscalYear: 'FY2024',
       keywords: ['revenue', 'expenses', 'profit', 'assets', 'liabilities'],
     },

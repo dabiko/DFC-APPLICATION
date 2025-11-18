@@ -137,7 +137,9 @@ export const SearchResultsList: FC<SearchResultsListProps> = ({
           result={result}
           viewMode="list"
           isSelected={localSelectedIds.has(result.id)}
-          onSelect={onSelectionChange ? (selected) => handleResultSelect(result.id, selected) : undefined}
+          onSelect={
+            onSelectionChange ? (selected) => handleResultSelect(result.id, selected) : undefined
+          }
           onClick={() => handleResultClick(result)}
           onPreview={() => handleResultPreview(result)}
           onDownload={() => handleResultDownload(result)}

@@ -126,7 +126,9 @@ export const VersionComparisonModal: FC<VersionComparisonProps> = ({
 
                             <div>
                               <p className="text-gray-500 dark:text-gray-400">Created By</p>
-                              <p className="text-gray-900 dark:text-gray-100">{fromVersion.createdBy}</p>
+                              <p className="text-gray-900 dark:text-gray-100">
+                                {fromVersion.createdBy}
+                              </p>
                             </div>
 
                             {fromVersion.checksum && (
@@ -202,7 +204,9 @@ export const VersionComparisonModal: FC<VersionComparisonProps> = ({
 
                             <div>
                               <p className="text-gray-500 dark:text-gray-400">Created By</p>
-                              <p className="text-gray-900 dark:text-gray-100">{toVersion.createdBy}</p>
+                              <p className="text-gray-900 dark:text-gray-100">
+                                {toVersion.createdBy}
+                              </p>
                             </div>
 
                             {toVersion.checksum && (
@@ -236,7 +240,9 @@ export const VersionComparisonModal: FC<VersionComparisonProps> = ({
                                 key={index}
                                 className="flex items-start gap-2 p-3 bg-primary-50 dark:bg-primary-900/20 rounded-lg"
                               >
-                                <span className="text-primary-600 dark:text-primary-400 mt-0.5">•</span>
+                                <span className="text-primary-600 dark:text-primary-400 mt-0.5">
+                                  •
+                                </span>
                                 <p className="text-sm text-gray-700 dark:text-gray-300">{change}</p>
                               </div>
                             ))}

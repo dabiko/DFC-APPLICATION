@@ -77,7 +77,7 @@ export const DeleteFolderModal: FC<DeleteFolderModalProps> = ({
 
   if (!isOpen || !folder) return null
 
-  const hasContents = (folder.childrenCount > 0 || folder.documentCount > 0)
+  const hasContents = folder.childrenCount > 0 || folder.documentCount > 0
   const isConfirmationValid = confirmationText === folder.name
 
   return (
@@ -98,7 +98,10 @@ export const DeleteFolderModal: FC<DeleteFolderModalProps> = ({
             <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full">
               <TrashIcon className="w-6 h-6 text-red-600 dark:text-red-400" />
             </div>
-            <h2 id="delete-folder-title" className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            <h2
+              id="delete-folder-title"
+              className="text-lg font-semibold text-gray-900 dark:text-gray-100"
+            >
               Delete Folder
             </h2>
           </div>
@@ -124,8 +127,9 @@ export const DeleteFolderModal: FC<DeleteFolderModalProps> = ({
                     This action cannot be undone
                   </h3>
                   <p className="text-sm text-red-700 dark:text-red-300">
-                    You are about to permanently delete this folder{hasContents ? ' and all its contents' : ''}.
-                    This will remove all data and cannot be recovered.
+                    You are about to permanently delete this folder
+                    {hasContents ? ' and all its contents' : ''}. This will remove all data and
+                    cannot be recovered.
                   </p>
                 </div>
               </div>
@@ -148,10 +152,16 @@ export const DeleteFolderModal: FC<DeleteFolderModalProps> = ({
                   </p>
                   <ul className="mt-1 text-sm text-yellow-700 dark:text-yellow-300 list-disc list-inside">
                     {folder.childrenCount > 0 && (
-                      <li><strong>{folder.childrenCount}</strong> subfolder{folder.childrenCount === 1 ? '' : 's'}</li>
+                      <li>
+                        <strong>{folder.childrenCount}</strong> subfolder
+                        {folder.childrenCount === 1 ? '' : 's'}
+                      </li>
                     )}
                     {folder.documentCount > 0 && (
-                      <li><strong>{folder.documentCount}</strong> document{folder.documentCount === 1 ? '' : 's'}</li>
+                      <li>
+                        <strong>{folder.documentCount}</strong> document
+                        {folder.documentCount === 1 ? '' : 's'}
+                      </li>
                     )}
                   </ul>
                   <p className="mt-2 text-xs text-yellow-700 dark:text-yellow-300">
@@ -189,8 +199,15 @@ export const DeleteFolderModal: FC<DeleteFolderModalProps> = ({
 
             {/* Confirmation input */}
             <div>
-              <label htmlFor="confirmation" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Type <span className="font-mono font-semibold text-red-600 dark:text-red-400">{folder.name}</span> to confirm
+              <label
+                htmlFor="confirmation"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              >
+                Type{' '}
+                <span className="font-mono font-semibold text-red-600 dark:text-red-400">
+                  {folder.name}
+                </span>{' '}
+                to confirm
               </label>
               <input
                 id="confirmation"
@@ -213,9 +230,7 @@ export const DeleteFolderModal: FC<DeleteFolderModalProps> = ({
                 `}
                 autoFocus
               />
-              {error && (
-                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{error}</p>
-              )}
+              {error && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{error}</p>}
             </div>
 
             {/* Permission warning */}
@@ -264,8 +279,20 @@ export const DeleteFolderModal: FC<DeleteFolderModalProps> = ({
               {isLoading ? (
                 <>
                   <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      fill="none"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
                   </svg>
                   Deleting...
                 </>

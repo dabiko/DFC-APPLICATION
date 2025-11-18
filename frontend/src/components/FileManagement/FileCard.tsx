@@ -71,7 +71,10 @@ export const FileCard: FC<FileCardProps> = ({
       case 'blue':
         return cn(baseClass, 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300')
       case 'orange':
-        return cn(baseClass, 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300')
+        return cn(
+          baseClass,
+          'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
+        )
       case 'red':
         return cn(baseClass, 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300')
       default:
@@ -125,13 +128,11 @@ export const FileCard: FC<FileCardProps> = ({
           {isFolder ? (
             <FolderIcon className="w-20 h-20 text-blue-500" />
           ) : item.thumbnailUrl ? (
-            <img
-              src={item.thumbnailUrl}
-              alt={item.name}
-              className="w-full h-full object-cover"
-            />
+            <img src={item.thumbnailUrl} alt={item.name} className="w-full h-full object-cover" />
           ) : (
-            <span className="text-6xl">{getFileIcon({ name: item.name, type: item.mimeType || '' } as File)}</span>
+            <span className="text-6xl">
+              {getFileIcon({ name: item.name, type: item.mimeType || '' } as File)}
+            </span>
           )}
         </div>
 
@@ -148,9 +149,7 @@ export const FileCard: FC<FileCardProps> = ({
           {/* Metadata */}
           <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
             <span>
-              {isFolder
-                ? `${item.itemCount || 0} items`
-                : formatFileSize(item.fileSize || 0)}
+              {isFolder ? `${item.itemCount || 0} items` : formatFileSize(item.fileSize || 0)}
             </span>
             <span>{formatDistanceToNow(new Date(item.modifiedAt), { addSuffix: true })}</span>
           </div>
@@ -163,14 +162,13 @@ export const FileCard: FC<FileCardProps> = ({
             </span>
 
             {/* Status indicators */}
-            {item.isLocked && (
-              <LockClosedIcon className="w-4 h-4 text-gray-500" title="Locked" />
-            )}
-            {item.isShared && (
-              <ShareIcon className="w-4 h-4 text-blue-500" title="Shared" />
-            )}
+            {item.isLocked && <LockClosedIcon className="w-4 h-4 text-gray-500" title="Locked" />}
+            {item.isShared && <ShareIcon className="w-4 h-4 text-blue-500" title="Shared" />}
             {item.hasVersions && (
-              <ClockIcon className="w-4 h-4 text-gray-500" title={`Version ${item.currentVersion}`} />
+              <ClockIcon
+                className="w-4 h-4 text-gray-500"
+                title={`Version ${item.currentVersion}`}
+              />
             )}
           </div>
         </div>
@@ -207,21 +205,17 @@ export const FileCard: FC<FileCardProps> = ({
         {isFolder ? (
           <FolderIcon className="w-8 h-8 text-blue-500" />
         ) : item.thumbnailUrl ? (
-          <img
-            src={item.thumbnailUrl}
-            alt={item.name}
-            className="w-10 h-10 object-cover rounded"
-          />
+          <img src={item.thumbnailUrl} alt={item.name} className="w-10 h-10 object-cover rounded" />
         ) : (
-          <span className="text-2xl">{getFileIcon({ name: item.name, type: item.mimeType || '' } as File)}</span>
+          <span className="text-2xl">
+            {getFileIcon({ name: item.name, type: item.mimeType || '' } as File)}
+          </span>
         )}
       </div>
 
       {/* Name */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-          {item.name}
-        </p>
+        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{item.name}</p>
         <div className="flex items-center gap-2 mt-0.5">
           <span className={getConfidentialityBadgeClass()}>
             {confidentialityIcon} {item.confidentialityLevel}
@@ -233,7 +227,9 @@ export const FileCard: FC<FileCardProps> = ({
 
       {/* Type */}
       <div className="hidden sm:flex flex-shrink-0 w-32 text-sm text-gray-600 dark:text-gray-400">
-        {isFolder ? 'Folder' : item.metadata?.documentType || item.extension?.toUpperCase() || 'File'}
+        {isFolder
+          ? 'Folder'
+          : item.metadata?.documentType || item.extension?.toUpperCase() || 'File'}
       </div>
 
       {/* Size */}

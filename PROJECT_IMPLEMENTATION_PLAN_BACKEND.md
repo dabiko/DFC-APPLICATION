@@ -18,20 +18,20 @@ This document outlines all backend development tasks extracted from the main imp
 ## BACKEND TECHNOLOGY STACK
 
 ### Core Framework
-- **Framework**: Django 4.2+ (Python 3.11+)
+- **Framework**: Django 5.2.8+ (Python 3.14+)
 - **API**: Django REST Framework (DRF)
 - **Authentication**: djangorestframework-simplejwt (JWT tokens)
 - **API Documentation**: drf-spectacular (OpenAPI/Swagger)
 
 ### Database & Storage
-- **Database**: PostgreSQL 14+ (with pgbouncer for connection pooling)
+- **Database**: PostgreSQL 18+ (with pgbouncer for connection pooling)
 - **Object Storage**: MinIO (S3-compatible, self-hosted)
-- **Search Engine**: Elasticsearch 8.x / OpenSearch 2.x
-- **Cache**: Redis 7.x
+- **Search Engine**: Elasticsearch 9.x / OpenSearch 3.x
+- **Cache**: Redis 8.x
 
 ### Background Processing
 - **Task Queue**: Celery 5.x
-- **Message Broker**: RabbitMQ 3.x or Redis
+- **Message Broker**: RabbitMQ 4.x or Redis
 - **Task Monitoring**: Flower
 
 ### Key Python Libraries

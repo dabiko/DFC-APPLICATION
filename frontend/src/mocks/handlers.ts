@@ -56,7 +56,8 @@ export const handlers = [
       return HttpResponse.json(
         {
           success: false,
-          message: 'Access denied. Only CCC PLC email addresses (@cccplc.net) are allowed to access this system.',
+          message:
+            'Access denied. Only CCC PLC email addresses (@cccplc.net) are allowed to access this system.',
           error: 'INVALID_DOMAIN',
         },
         { status: 403 }

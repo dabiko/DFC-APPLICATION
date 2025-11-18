@@ -111,7 +111,10 @@ export const RenameFolderModal: FC<RenameFolderModalProps> = ({
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-3">
             <PencilIcon className="w-6 h-6 text-primary-600 dark:text-primary-400" />
-            <h2 id="rename-folder-title" className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            <h2
+              id="rename-folder-title"
+              className="text-lg font-semibold text-gray-900 dark:text-gray-100"
+            >
               Rename Folder
             </h2>
           </div>
@@ -130,12 +133,16 @@ export const RenameFolderModal: FC<RenameFolderModalProps> = ({
           <div className="px-6 py-4 space-y-4">
             {/* Current path */}
             <div className="text-sm text-gray-600 dark:text-gray-400">
-              Location: <span className="font-medium text-gray-900 dark:text-gray-100">{folder.path}</span>
+              Location:{' '}
+              <span className="font-medium text-gray-900 dark:text-gray-100">{folder.path}</span>
             </div>
 
             {/* Folder name input */}
             <div>
-              <label htmlFor="folder-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label
+                htmlFor="folder-name"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              >
                 New Folder Name <span className="text-red-500">*</span>
               </label>
               <input
@@ -160,9 +167,7 @@ export const RenameFolderModal: FC<RenameFolderModalProps> = ({
                 autoFocus
                 onFocus={(e) => e.target.select()}
               />
-              {error && (
-                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{error}</p>
-              )}
+              {error && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{error}</p>}
             </div>
 
             {/* Locked folder warning */}
@@ -178,8 +183,9 @@ export const RenameFolderModal: FC<RenameFolderModalProps> = ({
             {folder.childrenCount > 0 && (
               <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                 <p className="text-sm text-blue-800 dark:text-blue-200">
-                  This folder contains <strong>{folder.childrenCount}</strong> subfolder{folder.childrenCount === 1 ? '' : 's'}.
-                  Renaming will update the path for all subfolders and documents.
+                  This folder contains <strong>{folder.childrenCount}</strong> subfolder
+                  {folder.childrenCount === 1 ? '' : 's'}. Renaming will update the path for all
+                  subfolders and documents.
                 </p>
               </div>
             )}
@@ -215,8 +221,20 @@ export const RenameFolderModal: FC<RenameFolderModalProps> = ({
               {isLoading ? (
                 <>
                   <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      fill="none"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
                   </svg>
                   Renaming...
                 </>

@@ -74,7 +74,8 @@ export const Interactive: Story = {
     return (
       <div className="space-y-4">
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
-          <strong>Interactive Demo:</strong> Select files and configure security settings before uploading.
+          <strong>Interactive Demo:</strong> Select files and configure security settings before
+          uploading.
         </div>
         <SecureUpload
           config={config}

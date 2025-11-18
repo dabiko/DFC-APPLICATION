@@ -6,7 +6,13 @@
 import { FC, useState } from 'react'
 import { XMarkIcon, FunnelIcon } from '@heroicons/react/24/outline'
 import { cn } from '@utils/cn'
-import type { AuditLogFiltersProps, AuditActionType, ResourceType, AuditOutcome, AuditSeverity } from '@/types/audit'
+import type {
+  AuditLogFiltersProps,
+  AuditActionType,
+  ResourceType,
+  AuditOutcome,
+  AuditSeverity,
+} from '@/types/audit'
 import {
   ACTION_TYPE_LABELS,
   RESOURCE_TYPE_LABELS,
@@ -21,7 +27,7 @@ export const AuditLogFilters: FC<AuditLogFiltersProps> = ({
   onFiltersChange,
   onClearFilters,
   availableUsers,
-  availableResources,
+  availableResources: _availableResources,
   className,
 }) => {
   const [activeSection, setActiveSection] = useState<string | null>('dateRange')
@@ -94,7 +100,12 @@ export const AuditLogFilters: FC<AuditLogFiltersProps> = ({
   )
 
   return (
-    <div className={cn('bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700', className)}>
+    <div
+      className={cn(
+        'bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700',
+        className
+      )}
+    >
       {/* Header */}
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between">

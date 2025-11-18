@@ -261,7 +261,7 @@ export const SharedByMeDefault: StoryObj<typeof SharedByMeView> = {
 
 export const SharedByMeActiveOnly: StoryObj<typeof SharedByMeView> = {
   args: {
-    items: mockSharedByMeItems.filter(item => item.share.status === 'active'),
+    items: mockSharedByMeItems.filter((item) => item.share.status === 'active'),
     onRevokeShare: (shareId) => console.log('Revoke share:', shareId),
     onEditShare: (share) => console.log('Edit share:', share),
     onExtendExpiry: (shareId, newDate) => console.log('Extend expiry:', shareId, newDate),

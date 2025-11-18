@@ -159,7 +159,9 @@ export const CreateFolder: StoryObj = {
     const handleCreate = async (data: CreateFolderData) => {
       console.log('Creating folder:', data)
       await new Promise((resolve) => setTimeout(resolve, 1000))
-      alert(`Created folder: ${data.name}\nParent: ${data.parentId || 'Root'}\nConfidentiality: ${data.confidentiality}`)
+      alert(
+        `Created folder: ${data.name}\nParent: ${data.parentId || 'Root'}\nConfidentiality: ${data.confidentiality}`
+      )
     }
 
     return (
@@ -245,8 +247,8 @@ export const RenameLockedFolder: StoryObj = {
   render: () => {
     const [isOpen, setIsOpen] = useState(true)
 
-    const handleRename = async (folderId: string, newName: string) => {
-      console.log('Attempting to rename locked folder:', folderId)
+    const handleRename = async (folderId: string, _newName: string) => {
+      console.warn('Attempting to rename locked folder:', folderId)
       throw new Error('Cannot rename a locked folder')
     }
 
@@ -393,7 +395,9 @@ export const DeleteLockedFolder: StoryObj = {
 // All Modals Flow
 export const AllModalsFlow: StoryObj = {
   render: () => {
-    const [activeModal, setActiveModal] = useState<'create' | 'rename' | 'move' | 'delete' | null>(null)
+    const [activeModal, setActiveModal] = useState<'create' | 'rename' | 'move' | 'delete' | null>(
+      null
+    )
 
     return (
       <div className="p-8 space-y-4">

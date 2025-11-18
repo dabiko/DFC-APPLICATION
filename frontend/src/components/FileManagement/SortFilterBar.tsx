@@ -9,12 +9,16 @@ import {
   Squares2X2Icon,
   ListBulletIcon,
   FunnelIcon,
-  XMarkIcon,
   ChevronDownIcon,
   AdjustmentsHorizontalIcon,
 } from '@heroicons/react/24/outline'
 import { cn } from '@utils/cn'
-import type { SortFilterBarProps, SortField, SortOrder, FilterOptions } from '@/types/fileManagement'
+import type {
+  SortFilterBarProps,
+  SortField,
+  SortOrder,
+  FilterOptions,
+} from '@/types/fileManagement'
 import { SORT_OPTIONS } from '@/types/fileManagement'
 
 export const SortFilterBar: FC<SortFilterBarProps> = ({
@@ -113,7 +117,8 @@ export const SortFilterBar: FC<SortFilterBarProps> = ({
                           active
                             ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
                             : 'text-gray-700 dark:text-gray-300',
-                          option.field === sortBy && option.order === sortOrder &&
+                          option.field === sortBy &&
+                            option.order === sortOrder &&
                             'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 font-medium'
                         )}
                       >
@@ -129,7 +134,7 @@ export const SortFilterBar: FC<SortFilterBarProps> = ({
 
         {/* Filter Popover */}
         <Popover className="relative">
-          {({ open }) => (
+          {({ open: _open }) => (
             <>
               <Popover.Button
                 className={cn(
@@ -205,23 +210,27 @@ export const SortFilterBar: FC<SortFilterBarProps> = ({
                         Confidentiality
                       </label>
                       <div className="space-y-2">
-                        {['Public', 'Internal', 'Confidential', 'Highly Confidential'].map((level) => (
-                          <label key={level} className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={(localFilters.confidentialityLevels || []).includes(level)}
-                              onChange={(e) => {
-                                const current = localFilters.confidentialityLevels || []
-                                const newLevels = e.target.checked
-                                  ? [...current, level]
-                                  : current.filter((l) => l !== level)
-                                handleFilterChange('confidentialityLevels', newLevels)
-                              }}
-                              className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                            />
-                            <span className="text-sm text-gray-700 dark:text-gray-300">{level}</span>
-                          </label>
-                        ))}
+                        {['Public', 'Internal', 'Confidential', 'Highly Confidential'].map(
+                          (level) => (
+                            <label key={level} className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={(localFilters.confidentialityLevels || []).includes(level)}
+                                onChange={(e) => {
+                                  const current = localFilters.confidentialityLevels || []
+                                  const newLevels = e.target.checked
+                                    ? [...current, level]
+                                    : current.filter((l) => l !== level)
+                                  handleFilterChange('confidentialityLevels', newLevels)
+                                }}
+                                className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                              />
+                              <span className="text-sm text-gray-700 dark:text-gray-300">
+                                {level}
+                              </span>
+                            </label>
+                          )
+                        )}
                       </div>
                     </div>
 
@@ -267,7 +276,9 @@ export const SortFilterBar: FC<SortFilterBarProps> = ({
                           onChange={(e) => handleFilterChange('hasVersions', e.target.checked)}
                           className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                         />
-                        <span className="text-sm text-gray-700 dark:text-gray-300">Has versions</span>
+                        <span className="text-sm text-gray-700 dark:text-gray-300">
+                          Has versions
+                        </span>
                       </label>
                       <label className="flex items-center gap-2">
                         <input
@@ -276,7 +287,9 @@ export const SortFilterBar: FC<SortFilterBarProps> = ({
                           onChange={(e) => handleFilterChange('isShared', e.target.checked)}
                           className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                         />
-                        <span className="text-sm text-gray-700 dark:text-gray-300">Shared with me</span>
+                        <span className="text-sm text-gray-700 dark:text-gray-300">
+                          Shared with me
+                        </span>
                       </label>
                     </div>
                   </div>

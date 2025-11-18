@@ -82,7 +82,12 @@ export const EncryptionSettings: FC<EncryptionSettingsProps> = ({
   ]
 
   return (
-    <div className={cn('bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700', className)}>
+    <div
+      className={cn(
+        'bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700',
+        className
+      )}
+    >
       {/* Header */}
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between">
@@ -144,7 +149,9 @@ export const EncryptionSettings: FC<EncryptionSettingsProps> = ({
               </label>
               <select
                 value={localSettings.preferredAlgorithm}
-                onChange={(e) => updateSetting('preferredAlgorithm', e.target.value as EncryptionAlgorithm)}
+                onChange={(e) =>
+                  updateSetting('preferredAlgorithm', e.target.value as EncryptionAlgorithm)
+                }
                 className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               >
                 {algorithmOptions.map((algo) => (

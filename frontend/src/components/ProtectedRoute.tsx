@@ -22,10 +22,10 @@ interface ProtectedRouteProps {
  * @example
  * ```tsx
  * <Route
- *   path="/dashboard"
+ *   path="/protected"
  *   element={
  *     <ProtectedRoute>
- *       <DashboardPage />
+ *       <ProtectedComponent />
  *     </ProtectedRoute>
  *   }
  * />

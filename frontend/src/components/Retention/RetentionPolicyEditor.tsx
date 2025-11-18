@@ -29,9 +29,7 @@ export const RetentionPolicyEditor: React.FC<RetentionPolicyEditorProps> = ({
     policy || getDefaultRetentionPolicy()
   )
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [activeTab, setActiveTab] = useState<
-    'basic' | 'scope' | 'actions' | 'compliance'
-  >('basic')
+  const [activeTab, setActiveTab] = useState<'basic' | 'scope' | 'actions' | 'compliance'>('basic')
 
   useEffect(() => {
     if (policy) {
@@ -133,15 +131,7 @@ export const RetentionPolicyEditor: React.FC<RetentionPolicyEditorProps> = ({
 
   const securityLevelOptions = ['Public', 'Internal', 'Confidential', 'Highly Confidential']
 
-  const complianceOptions = [
-    'GDPR',
-    'HIPAA',
-    'SOX',
-    'PCI-DSS',
-    'ISO-27001',
-    'FIPS-140-3',
-    'SOC 2',
-  ]
+  const complianceOptions = ['GDPR', 'HIPAA', 'SOX', 'PCI-DSS', 'ISO-27001', 'FIPS-140-3', 'SOC 2']
 
   const renderBasicTab = () => (
     <div className="space-y-6">
@@ -203,9 +193,7 @@ export const RetentionPolicyEditor: React.FC<RetentionPolicyEditorProps> = ({
           }`}
           disabled={mode === 'view'}
         />
-        {errors.description && (
-          <p className="text-sm text-red-600 mt-1">{errors.description}</p>
-        )}
+        {errors.description && <p className="text-sm text-red-600 mt-1">{errors.description}</p>}
       </div>
 
       {/* Retention Period */}
@@ -220,9 +208,7 @@ export const RetentionPolicyEditor: React.FC<RetentionPolicyEditorProps> = ({
               type="number"
               min="1"
               value={formData.retentionPeriod?.value || ''}
-              onChange={(e) =>
-                handleRetentionPeriodChange('value', parseInt(e.target.value) || 0)
-              }
+              onChange={(e) => handleRetentionPeriodChange('value', parseInt(e.target.value) || 0)}
               placeholder="Duration"
               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white ${
                 errors.retentionPeriod
@@ -308,9 +294,7 @@ export const RetentionPolicyEditor: React.FC<RetentionPolicyEditorProps> = ({
                   const current = formData.documentTypes || []
                   handleInputChange(
                     'documentTypes',
-                    e.target.checked
-                      ? [...current, type]
-                      : current.filter((t) => t !== type)
+                    e.target.checked ? [...current, type] : current.filter((t) => t !== type)
                   )
                 }}
                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
@@ -350,9 +334,7 @@ export const RetentionPolicyEditor: React.FC<RetentionPolicyEditorProps> = ({
             </label>
           ))}
         </div>
-        {errors.departments && (
-          <p className="text-sm text-red-600 mt-1">{errors.departments}</p>
-        )}
+        {errors.departments && <p className="text-sm text-red-600 mt-1">{errors.departments}</p>}
       </div>
 
       {/* Security Levels */}
@@ -394,9 +376,7 @@ export const RetentionPolicyEditor: React.FC<RetentionPolicyEditorProps> = ({
         </label>
         <select
           value={formData.primaryAction || 'archive'}
-          onChange={(e) =>
-            handleInputChange('primaryAction', e.target.value as RetentionAction)
-          }
+          onChange={(e) => handleInputChange('primaryAction', e.target.value as RetentionAction)}
           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
           disabled={mode === 'view'}
         >
@@ -460,9 +440,7 @@ export const RetentionPolicyEditor: React.FC<RetentionPolicyEditorProps> = ({
           type="number"
           min="0"
           value={formData.notifyBeforeDays || ''}
-          onChange={(e) =>
-            handleInputChange('notifyBeforeDays', parseInt(e.target.value) || 0)
-          }
+          onChange={(e) => handleInputChange('notifyBeforeDays', parseInt(e.target.value) || 0)}
           placeholder="30"
           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
           disabled={mode === 'view'}

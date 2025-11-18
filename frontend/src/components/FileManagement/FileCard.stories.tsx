@@ -238,7 +238,12 @@ export const MultipleFilesGrid: Story = {
       <FileCard item={mockFileItem} viewMode="grid" showCheckbox />
       <FileCard item={mockFolderItem} viewMode="grid" showCheckbox />
       <FileCard
-        item={{ ...mockFileItem, id: '3', confidentialityLevel: 'Highly Confidential', isLocked: true }}
+        item={{
+          ...mockFileItem,
+          id: '3',
+          confidentialityLevel: 'Highly Confidential',
+          isLocked: true,
+        }}
         viewMode="grid"
         showCheckbox
       />
@@ -257,7 +262,12 @@ export const MultipleFilesList: Story = {
       <FileCard item={mockFileItem} viewMode="list" showCheckbox />
       <FileCard item={mockFolderItem} viewMode="list" showCheckbox />
       <FileCard
-        item={{ ...mockFileItem, id: '3', confidentialityLevel: 'Highly Confidential', isLocked: true }}
+        item={{
+          ...mockFileItem,
+          id: '3',
+          confidentialityLevel: 'Highly Confidential',
+          isLocked: true,
+        }}
         viewMode="list"
         showCheckbox
       />

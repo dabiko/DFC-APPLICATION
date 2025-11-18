@@ -4,11 +4,7 @@
  */
 
 import { FC, useState } from 'react'
-import {
-  ChevronDownIcon,
-  ChevronUpIcon,
-  XMarkIcon,
-} from '@heroicons/react/24/outline'
+import { ChevronDownIcon, ChevronUpIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { cn } from '@utils/cn'
 import type { SearchFiltersPanelProps, SearchFilters, FacetCount } from '@/types/search'
 import { FILE_SIZE_RANGES, DATE_RANGE_PRESETS } from '@/types/search'
@@ -54,11 +50,7 @@ export const SearchFiltersPanel: FC<SearchFiltersPanelProps> = ({
     handleFilterChange(key, updated.length > 0 ? updated : undefined)
   }
 
-  const renderFilterSection = (
-    title: string,
-    key: string,
-    content: React.ReactNode
-  ) => {
+  const renderFilterSection = (title: string, key: string, content: React.ReactNode) => {
     const isExpanded = expandedSections.has(key)
 
     return (
@@ -87,11 +79,14 @@ export const SearchFiltersPanel: FC<SearchFiltersPanelProps> = ({
     if (!facetCounts) return null
 
     return facetCounts.map((facet) => (
-      <label key={facet.value} className="flex items-center justify-between gap-2 cursor-pointer group">
+      <label
+        key={facet.value}
+        className="flex items-center justify-between gap-2 cursor-pointer group"
+      >
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <input
             type="checkbox"
-            checked={(filters[facetKey] as string[] || []).includes(facet.value)}
+            checked={((filters[facetKey] as string[]) || []).includes(facet.value)}
             onChange={(e) => handleCheckboxChange(facetKey, facet.value, e.target.checked)}
             className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
           />
@@ -126,7 +121,12 @@ export const SearchFiltersPanel: FC<SearchFiltersPanelProps> = ({
   }
 
   return (
-    <div className={cn('bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg', className)}>
+    <div
+      className={cn(
+        'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg',
+        className
+      )}
+    >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-2">
@@ -175,7 +175,8 @@ export const SearchFiltersPanel: FC<SearchFiltersPanelProps> = ({
         )}
 
         {/* Departments */}
-        {facets?.departments && facets.departments.length > 0 &&
+        {facets?.departments &&
+          facets.departments.length > 0 &&
           renderFilterSection(
             'Department',
             'departments',
@@ -183,7 +184,8 @@ export const SearchFiltersPanel: FC<SearchFiltersPanelProps> = ({
           )}
 
         {/* File Types */}
-        {facets?.fileTypes && facets.fileTypes.length > 0 &&
+        {facets?.fileTypes &&
+          facets.fileTypes.length > 0 &&
           renderFilterSection(
             'File Type',
             'fileTypes',
@@ -248,7 +250,10 @@ export const SearchFiltersPanel: FC<SearchFiltersPanelProps> = ({
             'File Size',
             'fileSize',
             Object.entries(FILE_SIZE_RANGES).map(([key, range]) => (
-              <label key={key} className="flex items-center justify-between gap-2 cursor-pointer group">
+              <label
+                key={key}
+                className="flex items-center justify-between gap-2 cursor-pointer group"
+              >
                 <div className="flex items-center gap-2">
                   <input
                     type="checkbox"

@@ -68,12 +68,10 @@ export const flattenFolderTree = (
 
     // Recursively add children if expanded
     if (isExpanded && folder.children && folder.children.length > 0) {
-      const childNodes = flattenFolderTree(
-        folder.children,
-        expandedIds,
-        depth + 1,
-        [...parentPath, folder.id]
-      )
+      const childNodes = flattenFolderTree(folder.children, expandedIds, depth + 1, [
+        ...parentPath,
+        folder.id,
+      ])
       result.push(...childNodes)
     }
   })
@@ -264,7 +262,9 @@ export const getDescendantIds = (folder: Folder): string[] => {
 /**
  * Calculate folder statistics
  */
-export const calculateFolderStats = (folder: Folder): { totalFolders: number; totalDocuments: number; maxDepth: number } => {
+export const calculateFolderStats = (
+  folder: Folder
+): { totalFolders: number; totalDocuments: number; maxDepth: number } => {
   let totalFolders = 1
   let totalDocuments = folder.documentCount
   let maxDepth = 0

@@ -5,7 +5,6 @@
 
 import { FC, useState, useMemo, useCallback, useEffect } from 'react'
 import { List, useListRef } from 'react-window'
-import type { ListImperativeAPI } from 'react-window'
 import { FolderTreeItem } from './FolderTreeItem'
 import { FolderContextMenu } from './FolderContextMenu'
 import { Spinner } from '@components/Feedback/Spinner'
@@ -30,7 +29,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
   onFolderSelect,
   onFolderExpand,
   onFolderOperation,
-  enableDragDrop = false,
+  enableDragDrop: _enableDragDrop = false,
   enableContextMenu = true,
   enableVirtualization = true,
   maxHeight = 600,
@@ -47,7 +46,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
     contextMenuPosition: null,
   })
 
-  const [isLoading, setIsLoading] = useState(false)
+  const [_isLoading, _setIsLoading] = useState(false)
   const listRef = useListRef()
 
   // Update selected folder when prop changes
@@ -62,16 +61,6 @@ export const FolderTree: FC<FolderTreeProps> = ({
     // Apply search filter
     if (searchQuery.trim()) {
       tree = filterFoldersBySearch(tree, searchQuery)
-      // Auto-expand all folders when searching
-      const allIds = new Set<string>()
-      const collectIds = (folderList: Folder[]) => {
-        folderList.forEach((f) => {
-          allIds.add(f.id)
-          if (f.children) collectIds(f.children)
-        })
-      }
-      collectIds(tree)
-      setState((prev) => ({ ...prev, expandedIds: allIds }))
     }
 
     // Sort folders
@@ -79,6 +68,21 @@ export const FolderTree: FC<FolderTreeProps> = ({
 
     return tree
   }, [folders, searchQuery])
+
+  // Auto-expand all folders when searching
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      const allIds = new Set<string>()
+      const collectIds = (folderList: Folder[]) => {
+        folderList.forEach((f) => {
+          allIds.add(f.id)
+          if (f.children) collectIds(f.children)
+        })
+      }
+      collectIds(folderTree)
+      setState((prev) => ({ ...prev, expandedIds: allIds }))
+    }
+  }, [searchQuery, folderTree])
 
   // Flatten tree for virtualization
   const flattenedTree = useMemo(() => {
@@ -302,12 +306,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
     return (
       <div className="flex flex-col items-center justify-center h-64 text-center px-4">
         <div className="text-gray-400 dark:text-gray-600 mb-2">
-          <svg
-            className="w-16 h-16 mx-auto"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
+          <svg className="w-16 h-16 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -371,7 +370,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
       tabIndex={0}
       style={{ maxHeight: `${maxHeight}px`, overflowY: 'auto' }}
     >
-      {flattenedTree.map((node, index) => (
+      {flattenedTree.map((node, _index) => (
         <FolderTreeItem
           key={node.folder.id}
           folder={node.folder}

@@ -472,7 +472,9 @@ export const getDocumentTypeInfo = (type: DocumentType): DocumentTypeInfo | unde
   return DOCUMENT_TYPES.find((t) => t.value === type)
 }
 
-export const getRetentionPeriodInfo = (period: RetentionPeriod): RetentionPeriodInfo | undefined => {
+export const getRetentionPeriodInfo = (
+  period: RetentionPeriod
+): RetentionPeriodInfo | undefined => {
   return RETENTION_PERIODS.find((p) => p.value === period)
 }
 

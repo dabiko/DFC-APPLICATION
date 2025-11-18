@@ -48,11 +48,7 @@ export type ComplianceStandard =
 /**
  * Encryption Policy Type
  */
-export type EncryptionPolicyType =
-  | 'mandatory'
-  | 'optional'
-  | 'automatic'
-  | 'disabled'
+export type EncryptionPolicyType = 'mandatory' | 'optional' | 'automatic' | 'disabled'
 
 /**
  * Key Rotation Frequency

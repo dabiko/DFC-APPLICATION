@@ -77,9 +77,7 @@ export const RetentionPolicyList: React.FC<RetentionPolicyListProps> = ({
           {/* Header */}
           <div className="flex items-start justify-between mb-3">
             <div className="flex-1">
-              <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
-                {policy.name}
-              </h3>
+              <h3 className="font-semibold text-gray-900 dark:text-white mb-1">{policy.name}</h3>
               {getStatusBadge(policy.status)}
             </div>
             <div className="flex items-center gap-1 ml-2">
@@ -126,9 +124,7 @@ export const RetentionPolicyList: React.FC<RetentionPolicyListProps> = ({
               <span>{formatRetentionPeriod(policy.retentionPeriod)}</span>
             </div>
             <span className="text-gray-400">•</span>
-            <span className="text-gray-600 dark:text-gray-400">
-              {policy.primaryAction}
-            </span>
+            <span className="text-gray-600 dark:text-gray-400">{policy.primaryAction}</span>
           </div>
 
           {/* Documents Affected */}
@@ -237,9 +233,7 @@ export const RetentionPolicyList: React.FC<RetentionPolicyListProps> = ({
             >
               <td className="px-6 py-4">
                 <div>
-                  <div className="font-medium text-gray-900 dark:text-white">
-                    {policy.name}
-                  </div>
+                  <div className="font-medium text-gray-900 dark:text-white">{policy.name}</div>
                   <div className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1">
                     {policy.description}
                   </div>
@@ -343,11 +337,7 @@ export const RetentionPolicyList: React.FC<RetentionPolicyListProps> = ({
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
-                        if (
-                          window.confirm(
-                            `Are you sure you want to delete "${policy.name}"?`
-                          )
-                        ) {
+                        if (window.confirm(`Are you sure you want to delete "${policy.name}"?`)) {
                           onDeletePolicy(policy.id)
                         }
                       }}
@@ -384,9 +374,7 @@ export const RetentionPolicyList: React.FC<RetentionPolicyListProps> = ({
         >
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <h4 className="font-medium text-gray-900 dark:text-white truncate">
-                {policy.name}
-              </h4>
+              <h4 className="font-medium text-gray-900 dark:text-white truncate">{policy.name}</h4>
               {getStatusBadge(policy.status)}
             </div>
             <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
@@ -477,8 +465,8 @@ export const RetentionPolicyList: React.FC<RetentionPolicyListProps> = ({
           </h2>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
             {policies.length} {policies.length === 1 ? 'policy' : 'policies'} •{' '}
-            {policies.reduce((sum, p) => sum + p.documentsAffected, 0).toLocaleString()}{' '}
-            documents affected
+            {policies.reduce((sum, p) => sum + p.documentsAffected, 0).toLocaleString()} documents
+            affected
           </p>
         </div>
         {onCreatePolicy && (

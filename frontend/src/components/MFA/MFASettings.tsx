@@ -46,7 +46,11 @@ export const MFASettings: React.FC<MFASettingsProps> = ({
   }
 
   const handleRegenerateCodes = async () => {
-    if (confirm('Are you sure you want to regenerate your backup codes? Your old codes will no longer work.')) {
+    if (
+      confirm(
+        'Are you sure you want to regenerate your backup codes? Your old codes will no longer work.'
+      )
+    ) {
       try {
         await onRegenerateBackupCodes()
       } catch (error) {
@@ -227,7 +231,8 @@ export const MFASettings: React.FC<MFASettingsProps> = ({
               <div className="flex gap-2">
                 <ExclamationTriangleIcon className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0" />
                 <p className="text-sm text-red-700 dark:text-red-300">
-                  Disabling MFA will make your account less secure. Your backup codes will no longer work.
+                  Disabling MFA will make your account less secure. Your backup codes will no longer
+                  work.
                 </p>
               </div>
             </div>

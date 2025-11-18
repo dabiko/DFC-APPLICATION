@@ -4,7 +4,12 @@
  */
 
 import { FC, useState } from 'react'
-import { ChevronRightIcon, HomeIcon, DocumentDuplicateIcon, CheckIcon } from '@heroicons/react/24/outline'
+import {
+  ChevronRightIcon,
+  HomeIcon,
+  DocumentDuplicateIcon,
+  CheckIcon,
+} from '@heroicons/react/24/outline'
 import type { Folder } from '@/types/folder'
 import copy from 'copy-to-clipboard'
 
@@ -108,7 +113,10 @@ export const FolderBreadcrumbs: FC<FolderBreadcrumbsProps> = ({
               </li>
 
               {!isLast && (
-                <li className="flex items-center text-gray-400 dark:text-gray-600" aria-hidden="true">
+                <li
+                  className="flex items-center text-gray-400 dark:text-gray-600"
+                  aria-hidden="true"
+                >
                   <ChevronRightIcon className="w-4 h-4" />
                 </li>
               )}

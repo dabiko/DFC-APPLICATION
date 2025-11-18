@@ -140,7 +140,8 @@ export const Interactive: Story = {
     return (
       <div className="space-y-4">
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
-          <strong>Interactive Demo:</strong> Select a report type, date range, and generate reports. Download using CSV or PDF options.
+          <strong>Interactive Demo:</strong> Select a report type, date range, and generate reports.
+          Download using CSV or PDF options.
         </div>
 
         <ComplianceReportGenerator

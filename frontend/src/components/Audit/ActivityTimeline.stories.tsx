@@ -80,7 +80,10 @@ const mockTimelineEvents: TimelineEvent[] = [
     userName: 'John Doe',
     color: 'yellow',
     relatedEntries: [
-      createMockEntry('permission_granted', new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()),
+      createMockEntry(
+        'permission_granted',
+        new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
+      ),
     ],
   },
   {
@@ -93,7 +96,10 @@ const mockTimelineEvents: TimelineEvent[] = [
     userName: 'Bob Johnson',
     color: 'green',
     relatedEntries: [
-      createMockEntry('document_created', new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()),
+      createMockEntry(
+        'document_created',
+        new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+      ),
     ],
   },
 ]
@@ -167,7 +173,8 @@ export const Interactive: Story = {
     return (
       <div className="space-y-4">
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
-          <strong>Interactive Demo:</strong> Click events to see details, use "Load More" to fetch additional events.
+          <strong>Interactive Demo:</strong> Click events to see details, use "Load More" to fetch
+          additional events.
         </div>
 
         <ActivityTimeline

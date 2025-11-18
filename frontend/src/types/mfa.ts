@@ -387,9 +387,7 @@ export function isDeviceTrustExpiring(expiresAt?: string, daysThreshold = 7): bo
   if (!expiresAt) return false
   const expiry = new Date(expiresAt)
   const now = new Date()
-  const daysUntilExpiry = Math.ceil(
-    (expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-  )
+  const daysUntilExpiry = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
   return daysUntilExpiry > 0 && daysUntilExpiry <= daysThreshold
 }
 
@@ -530,9 +528,13 @@ export function printBackupCodes(codes: string[]): void {
           ⚠️ Save these codes in a secure location. Each code can only be used once.
         </div>
         <div class="codes">
-          ${codes.map((code, i) => `
+          ${codes
+            .map(
+              (code, i) => `
             <div class="code">${i + 1}. ${formatBackupCode(code)}</div>
-          `).join('')}
+          `
+            )
+            .join('')}
         </div>
         <p style="text-align: center; color: #666;">
           Generated: ${new Date().toLocaleString()}

@@ -204,7 +204,9 @@ export const SecurityBadge: FC<SecurityBadgeProps> = ({
       text += `Encryption: ${ENCRYPTION_STATUS_LABELS[status]}`
     }
     if (securityLevel) {
-      text += text ? ` | Security: ${SECURITY_LEVEL_LABELS[securityLevel]}` : `Security: ${SECURITY_LEVEL_LABELS[securityLevel]}`
+      text += text
+        ? ` | Security: ${SECURITY_LEVEL_LABELS[securityLevel]}`
+        : `Security: ${SECURITY_LEVEL_LABELS[securityLevel]}`
     }
     if (strength) {
       text += text ? ` | Strength: ${strength}` : `Strength: ${strength}`

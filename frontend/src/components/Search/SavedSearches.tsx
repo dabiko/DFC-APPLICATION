@@ -64,10 +64,7 @@ export const SavedSearches: FC<SavedSearchesProps> = ({
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => onExecute(search)}
-                  className="text-left flex-1 min-w-0"
-                >
+                <button onClick={() => onExecute(search)} className="text-left flex-1 min-w-0">
                   <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate hover:text-primary-600 dark:hover:text-primary-400">
                     {search.name}
                   </h3>
@@ -98,12 +95,15 @@ export const SavedSearches: FC<SavedSearchesProps> = ({
 
               {/* Metadata */}
               <div className="mt-2 flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-                <span>Updated {formatDistanceToNow(new Date(search.updatedAt), { addSuffix: true })}</span>
+                <span>
+                  Updated {formatDistanceToNow(new Date(search.updatedAt), { addSuffix: true })}
+                </span>
                 {search.lastExecutedAt && (
                   <>
                     <span>•</span>
                     <span>
-                      Last used {formatDistanceToNow(new Date(search.lastExecutedAt), { addSuffix: true })}
+                      Last used{' '}
+                      {formatDistanceToNow(new Date(search.lastExecutedAt), { addSuffix: true })}
                     </span>
                   </>
                 )}

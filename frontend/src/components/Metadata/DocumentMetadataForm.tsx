@@ -189,7 +189,8 @@ export const DocumentMetadataForm: FC<MetadataFormProps> = ({
             onBlur={() => handleBlur('identifier')}
             error={touched.identifier ? errors.identifier : undefined}
             placeholder={
-              IDENTIFIER_TYPES.find((t) => t.value === formData.identifierType)?.format || 'Enter identifier'
+              IDENTIFIER_TYPES.find((t) => t.value === formData.identifierType)?.format ||
+              'Enter identifier'
             }
             required
             disabled={isLoading}

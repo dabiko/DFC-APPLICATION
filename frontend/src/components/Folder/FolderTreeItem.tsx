@@ -192,10 +192,7 @@ export const FolderTreeItem: FC<FolderTreeItemProps> = memo(
 
         {/* Lock Indicator */}
         {showLockIndicator && folder.isLocked && (
-          <div
-            className="flex-shrink-0 text-red-500 dark:text-red-400"
-            title="Folder is locked"
-          >
+          <div className="flex-shrink-0 text-red-500 dark:text-red-400" title="Folder is locked">
             <LockClosedIcon className="w-4 h-4" />
           </div>
         )}

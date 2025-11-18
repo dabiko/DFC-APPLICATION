@@ -514,10 +514,7 @@ export interface HoldReleaseWorkflowProps {
 // Helper Functions
 // ============================================================================
 
-export function calculateRetentionEndDate(
-  startDate: string,
-  period: RetentionPeriod
-): Date {
+export function calculateRetentionEndDate(startDate: string, period: RetentionPeriod): Date {
   const start = new Date(startDate)
   const end = new Date(start)
 
@@ -561,17 +558,12 @@ export function getLifecycleStageLabel(stage: DocumentLifecycleStage): string {
   return labels[stage]
 }
 
-export function getLifecycleStageColor(
-  stage: DocumentLifecycleStage
-): {
+export function getLifecycleStageColor(stage: DocumentLifecycleStage): {
   bg: string
   text: string
   border: string
 } {
-  const colors: Record<
-    DocumentLifecycleStage,
-    { bg: string; text: string; border: string }
-  > = {
+  const colors: Record<DocumentLifecycleStage, { bg: string; text: string; border: string }> = {
     active: {
       bg: 'bg-green-100 dark:bg-green-900/30',
       text: 'text-green-800 dark:text-green-300',
@@ -666,10 +658,7 @@ export function getComplianceStatusColor(status: ComplianceStatus): {
   text: string
   border: string
 } {
-  const colors: Record<
-    ComplianceStatus,
-    { bg: string; text: string; border: string }
-  > = {
+  const colors: Record<ComplianceStatus, { bg: string; text: string; border: string }> = {
     compliant: {
       bg: 'bg-green-100 dark:bg-green-900/30',
       text: 'text-green-800 dark:text-green-300',
@@ -694,9 +683,7 @@ export function getComplianceStatusColor(status: ComplianceStatus): {
   return colors[status]
 }
 
-export function getViolationSeverityColor(
-  severity: 'low' | 'medium' | 'high' | 'critical'
-): {
+export function getViolationSeverityColor(severity: 'low' | 'medium' | 'high' | 'critical'): {
   bg: string
   text: string
   border: string

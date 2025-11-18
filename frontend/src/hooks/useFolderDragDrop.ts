@@ -4,17 +4,8 @@
  */
 
 import { useState, useCallback } from 'react'
-import {
-  PointerSensor,
-  KeyboardSensor,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core'
-import type {
-  DragEndEvent,
-  DragOverEvent,
-  DragStartEvent,
-} from '@dnd-kit/core'
+import { PointerSensor, KeyboardSensor, useSensor, useSensors } from '@dnd-kit/core'
+import type { DragEndEvent, DragOverEvent, DragStartEvent } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import type { Folder, FolderDragData, FolderDropResult } from '@/types/folder'
 import { canMoveFolder, findFolderById } from '@/utils/folderTree'
@@ -267,15 +258,8 @@ export const useFolderDragDrop = ({
 
 // Export sortable folder hook for use in FolderTreeItem
 export const useSortableFolder = (folderId: string) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-    isOver,
-  } = useSortable({ id: folderId })
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging, isOver } =
+    useSortable({ id: folderId })
 
   const style = {
     transform: CSS.Transform.toString(transform),

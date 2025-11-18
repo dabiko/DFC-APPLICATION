@@ -19,7 +19,8 @@ const mockPolicies: RetentionPolicy[] = [
   {
     id: 'policy-1',
     name: 'Financial Records Retention',
-    description: 'Retention policy for all financial documents including invoices, statements, and tax records',
+    description:
+      'Retention policy for all financial documents including invoices, statements, and tax records',
     status: 'active',
     version: 1,
     createdAt: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString(),
@@ -161,7 +162,8 @@ export const Interactive: Story = {
     return (
       <div className="space-y-4">
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
-          <strong>Interactive Demo:</strong> Select policies, toggle status, and interact with the list
+          <strong>Interactive Demo:</strong> Select policies, toggle status, and interact with the
+          list
         </div>
         <RetentionPolicyList
           policies={policies}
@@ -176,9 +178,7 @@ export const Interactive: Story = {
           onToggleStatus={(id) => {
             setPolicies(
               policies.map((p) =>
-                p.id === id
-                  ? { ...p, status: p.status === 'active' ? 'inactive' : 'active' }
-                  : p
+                p.id === id ? { ...p, status: p.status === 'active' ? 'inactive' : 'active' } : p
               )
             )
           }}

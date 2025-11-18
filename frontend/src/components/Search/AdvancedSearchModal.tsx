@@ -24,9 +24,7 @@ export const AdvancedSearchModal: FC<AdvancedSearchModalProps> = ({
     ...initialQuery,
   })
 
-  const [filters, setFilters] = useState<SearchFilters>(
-    initialQuery?.filters || {}
-  )
+  const [filters, setFilters] = useState<SearchFilters>(initialQuery?.filters || {})
 
   const handleQueryChange = (field: keyof SearchQuery, value: unknown) => {
     setQuery({ ...query, [field]: value })
@@ -185,7 +183,14 @@ export const AdvancedSearchModal: FC<AdvancedSearchModalProps> = ({
                           Document Type
                         </label>
                         <div className="grid grid-cols-3 gap-2">
-                          {['Invoice', 'Contract', 'Report', 'KYC Record', 'Identification', 'Statement'].map((type) => (
+                          {[
+                            'Invoice',
+                            'Contract',
+                            'Report',
+                            'KYC Record',
+                            'Identification',
+                            'Statement',
+                          ].map((type) => (
                             <label key={type} className="flex items-center gap-2 cursor-pointer">
                               <input
                                 type="checkbox"
@@ -193,7 +198,9 @@ export const AdvancedSearchModal: FC<AdvancedSearchModalProps> = ({
                                 onChange={() => handleArrayFilterChange('documentTypes', type)}
                                 className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                               />
-                              <span className="text-sm text-gray-700 dark:text-gray-300">{type}</span>
+                              <span className="text-sm text-gray-700 dark:text-gray-300">
+                                {type}
+                              </span>
                             </label>
                           ))}
                         </div>
@@ -205,17 +212,23 @@ export const AdvancedSearchModal: FC<AdvancedSearchModalProps> = ({
                           Confidentiality Level
                         </label>
                         <div className="grid grid-cols-2 gap-2">
-                          {['Public', 'Internal', 'Confidential', 'Highly Confidential'].map((level) => (
-                            <label key={level} className="flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={(filters.confidentialityLevels || []).includes(level)}
-                                onChange={() => handleArrayFilterChange('confidentialityLevels', level)}
-                                className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                              />
-                              <span className="text-sm text-gray-700 dark:text-gray-300">{level}</span>
-                            </label>
-                          ))}
+                          {['Public', 'Internal', 'Confidential', 'Highly Confidential'].map(
+                            (level) => (
+                              <label key={level} className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={(filters.confidentialityLevels || []).includes(level)}
+                                  onChange={() =>
+                                    handleArrayFilterChange('confidentialityLevels', level)
+                                  }
+                                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                />
+                                <span className="text-sm text-gray-700 dark:text-gray-300">
+                                  {level}
+                                </span>
+                              </label>
+                            )
+                          )}
                         </div>
                       </div>
 
@@ -277,11 +290,15 @@ export const AdvancedSearchModal: FC<AdvancedSearchModalProps> = ({
                           <Input
                             type="number"
                             label="Min"
-                            value={filters.sizeRange?.min ? filters.sizeRange.min / (1024 * 1024) : ''}
+                            value={
+                              filters.sizeRange?.min ? filters.sizeRange.min / (1024 * 1024) : ''
+                            }
                             onChange={(e) =>
                               handleFilterChange('sizeRange', {
                                 ...filters.sizeRange,
-                                min: e.target.value ? parseFloat(e.target.value) * 1024 * 1024 : undefined,
+                                min: e.target.value
+                                  ? parseFloat(e.target.value) * 1024 * 1024
+                                  : undefined,
                               })
                             }
                             placeholder="0"
@@ -289,11 +306,15 @@ export const AdvancedSearchModal: FC<AdvancedSearchModalProps> = ({
                           <Input
                             type="number"
                             label="Max"
-                            value={filters.sizeRange?.max ? filters.sizeRange.max / (1024 * 1024) : ''}
+                            value={
+                              filters.sizeRange?.max ? filters.sizeRange.max / (1024 * 1024) : ''
+                            }
                             onChange={(e) =>
                               handleFilterChange('sizeRange', {
                                 ...filters.sizeRange,
-                                max: e.target.value ? parseFloat(e.target.value) * 1024 * 1024 : undefined,
+                                max: e.target.value
+                                  ? parseFloat(e.target.value) * 1024 * 1024
+                                  : undefined,
                               })
                             }
                             placeholder="500"
@@ -311,25 +332,35 @@ export const AdvancedSearchModal: FC<AdvancedSearchModalProps> = ({
                             <input
                               type="checkbox"
                               checked={filters.hasVersions || false}
-                              onChange={(e) => handleFilterChange('hasVersions', e.target.checked || undefined)}
+                              onChange={(e) =>
+                                handleFilterChange('hasVersions', e.target.checked || undefined)
+                              }
                               className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                             />
-                            <span className="text-sm text-gray-700 dark:text-gray-300">Has versions</span>
+                            <span className="text-sm text-gray-700 dark:text-gray-300">
+                              Has versions
+                            </span>
                           </label>
                           <label className="flex items-center gap-2 cursor-pointer">
                             <input
                               type="checkbox"
                               checked={filters.isShared || false}
-                              onChange={(e) => handleFilterChange('isShared', e.target.checked || undefined)}
+                              onChange={(e) =>
+                                handleFilterChange('isShared', e.target.checked || undefined)
+                              }
                               className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                             />
-                            <span className="text-sm text-gray-700 dark:text-gray-300">Shared with me</span>
+                            <span className="text-sm text-gray-700 dark:text-gray-300">
+                              Shared with me
+                            </span>
                           </label>
                           <label className="flex items-center gap-2 cursor-pointer">
                             <input
                               type="checkbox"
                               checked={filters.isLocked || false}
-                              onChange={(e) => handleFilterChange('isLocked', e.target.checked || undefined)}
+                              onChange={(e) =>
+                                handleFilterChange('isLocked', e.target.checked || undefined)
+                              }
                               className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                             />
                             <span className="text-sm text-gray-700 dark:text-gray-300">Locked</span>

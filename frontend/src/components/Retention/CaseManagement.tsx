@@ -1,9 +1,7 @@
 import React, { useState } from 'react'
 import {
   DocumentPlusIcon,
-  DocumentMinusIcon,
   BellIcon,
-  ClockIcon,
   UserIcon,
   CheckCircleIcon,
   XCircleIcon,
@@ -89,7 +87,10 @@ export const CaseManagement: React.FC<CaseManagementProps> = ({
           </label>
           <div className="space-y-1">
             {hold.custodians.map((custodian, i) => (
-              <div key={i} className="text-sm text-gray-900 dark:text-white flex items-center gap-2">
+              <div
+                key={i}
+                className="text-sm text-gray-900 dark:text-white flex items-center gap-2"
+              >
                 <UserIcon className="w-4 h-4 text-gray-400" />
                 {custodian}
               </div>
@@ -102,7 +103,9 @@ export const CaseManagement: React.FC<CaseManagementProps> = ({
           </label>
           <div className="space-y-1">
             {hold.legalCounsel.map((counsel, i) => (
-              <div key={i} className="text-sm text-gray-900 dark:text-white">{counsel}</div>
+              <div key={i} className="text-sm text-gray-900 dark:text-white">
+                {counsel}
+              </div>
             ))}
           </div>
         </div>
@@ -112,7 +115,9 @@ export const CaseManagement: React.FC<CaseManagementProps> = ({
           </label>
           <div className="space-y-1">
             {hold.reviewers.map((reviewer, i) => (
-              <div key={i} className="text-sm text-gray-900 dark:text-white">{reviewer}</div>
+              <div key={i} className="text-sm text-gray-900 dark:text-white">
+                {reviewer}
+              </div>
             ))}
           </div>
         </div>
@@ -204,8 +209,7 @@ export const CaseManagement: React.FC<CaseManagementProps> = ({
             Notifications ({hold.notificationsSent})
           </div>
           <div className="text-sm text-gray-600 dark:text-gray-400">
-            {hold.acknowledgedBy.length} acknowledged •{' '}
-            {hold.pendingAcknowledgment.length} pending
+            {hold.acknowledgedBy.length} acknowledged • {hold.pendingAcknowledgment.length} pending
           </div>
         </div>
         {!readonly && onSendNotification && (

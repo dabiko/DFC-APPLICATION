@@ -62,9 +62,7 @@ export const HoldReleaseWorkflow: React.FC<HoldReleaseWorkflowProps> = ({
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
             <span className="text-gray-600 dark:text-gray-400">Case:</span>
-            <span className="ml-2 font-medium text-gray-900 dark:text-white">
-              {hold.caseName}
-            </span>
+            <span className="ml-2 font-medium text-gray-900 dark:text-white">{hold.caseName}</span>
           </div>
           <div>
             <span className="text-gray-600 dark:text-gray-400">Case #:</span>
@@ -107,9 +105,7 @@ export const HoldReleaseWorkflow: React.FC<HoldReleaseWorkflowProps> = ({
 
       {showRequestForm && (
         <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-blue-50 dark:bg-blue-900/20">
-          <h4 className="font-medium text-gray-900 dark:text-white mb-4">
-            Submit Release Request
-          </h4>
+          <h4 className="font-medium text-gray-900 dark:text-white mb-4">Submit Release Request</h4>
 
           <div className="space-y-4">
             {/* Release Scope */}

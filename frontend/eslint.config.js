@@ -39,6 +39,9 @@ export default defineConfig([
         {
           argsIgnorePattern: '^_',
           varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+          destructuredArrayIgnorePattern: '^_',
+          ignoreRestSiblings: true,
         },
       ],
       '@typescript-eslint/explicit-module-boundary-types': 'off',
@@ -49,6 +52,8 @@ export default defineConfig([
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       'prefer-const': 'error',
       'no-var': 'error',
+      'no-control-regex': 'warn',
+      'no-case-declarations': 'error',
 
       // Prettier integration
       'prettier/prettier': 'error',

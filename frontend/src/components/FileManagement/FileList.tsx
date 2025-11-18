@@ -17,8 +17,8 @@ export const FileList: FC<FileListProps> = ({
   onItemClick,
   onItemDoubleClick,
   onSelectionChange,
-  onSortChange,
-  onViewModeChange,
+  onSortChange: _onSortChange,
+  onViewModeChange: _onViewModeChange,
   isLoading = false,
   emptyState,
   className,
@@ -59,9 +59,9 @@ export const FileList: FC<FileListProps> = ({
   }
 
   // Handle favorite toggle
-  const handleFavoriteToggle = (itemId: string) => {
+  const handleFavoriteToggle = (_itemId: string) => {
     // This would typically call an API to toggle favorite status
-    console.log('Toggle favorite:', itemId)
+    // TODO: Implement favorite toggle API call
   }
 
   // Sort items
@@ -84,10 +84,11 @@ export const FileList: FC<FileListProps> = ({
       case 'dateCreated':
         comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
         break
-      case 'confidentiality':
+      case 'confidentiality': {
         const levels = ['Public', 'Internal', 'Confidential', 'Highly Confidential']
         comparison = levels.indexOf(a.confidentialityLevel) - levels.indexOf(b.confidentialityLevel)
         break
+      }
       default:
         comparison = 0
     }
@@ -133,7 +134,9 @@ export const FileList: FC<FileListProps> = ({
                 d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"
               />
             </svg>
-            <h3 className="mt-2 text-sm font-semibold text-gray-900 dark:text-gray-100">No files</h3>
+            <h3 className="mt-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
+              No files
+            </h3>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               Get started by uploading a file or creating a folder.
             </p>

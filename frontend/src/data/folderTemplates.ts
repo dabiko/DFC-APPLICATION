@@ -18,20 +18,12 @@ export const FOLDER_TEMPLATES: FolderTemplate[] = [
       {
         name: 'Planning',
         confidentiality: 'internal',
-        children: [
-          { name: 'Requirements' },
-          { name: 'Proposals' },
-          { name: 'Budget' },
-        ],
+        children: [{ name: 'Requirements' }, { name: 'Proposals' }, { name: 'Budget' }],
       },
       {
         name: 'Documents',
         confidentiality: 'internal',
-        children: [
-          { name: 'Drafts' },
-          { name: 'Final' },
-          { name: 'References' },
-        ],
+        children: [{ name: 'Drafts' }, { name: 'Final' }, { name: 'References' }],
       },
       {
         name: 'Reports',
@@ -45,11 +37,7 @@ export const FOLDER_TEMPLATES: FolderTemplate[] = [
       {
         name: 'Meetings',
         confidentiality: 'internal',
-        children: [
-          { name: 'Agendas' },
-          { name: 'Minutes' },
-          { name: 'Presentations' },
-        ],
+        children: [{ name: 'Agendas' }, { name: 'Minutes' }, { name: 'Presentations' }],
       },
       {
         name: 'Archive',
@@ -60,7 +48,8 @@ export const FOLDER_TEMPLATES: FolderTemplate[] = [
   {
     id: 'employee-file',
     name: 'Employee File',
-    description: 'Employee record structure with personal info, contracts, performance, and training',
+    description:
+      'Employee record structure with personal info, contracts, performance, and training',
     icon: '👤',
     category: 'employee',
     defaultConfidentiality: 'highly_confidential',
@@ -78,20 +67,12 @@ export const FOLDER_TEMPLATES: FolderTemplate[] = [
       {
         name: 'Contracts & Agreements',
         confidentiality: 'highly_confidential',
-        children: [
-          { name: 'Employment Contract' },
-          { name: 'NDAs' },
-          { name: 'Amendments' },
-        ],
+        children: [{ name: 'Employment Contract' }, { name: 'NDAs' }, { name: 'Amendments' }],
       },
       {
         name: 'Performance',
         confidentiality: 'confidential',
-        children: [
-          { name: 'Reviews' },
-          { name: 'Goals' },
-          { name: 'Feedback' },
-        ],
+        children: [{ name: 'Reviews' }, { name: 'Goals' }, { name: 'Feedback' }],
       },
       {
         name: 'Training & Development',
@@ -105,11 +86,7 @@ export const FOLDER_TEMPLATES: FolderTemplate[] = [
       {
         name: 'Compensation',
         confidentiality: 'highly_confidential',
-        children: [
-          { name: 'Salary History' },
-          { name: 'Bonuses' },
-          { name: 'Benefits' },
-        ],
+        children: [{ name: 'Salary History' }, { name: 'Bonuses' }, { name: 'Benefits' }],
       },
       {
         name: 'Time & Attendance',
@@ -139,38 +116,22 @@ export const FOLDER_TEMPLATES: FolderTemplate[] = [
       {
         name: 'Contracts',
         confidentiality: 'confidential',
-        children: [
-          { name: 'Service Agreements' },
-          { name: 'SOWs' },
-          { name: 'Amendments' },
-        ],
+        children: [{ name: 'Service Agreements' }, { name: 'SOWs' }, { name: 'Amendments' }],
       },
       {
         name: 'Invoices',
         confidentiality: 'confidential',
-        children: [
-          { name: 'Pending' },
-          { name: 'Paid' },
-          { name: 'Overdue' },
-        ],
+        children: [{ name: 'Pending' }, { name: 'Paid' }, { name: 'Overdue' }],
       },
       {
         name: 'Communications',
         confidentiality: 'internal',
-        children: [
-          { name: 'Emails' },
-          { name: 'Meeting Notes' },
-          { name: 'Proposals' },
-        ],
+        children: [{ name: 'Emails' }, { name: 'Meeting Notes' }, { name: 'Proposals' }],
       },
       {
         name: 'Deliverables',
         confidentiality: 'confidential',
-        children: [
-          { name: 'Work in Progress' },
-          { name: 'Completed' },
-          { name: 'Approved' },
-        ],
+        children: [{ name: 'Work in Progress' }, { name: 'Completed' }, { name: 'Approved' }],
       },
     ],
   },
@@ -186,11 +147,7 @@ export const FOLDER_TEMPLATES: FolderTemplate[] = [
       {
         name: 'Planning',
         confidentiality: 'confidential',
-        children: [
-          { name: 'Audit Plan' },
-          { name: 'Risk Assessment' },
-          { name: 'Materiality' },
-        ],
+        children: [{ name: 'Audit Plan' }, { name: 'Risk Assessment' }, { name: 'Materiality' }],
       },
       {
         name: 'Evidence',
@@ -245,20 +202,12 @@ export const FOLDER_TEMPLATES: FolderTemplate[] = [
       {
         name: 'Policies',
         confidentiality: 'internal',
-        children: [
-          { name: 'Department Policies' },
-          { name: 'SOPs' },
-          { name: 'Guidelines' },
-        ],
+        children: [{ name: 'Department Policies' }, { name: 'SOPs' }, { name: 'Guidelines' }],
       },
       {
         name: 'Team Documents',
         confidentiality: 'internal',
-        children: [
-          { name: 'Meeting Minutes' },
-          { name: 'Presentations' },
-          { name: 'Reports' },
-        ],
+        children: [{ name: 'Meeting Minutes' }, { name: 'Presentations' }, { name: 'Reports' }],
       },
       {
         name: 'Projects',
@@ -291,11 +240,7 @@ export const FOLDER_TEMPLATES: FolderTemplate[] = [
       {
         name: 'Case Information',
         confidentiality: 'highly_confidential',
-        children: [
-          { name: 'Case Summary' },
-          { name: 'Timeline' },
-          { name: 'Key Parties' },
-        ],
+        children: [{ name: 'Case Summary' }, { name: 'Timeline' }, { name: 'Key Parties' }],
       },
       {
         name: 'Evidence',
@@ -327,11 +272,7 @@ export const FOLDER_TEMPLATES: FolderTemplate[] = [
       {
         name: 'Remediation',
         confidentiality: 'confidential',
-        children: [
-          { name: 'Action Plan' },
-          { name: 'Follow-up' },
-          { name: 'Closure' },
-        ],
+        children: [{ name: 'Action Plan' }, { name: 'Follow-up' }, { name: 'Closure' }],
       },
     ],
   },

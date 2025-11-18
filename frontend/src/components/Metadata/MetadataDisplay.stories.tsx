@@ -29,7 +29,8 @@ const sampleMetadata: DocumentMetadata = {
   confidentialityLevel: 'confidential',
   retentionPeriod: '7_years',
   tags: ['financial', 'quarterly', 'report', 'fy2024'],
-  description: 'Comprehensive quarterly financial statement for Q4 2024 including balance sheet, income statement, and cash flow analysis.',
+  description:
+    'Comprehensive quarterly financial statement for Q4 2024 including balance sheet, income statement, and cash flow analysis.',
   fiscalYear: 'FY2024',
   keywords: ['revenue', 'expenses', 'profit', 'assets', 'liabilities', 'equity'],
   version: 1,
@@ -128,7 +129,8 @@ export const OnLegalHold: Story = {
       tags: ['audit', 'internal', 'compliance', 'risk-assessment'],
       description: 'Annual internal audit findings and recommendations.',
       isOnLegalHold: true,
-      legalHoldReason: 'Document is under legal hold due to pending litigation (Case #2024-LAW-015). Do not delete or modify.',
+      legalHoldReason:
+        'Document is under legal hold due to pending litigation (Case #2024-LAW-015). Do not delete or modify.',
       version: 1,
     },
     mode: 'view',
@@ -170,7 +172,8 @@ export const AllOptionalFields: Story = {
       confidentialityLevel: 'internal',
       retentionPeriod: '5_years',
       tags: ['report', 'research', 'analysis', 'quarterly'],
-      description: 'This is a comprehensive example showing all optional metadata fields populated.',
+      description:
+        'This is a comprehensive example showing all optional metadata fields populated.',
       subject: 'Market Analysis Q1 2025',
       keywords: ['market-research', 'trends', 'analysis', 'forecast'],
       expirationDate: '2030-01-15',
@@ -178,7 +181,8 @@ export const AllOptionalFields: Story = {
       customerName: 'Internal Research',
       pageCount: 42,
       language: 'en',
-      comments: 'This document contains detailed market analysis and forecasts for Q1 2025. Please review carefully before distribution.',
+      comments:
+        'This document contains detailed market analysis and forecasts for Q1 2025. Please review carefully before distribution.',
       version: 3,
     },
     mode: 'view',

@@ -5,7 +5,6 @@ import {
   KeyIcon,
   ClipboardDocumentIcon,
   CheckIcon,
-  XMarkIcon,
   EyeIcon,
   EyeSlashIcon,
 } from '@heroicons/react/24/outline'
@@ -292,9 +291,7 @@ export const MFASetup: React.FC<MFASetupProps> = ({
                 key={index}
                 className="px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg font-mono text-center"
               >
-                <span className="text-xs text-gray-500 dark:text-gray-400 mr-2">
-                  {index + 1}.
-                </span>
+                <span className="text-xs text-gray-500 dark:text-gray-400 mr-2">{index + 1}.</span>
                 <span className="text-gray-900 dark:text-white font-semibold">
                   {formatBackupCode(code)}
                 </span>

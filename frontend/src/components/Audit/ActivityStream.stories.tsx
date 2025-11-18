@@ -248,8 +248,8 @@ export const Interactive: Story = {
     return (
       <div className="space-y-4">
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
-          <strong>Interactive Demo:</strong> Toggle between "All Activity" and "Current Folder",
-          use filters, and click "Simulate Activity" to see real-time updates.
+          <strong>Interactive Demo:</strong> Toggle between "All Activity" and "Current Folder", use
+          filters, and click "Simulate Activity" to see real-time updates.
         </div>
 
         <button
@@ -305,7 +305,7 @@ export const DarkMode: Story = {
  */
 export const Collapsed: Story = {
   render: () => {
-    const [isExpanded] = useState(false)
+    const [_isExpanded] = useState(false)
 
     return (
       <div className="bg-white p-4">

@@ -15,7 +15,10 @@ import { formatFileSize } from '@/utils/versionUtils'
 /**
  * Validate a single file
  */
-export function validateFile(file: File, config: Partial<UploadConfig> = {}): FileValidationError | null {
+export function validateFile(
+  file: File,
+  config: Partial<UploadConfig> = {}
+): FileValidationError | null {
   const fullConfig = { ...DEFAULT_UPLOAD_CONFIG, ...config }
 
   // Check file size
@@ -46,7 +49,8 @@ export function validateFile(file: File, config: Partial<UploadConfig> = {}): Fi
   if (!isValidFileName(file.name)) {
     return {
       code: 'invalid-name',
-      message: 'File name contains invalid characters. Only letters, numbers, hyphens, underscores, and periods are allowed.',
+      message:
+        'File name contains invalid characters. Only letters, numbers, hyphens, underscores, and periods are allowed.',
       file,
     }
   }
@@ -251,9 +255,7 @@ export function calculateUploadStatistics(uploads: FileUploadItem[]) {
   const totalUploaded = uploadedSize + uploadingSize
 
   const averageSpeed =
-    uploads
-      .filter((u) => u.uploadSpeed)
-      .reduce((sum, u) => sum + (u.uploadSpeed || 0), 0) /
+    uploads.filter((u) => u.uploadSpeed).reduce((sum, u) => sum + (u.uploadSpeed || 0), 0) /
     Math.max(1, uploading)
 
   const remainingSize = totalSize - totalUploaded
@@ -317,10 +319,7 @@ export function generateUploadId(): string {
 /**
  * Check for duplicate files
  */
-export function checkDuplicateFiles(
-  newFiles: File[],
-  existingUploads: FileUploadItem[]
-): File[] {
+export function checkDuplicateFiles(newFiles: File[], existingUploads: FileUploadItem[]): File[] {
   const existingFileNames = new Set(existingUploads.map((u) => u.file.name))
 
   return newFiles.filter((file) => !existingFileNames.has(file.name))

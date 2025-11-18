@@ -64,8 +64,14 @@ export function getFileExtension(filename: string): string {
 /**
  * Get file type category from MIME type
  */
-export function getFileTypeCategory(mimeType: string): 'document' | 'image' | 'video' | 'audio' | 'archive' | 'other' {
-  if (mimeType.startsWith('application/pdf') || mimeType.includes('document') || mimeType.includes('text')) {
+export function getFileTypeCategory(
+  mimeType: string
+): 'document' | 'image' | 'video' | 'audio' | 'archive' | 'other' {
+  if (
+    mimeType.startsWith('application/pdf') ||
+    mimeType.includes('document') ||
+    mimeType.includes('text')
+  ) {
     return 'document'
   }
   if (mimeType.startsWith('image/')) {
@@ -99,13 +105,13 @@ export function calculateVersionStatistics(versions: DocumentVersion[]): Version
     }
   }
 
-  const sortedVersions = [...versions].sort((a, b) =>
-    new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  const sortedVersions = [...versions].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
   )
 
-  const contributors = Array.from(new Set(versions.map(v => v.createdBy)))
+  const contributors = Array.from(new Set(versions.map((v) => v.createdBy)))
   const totalStorageSize = versions.reduce((sum, v) => sum + v.fileSize, 0)
-  const currentVersion = Math.max(...versions.map(v => v.versionNumber))
+  const currentVersion = Math.max(...versions.map((v) => v.versionNumber))
 
   return {
     totalVersions: versions.length,
@@ -160,7 +166,7 @@ export function filterVersions(
     versionTo?: number
   }
 ): DocumentVersion[] {
-  return versions.filter(version => {
+  return versions.filter((version) => {
     // Filter by creator
     if (filters.createdBy && version.createdBy !== filters.createdBy) {
       return false
@@ -199,14 +205,14 @@ export function findVersionByNumber(
   versions: DocumentVersion[],
   versionNumber: number
 ): DocumentVersion | undefined {
-  return versions.find(v => v.versionNumber === versionNumber)
+  return versions.find((v) => v.versionNumber === versionNumber)
 }
 
 /**
  * Get current version
  */
 export function getCurrentVersion(versions: DocumentVersion[]): DocumentVersion | undefined {
-  return versions.find(v => v.isCurrent)
+  return versions.find((v) => v.isCurrent)
 }
 
 /**
@@ -217,7 +223,7 @@ export function getPreviousVersion(
   currentVersionNumber: number
 ): DocumentVersion | undefined {
   const sorted = sortVersions(versions, 'versionNumber', 'desc')
-  const currentIndex = sorted.findIndex(v => v.versionNumber === currentVersionNumber)
+  const currentIndex = sorted.findIndex((v) => v.versionNumber === currentVersionNumber)
 
   if (currentIndex === -1 || currentIndex === sorted.length - 1) {
     return undefined
@@ -234,7 +240,7 @@ export function getNextVersion(
   currentVersionNumber: number
 ): DocumentVersion | undefined {
   const sorted = sortVersions(versions, 'versionNumber', 'desc')
-  const currentIndex = sorted.findIndex(v => v.versionNumber === currentVersionNumber)
+  const currentIndex = sorted.findIndex((v) => v.versionNumber === currentVersionNumber)
 
   if (currentIndex === -1 || currentIndex === 0) {
     return undefined
@@ -251,9 +257,8 @@ export function calculateSizeDifference(
   version2: DocumentVersion
 ): { difference: number; percentChange: number; increased: boolean } {
   const difference = version2.fileSize - version1.fileSize
-  const percentChange = version1.fileSize === 0
-    ? 100
-    : Math.abs((difference / version1.fileSize) * 100)
+  const percentChange =
+    version1.fileSize === 0 ? 100 : Math.abs((difference / version1.fileSize) * 100)
 
   return {
     difference: Math.abs(difference),
@@ -314,7 +319,7 @@ export function getFileIcon(mimeType: string): string {
 export function validateVersionSequence(versions: DocumentVersion[]): boolean {
   if (versions.length === 0) return true
 
-  const versionNumbers = versions.map(v => v.versionNumber).sort((a, b) => a - b)
+  const versionNumbers = versions.map((v) => v.versionNumber).sort((a, b) => a - b)
 
   for (let i = 0; i < versionNumbers.length; i++) {
     if (versionNumbers[i] !== i + 1) {
@@ -341,7 +346,9 @@ export function getVersionChangesSummary(
   if (oldVersion.fileSize !== newVersion.fileSize) {
     const sizeDiff = calculateSizeDifference(oldVersion, newVersion)
     const action = sizeDiff.increased ? 'increased' : 'decreased'
-    changes.push(`File size ${action} by ${formatFileSize(sizeDiff.difference)} (${sizeDiff.percentChange.toFixed(1)}%)`)
+    changes.push(
+      `File size ${action} by ${formatFileSize(sizeDiff.difference)} (${sizeDiff.percentChange.toFixed(1)}%)`
+    )
   }
 
   if (oldVersion.mimeType !== newVersion.mimeType) {

@@ -147,7 +147,8 @@ export const Interactive: Story = {
     return (
       <div className="space-y-4">
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
-          <strong>Interactive Demo:</strong> Click on keys to select them, use rotation and revoke buttons.
+          <strong>Interactive Demo:</strong> Click on keys to select them, use rotation and revoke
+          buttons.
         </div>
         <KeyManagement
           keys={mockKeys}

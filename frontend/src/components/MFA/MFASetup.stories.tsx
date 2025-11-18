@@ -50,7 +50,8 @@ export const Step2_QRCodeScan: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Step 2: User scans QR code with their authenticator app. Manual secret entry available.',
+        story:
+          'Step 2: User scans QR code with their authenticator app. Manual secret entry available.',
       },
     },
   },
@@ -59,7 +60,9 @@ export const Step2_QRCodeScan: Story = {
     const passwordInput = canvasElement.querySelector('input[type="password"]') as HTMLInputElement
     if (passwordInput) {
       passwordInput.value = 'password123'
-      const continueButton = canvasElement.querySelector('button[type="button"]') as HTMLButtonElement
+      const continueButton = canvasElement.querySelector(
+        'button[type="button"]'
+      ) as HTMLButtonElement
       continueButton?.click()
     }
   },

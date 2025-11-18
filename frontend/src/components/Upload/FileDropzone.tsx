@@ -40,7 +40,9 @@ export const FileDropzone: FC<FileDropzoneProps> = ({
     const hasInvalidType = items.some((item) => {
       if (item.kind !== 'file') return true
       if (fullConfig.acceptedFileTypes.length === 0) return false
-      return !fullConfig.acceptedFileTypes.some((type) => item.type.includes(type.replace('/*', '')))
+      return !fullConfig.acceptedFileTypes.some((type) =>
+        item.type.includes(type.replace('/*', ''))
+      )
     })
 
     setIsDragReject(hasInvalidType)

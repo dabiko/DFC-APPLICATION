@@ -329,9 +329,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
               </div>
             ) : (
               <div className="space-y-4">
-                {comments
-                  .filter((c) => !c.parentId)
-                  .map((comment) => renderComment(comment))}
+                {comments.filter((c) => !c.parentId).map((comment) => renderComment(comment))}
               </div>
             )}
           </div>

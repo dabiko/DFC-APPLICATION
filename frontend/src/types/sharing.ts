@@ -465,9 +465,7 @@ export function isShareExpiringSoon(expiryDate?: string, daysThreshold = 7): boo
   if (!expiryDate) return false
   const expiry = new Date(expiryDate)
   const now = new Date()
-  const daysUntilExpiry = Math.ceil(
-    (expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-  )
+  const daysUntilExpiry = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
   return daysUntilExpiry > 0 && daysUntilExpiry <= daysThreshold
 }
 

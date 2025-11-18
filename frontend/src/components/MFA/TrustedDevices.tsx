@@ -25,7 +25,7 @@ export const TrustedDevices: React.FC<TrustedDevicesProps> = ({
   const [showRemoveModal, setShowRemoveModal] = useState(false)
   const [deviceToRemove, setDeviceToRemove] = useState<TrustedDevice | null>(null)
 
-  const currentDevice = devices.find(d => d.id === currentDeviceId)
+  const currentDevice = devices.find((d) => d.id === currentDeviceId)
   const isCurrentDeviceTrusted = !!currentDevice
 
   const handleRemoveClick = (device: TrustedDevice) => {
@@ -65,9 +65,7 @@ export const TrustedDevices: React.FC<TrustedDevicesProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-            Trusted Devices
-          </h2>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Trusted Devices</h2>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
             Manage devices that don't require MFA for 30 days
           </p>
@@ -184,9 +182,7 @@ export const TrustedDevices: React.FC<TrustedDevicesProps> = ({
                         </p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">
-                          Expires
-                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Expires</p>
                         <p className="text-sm font-medium text-gray-900 dark:text-white">
                           {format(new Date(device.expiresAt), 'MMM d, yyyy')}
                         </p>
@@ -198,8 +194,9 @@ export const TrustedDevices: React.FC<TrustedDevicesProps> = ({
                       <div className="flex items-start gap-2 p-2 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded">
                         <ExclamationTriangleIcon className="w-4 h-4 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
                         <p className="text-xs text-orange-700 dark:text-orange-300">
-                          This device will expire in {daysUntilExpiry} day{daysUntilExpiry !== 1 ? 's' : ''}.
-                          You'll need to verify with MFA after that.
+                          This device will expire in {daysUntilExpiry} day
+                          {daysUntilExpiry !== 1 ? 's' : ''}. You'll need to verify with MFA after
+                          that.
                         </p>
                       </div>
                     )}

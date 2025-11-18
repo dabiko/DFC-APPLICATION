@@ -56,9 +56,7 @@ export const HoldStatusIndicator: React.FC<HoldStatusIndicatorProps> = ({
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Case #:</span>
-              <span className="font-medium text-gray-900 dark:text-white">
-                {hold.caseNumber}
-              </span>
+              <span className="font-medium text-gray-900 dark:text-white">{hold.caseNumber}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Effective:</span>

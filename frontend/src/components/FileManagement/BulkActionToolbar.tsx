@@ -38,7 +38,6 @@ export const BulkActionToolbar: FC<BulkActionToolbarProps> = ({
   }
 
   const handleAction = (action: () => void) => {
-    const itemIds = selectedItems.map((item) => item.id)
     action()
   }
 
@@ -149,7 +148,9 @@ export const BulkActionToolbar: FC<BulkActionToolbarProps> = ({
                   <Menu.Item>
                     {({ active }) => (
                       <button
-                        onClick={() => handleAction(() => onAddTags(selectedItems.map((i) => i.id)))}
+                        onClick={() =>
+                          handleAction(() => onAddTags(selectedItems.map((i) => i.id)))
+                        }
                         className={cn(
                           'flex items-center gap-2 w-full px-4 py-2 text-sm',
                           active
@@ -170,7 +171,9 @@ export const BulkActionToolbar: FC<BulkActionToolbarProps> = ({
                     {({ active }) => (
                       <button
                         onClick={() =>
-                          handleAction(() => onChangeConfidentiality(selectedItems.map((i) => i.id)))
+                          handleAction(() =>
+                            onChangeConfidentiality(selectedItems.map((i) => i.id))
+                          )
                         }
                         className={cn(
                           'flex items-center gap-2 w-full px-4 py-2 text-sm',
@@ -206,7 +209,9 @@ export const BulkActionToolbar: FC<BulkActionToolbarProps> = ({
                 )}
 
                 {/* Divider */}
-                {onDelete && canDelete && <div className="my-1 h-px bg-gray-200 dark:bg-gray-700" />}
+                {onDelete && canDelete && (
+                  <div className="my-1 h-px bg-gray-200 dark:bg-gray-700" />
+                )}
 
                 {/* Delete */}
                 {onDelete && canDelete && (
@@ -235,8 +240,16 @@ export const BulkActionToolbar: FC<BulkActionToolbarProps> = ({
 
       {/* Selection summary */}
       <div className="hidden md:flex items-center gap-2 ml-2 px-3 text-xs text-gray-500 dark:text-gray-400">
-        {hasFiles && !hasFolders && <span>{selectedCount} file{selectedCount !== 1 ? 's' : ''}</span>}
-        {hasFolders && !hasFiles && <span>{selectedCount} folder{selectedCount !== 1 ? 's' : ''}</span>}
+        {hasFiles && !hasFolders && (
+          <span>
+            {selectedCount} file{selectedCount !== 1 ? 's' : ''}
+          </span>
+        )}
+        {hasFolders && !hasFiles && (
+          <span>
+            {selectedCount} folder{selectedCount !== 1 ? 's' : ''}
+          </span>
+        )}
         {hasFiles && hasFolders && (
           <span>
             {selectedItems.filter((i) => i.type === 'file').length} files,{' '}

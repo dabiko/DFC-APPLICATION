@@ -317,7 +317,9 @@ export const validateContractValue = (
 /**
  * Validate description
  */
-export const validateDescription = (description: string | undefined): MetadataValidationError | null => {
+export const validateDescription = (
+  description: string | undefined
+): MetadataValidationError | null => {
   if (!description) return null
 
   if (description.length > 2000) {
@@ -334,7 +336,9 @@ export const validateDescription = (description: string | undefined): MetadataVa
 /**
  * Validate keywords
  */
-export const validateKeywords = (keywords: string[] | undefined): MetadataValidationError | null => {
+export const validateKeywords = (
+  keywords: string[] | undefined
+): MetadataValidationError | null => {
   if (!keywords) return null
 
   if (keywords.length > 50) {

@@ -127,7 +127,11 @@ export const validateMetadata = async (
 export const bulkUpdateMetadata = async (
   documentIds: string[],
   updates: Partial<DocumentMetadata>
-): Promise<{ updated: number; failed: number; errors: Array<{ documentId: string; error: string }> }> => {
+): Promise<{
+  updated: number
+  failed: number
+  errors: Array<{ documentId: string; error: string }>
+}> => {
   const response = await api.post('/api/v1/metadata/bulk-update', {
     documentIds,
     updates,
@@ -162,7 +166,9 @@ export const exportMetadataJSON = async (documentIds: string[]): Promise<Blob> =
 /**
  * Import metadata from CSV
  */
-export const importMetadataCSV = async (file: File): Promise<{
+export const importMetadataCSV = async (
+  file: File
+): Promise<{
   imported: number
   failed: number
   errors: Array<{ row: number; error: string }>

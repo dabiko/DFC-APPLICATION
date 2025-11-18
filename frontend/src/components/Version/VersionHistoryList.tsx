@@ -59,8 +59,8 @@ export const VersionHistoryList: FC<VersionHistoryListProps> = ({
   const handleCompare = () => {
     if (selectedVersions.size === 2 && onCompareVersions) {
       const selectedIds = Array.from(selectedVersions)
-      const version1 = versions.find(v => v.id === selectedIds[0])
-      const version2 = versions.find(v => v.id === selectedIds[1])
+      const version1 = versions.find((v) => v.id === selectedIds[0])
+      const version2 = versions.find((v) => v.id === selectedIds[1])
 
       if (version1 && version2) {
         onCompareVersions(version1, version2)
@@ -82,7 +82,12 @@ export const VersionHistoryList: FC<VersionHistoryListProps> = ({
 
   if (versions.length === 0) {
     return (
-      <div className={cn('text-center py-12 bg-gray-50 dark:bg-gray-900 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700', className)}>
+      <div
+        className={cn(
+          'text-center py-12 bg-gray-50 dark:bg-gray-900 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700',
+          className
+        )}
+      >
         <p className="text-gray-600 dark:text-gray-400">No version history available</p>
         <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
           Versions will appear here as you upload new files
@@ -96,22 +101,36 @@ export const VersionHistoryList: FC<VersionHistoryListProps> = ({
       {/* Statistics Bar */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
         <div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Total Versions</p>
-          <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{stats.totalVersions}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            Total Versions
+          </p>
+          <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+            {stats.totalVersions}
+          </p>
         </div>
         <div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Current Version</p>
-          <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">v{stats.currentVersion}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            Current Version
+          </p>
+          <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+            v{stats.currentVersion}
+          </p>
         </div>
         <div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Total Storage</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            Total Storage
+          </p>
           <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
             {formatFileSize(stats.totalStorageSize)}
           </p>
         </div>
         <div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Contributors</p>
-          <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{stats.contributorCount}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            Contributors
+          </p>
+          <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+            {stats.contributorCount}
+          </p>
         </div>
       </div>
 
@@ -174,9 +193,7 @@ export const VersionHistoryList: FC<VersionHistoryListProps> = ({
           Document ID: <span className="font-mono">{documentId}</span>
         </p>
         {stats.contributors.length > 0 && (
-          <p className="mt-1">
-            Contributors: {stats.contributors.join(', ')}
-          </p>
+          <p className="mt-1">Contributors: {stats.contributors.join(', ')}</p>
         )}
       </div>
     </div>

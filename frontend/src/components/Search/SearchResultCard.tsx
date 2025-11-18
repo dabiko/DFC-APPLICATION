@@ -59,7 +59,10 @@ export const SearchResultCard: FC<SearchResultCardProps> = ({
       case 'blue':
         return cn(baseClass, 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300')
       case 'orange':
-        return cn(baseClass, 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300')
+        return cn(
+          baseClass,
+          'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
+        )
       case 'red':
         return cn(baseClass, 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300')
       default:
@@ -80,16 +83,15 @@ export const SearchResultCard: FC<SearchResultCardProps> = ({
           <span
             key={idx}
             className={cn(
-              match.isMatch && 'bg-yellow-200 dark:bg-yellow-900/50 text-gray-900 dark:text-gray-100 font-medium'
+              match.isMatch &&
+                'bg-yellow-200 dark:bg-yellow-900/50 text-gray-900 dark:text-gray-100 font-medium'
             )}
           >
             {match.text}
           </span>
         ))}
         {highlights.length > 1 && (
-          <span className="ml-2 text-xs text-gray-500">
-            +{highlights.length - 1} more
-          </span>
+          <span className="ml-2 text-xs text-gray-500">+{highlights.length - 1} more</span>
         )}
       </div>
     )
@@ -143,7 +145,10 @@ export const SearchResultCard: FC<SearchResultCardProps> = ({
         {/* File info */}
         <div className="p-3 space-y-2">
           {/* Name */}
-          <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate" title={fileName}>
+          <p
+            className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate"
+            title={fileName}
+          >
             {fileName}
           </p>
 
@@ -165,7 +170,9 @@ export const SearchResultCard: FC<SearchResultCardProps> = ({
             </span>
             {isLocked && <LockClosedIcon className="w-4 h-4 text-gray-500" />}
             {isShared && <ShareIcon className="w-4 h-4 text-blue-500" />}
-            {hasVersions && <ClockIcon className="w-4 h-4 text-gray-500" title={`v${currentVersion}`} />}
+            {hasVersions && (
+              <ClockIcon className="w-4 h-4 text-gray-500" title={`v${currentVersion}`} />
+            )}
           </div>
 
           {/* Highlights */}
@@ -233,7 +240,9 @@ export const SearchResultCard: FC<SearchResultCardProps> = ({
         {thumbnailUrl ? (
           <img src={thumbnailUrl} alt={fileName} className="w-12 h-12 object-cover rounded" />
         ) : (
-          <span className="text-3xl">{getFileIcon({ name: fileName, type: mimeType } as File)}</span>
+          <span className="text-3xl">
+            {getFileIcon({ name: fileName, type: mimeType } as File)}
+          </span>
         )}
       </div>
 
@@ -245,7 +254,10 @@ export const SearchResultCard: FC<SearchResultCardProps> = ({
             <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
               {fileName}
             </h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5" title={filePath}>
+            <p
+              className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5"
+              title={filePath}
+            >
               {filePath}
             </p>
           </div>

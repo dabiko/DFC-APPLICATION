@@ -129,9 +129,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-              Share Document
-            </h2>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Share Document</h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 truncate max-w-md">
               {documentName}
             </p>
@@ -192,10 +190,18 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                 onSelectUser={(user) => setSelectedUsers([...selectedUsers, user])}
                 onDeselectUser={(id) => setSelectedUsers(selectedUsers.filter((u) => u.id !== id))}
                 onSelectGroup={(group) => setSelectedGroups([...selectedGroups, group])}
-                onDeselectGroup={(id) => setSelectedGroups(selectedGroups.filter((g) => g.id !== id))}
+                onDeselectGroup={(id) =>
+                  setSelectedGroups(selectedGroups.filter((g) => g.id !== id))
+                }
                 availableUsers={[
                   { id: '1', name: 'John Doe', email: 'john@example.com', isActive: true },
-                  { id: '2', name: 'Jane Smith', email: 'jane@example.com', department: 'Finance', isActive: true },
+                  {
+                    id: '2',
+                    name: 'Jane Smith',
+                    email: 'jane@example.com',
+                    department: 'Finance',
+                    isActive: true,
+                  },
                 ]}
                 availableGroups={[
                   { id: 'g1', name: 'Finance Team', memberCount: 12, createdAt: '', createdBy: '' },
@@ -211,11 +217,13 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                   onChange={(e) => setInternalPermission(e.target.value as PermissionLevel)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-800 dark:text-white"
                 >
-                  {(['view', 'comment', 'edit', 'download', 'full'] as PermissionLevel[]).map((perm) => (
-                    <option key={perm} value={perm}>
-                      {getPermissionLabel(perm)} - {getPermissionDescription(perm)}
-                    </option>
-                  ))}
+                  {(['view', 'comment', 'edit', 'download', 'full'] as PermissionLevel[]).map(
+                    (perm) => (
+                      <option key={perm} value={perm}>
+                        {getPermissionLabel(perm)} - {getPermissionDescription(perm)}
+                      </option>
+                    )
+                  )}
                 </select>
               </div>
 
@@ -241,7 +249,9 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                       onChange={(e) => setCanReshare(e.target.checked)}
                       className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">Allow resharing</span>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                      Allow resharing
+                    </span>
                   </label>
                 </div>
               </div>
@@ -287,9 +297,15 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                 {externalEmails.length > 0 && (
                   <div className="flex flex-wrap gap-2">
                     {externalEmails.map((email) => (
-                      <div key={email} className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded-full text-sm">
+                      <div
+                        key={email}
+                        className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded-full text-sm"
+                      >
                         {email}
-                        <button onClick={() => handleRemoveEmail(email)} className="hover:bg-blue-200 dark:hover:bg-blue-800 rounded-full p-0.5">
+                        <button
+                          onClick={() => handleRemoveEmail(email)}
+                          className="hover:bg-blue-200 dark:hover:bg-blue-800 rounded-full p-0.5"
+                        >
                           <XMarkIcon className="w-3.5 h-3.5" />
                         </button>
                       </div>
@@ -422,7 +438,9 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-800 dark:text-white"
                     >
                       {(['view', 'comment', 'download'] as PermissionLevel[]).map((perm) => (
-                        <option key={perm} value={perm}>{getPermissionLabel(perm)}</option>
+                        <option key={perm} value={perm}>
+                          {getPermissionLabel(perm)}
+                        </option>
                       ))}
                     </select>
                   </div>

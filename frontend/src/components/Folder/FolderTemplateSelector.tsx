@@ -29,8 +29,8 @@ export const FolderTemplateSelector: FC<FolderTemplateSelectorProps> = ({
   const filteredTemplates = searchQuery
     ? searchTemplates(searchQuery)
     : categoryFilter === 'all'
-    ? FOLDER_TEMPLATES
-    : FOLDER_TEMPLATES.filter((t) => t.category === categoryFilter)
+      ? FOLDER_TEMPLATES
+      : FOLDER_TEMPLATES.filter((t) => t.category === categoryFilter)
 
   const handleSelectTemplate = () => {
     if (selectedTemplate) {
@@ -55,7 +55,10 @@ export const FolderTemplateSelector: FC<FolderTemplateSelectorProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <div>
-            <h2 id="template-selector-title" className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            <h2
+              id="template-selector-title"
+              className="text-lg font-semibold text-gray-900 dark:text-gray-100"
+            >
               Choose Folder Template
             </h2>
             {parentFolderName && (
@@ -174,7 +177,8 @@ export const FolderTemplateSelector: FC<FolderTemplateSelectorProps> = ({
 
                 <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                   <p className="text-sm text-blue-800 dark:text-blue-200">
-                    <strong>Default Confidentiality:</strong> {selectedTemplate.defaultConfidentiality}
+                    <strong>Default Confidentiality:</strong>{' '}
+                    {selectedTemplate.defaultConfidentiality}
                   </p>
                   <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
                     This template will create{' '}

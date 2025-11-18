@@ -129,7 +129,8 @@ const mockComments: Comment[] = [
         id: 'c3',
         documentId: 'doc-1',
         author: mockUser1,
-        content: 'Sure! The projections are based on historical growth patterns and market analysis.',
+        content:
+          'Sure! The projections are based on historical growth patterns and market analysis.',
         createdAt: '2025-11-16T11:30:00Z',
         isEdited: false,
         parentId: 'c2',
@@ -236,7 +237,7 @@ export const NotificationsDefault: StoryObj<typeof ShareNotifications> = {
 
 export const NotificationsUnreadOnly: StoryObj<typeof ShareNotifications> = {
   args: {
-    notifications: mockNotifications.filter(n => !n.isRead),
+    notifications: mockNotifications.filter((n) => !n.isRead),
     onMarkAsRead: (id) => console.log('Mark as read:', id),
     onMarkAllAsRead: () => console.log('Mark all as read'),
     onDeleteNotification: (id) => console.log('Delete notification:', id),

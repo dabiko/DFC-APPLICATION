@@ -10,7 +10,10 @@ import {
   BellIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline'
-import type { RetentionTimeline as RetentionTimelineType, RetentionTimelineProps } from '@/types/retention'
+import type {
+  RetentionTimeline as RetentionTimelineType,
+  RetentionTimelineProps,
+} from '@/types/retention'
 import { format, formatDistance } from 'date-fns'
 import { getLifecycleStageLabel, getLifecycleStageColor } from '@/types/retention'
 
@@ -95,9 +98,7 @@ export const RetentionTimeline: React.FC<RetentionTimelineProps> = ({
             >
               {format(new Date(timeline.milestones.retentionEnd), 'MMM d, yyyy')}
               {!isExpired && daysUntilExpiration <= 90 && (
-                <span className="ml-2 text-xs">
-                  ({daysUntilExpiration} days remaining)
-                </span>
+                <span className="ml-2 text-xs">({daysUntilExpiration} days remaining)</span>
               )}
               {isExpired && <span className="ml-2 text-xs">(Expired)</span>}
             </span>
@@ -130,8 +131,7 @@ export const RetentionTimeline: React.FC<RetentionTimelineProps> = ({
                   100,
                   Math.max(
                     0,
-                    ((now.getTime() -
-                      new Date(timeline.milestones.retentionStart).getTime()) /
+                    ((now.getTime() - new Date(timeline.milestones.retentionStart).getTime()) /
                       (retentionEnd.getTime() -
                         new Date(timeline.milestones.retentionStart).getTime())) *
                       100
@@ -154,8 +154,7 @@ export const RetentionTimeline: React.FC<RetentionTimelineProps> = ({
                     100,
                     Math.max(
                       0,
-                      ((now.getTime() -
-                        new Date(timeline.milestones.retentionStart).getTime()) /
+                      ((now.getTime() - new Date(timeline.milestones.retentionStart).getTime()) /
                         (retentionEnd.getTime() -
                           new Date(timeline.milestones.retentionStart).getTime())) *
                         100

@@ -18,7 +18,7 @@ import { format, parseISO, isToday, isYesterday, formatDistanceToNow } from 'dat
 
 export const ActivityTimeline: FC<ActivityTimelineProps> = ({
   events,
-  groupBy = 'day',
+  groupBy: _groupBy = 'day',
   onEventClick,
   onLoadMore,
   hasMore = false,
@@ -130,10 +130,17 @@ export const ActivityTimeline: FC<ActivityTimelineProps> = ({
   const sortedDates = Object.keys(groupedEvents).sort((a, b) => b.localeCompare(a))
 
   return (
-    <div className={cn('bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700', className)}>
+    <div
+      className={cn(
+        'bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700',
+        className
+      )}
+    >
       {/* Header */}
       <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Activity Timeline</h2>
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+          Activity Timeline
+        </h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
           {events.length} {events.length === 1 ? 'event' : 'events'}
         </p>
@@ -167,14 +174,19 @@ export const ActivityTimeline: FC<ActivityTimelineProps> = ({
                   {groupedEvents[date].map((event, eventIdx) => {
                     const color = getEventColor(event)
                     const colorClasses = getColorClasses(color)
-                    const isLastEvent = dateIdx === sortedDates.length - 1 && eventIdx === groupedEvents[date].length - 1
+                    const isLastEvent =
+                      dateIdx === sortedDates.length - 1 &&
+                      eventIdx === groupedEvents[date].length - 1
 
                     return (
                       <div key={event.id} className="relative pl-8">
                         {/* Timeline Line */}
                         {!isLastEvent && (
                           <div
-                            className={cn('absolute left-2.5 top-8 bottom-0 w-0.5 -mb-6', colorClasses.line)}
+                            className={cn(
+                              'absolute left-2.5 top-8 bottom-0 w-0.5 -mb-6',
+                              colorClasses.line
+                            )}
                           ></div>
                         )}
 
@@ -208,7 +220,9 @@ export const ActivityTimeline: FC<ActivityTimelineProps> = ({
                               </h4>
 
                               {/* Event Description */}
-                              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{event.description}</p>
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                {event.description}
+                              </p>
 
                               {/* Event Metadata */}
                               <div className="flex items-center gap-3 mt-2 text-xs text-gray-500 dark:text-gray-400">
@@ -218,7 +232,9 @@ export const ActivityTimeline: FC<ActivityTimelineProps> = ({
                                 </span>
                                 <span>•</span>
                                 <span>
-                                  {formatDistanceToNow(parseISO(event.timestamp), { addSuffix: true })}
+                                  {formatDistanceToNow(parseISO(event.timestamp), {
+                                    addSuffix: true,
+                                  })}
                                 </span>
                                 {event.relatedEntries.length > 0 && (
                                   <>

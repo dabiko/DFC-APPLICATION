@@ -42,16 +42,13 @@ export const UserSearchSelector: React.FC<UserSearchSelectorProps> = ({
     const query = searchQuery.toLowerCase()
     return availableGroups.filter(
       (group) =>
-        group.name.toLowerCase().includes(query) ||
-        group.description?.toLowerCase().includes(query)
+        group.name.toLowerCase().includes(query) || group.description?.toLowerCase().includes(query)
     )
   }, [availableGroups, searchQuery])
 
-  const isUserSelected = (userId: string) =>
-    selectedUsers.some((u) => u.id === userId)
+  const isUserSelected = (userId: string) => selectedUsers.some((u) => u.id === userId)
 
-  const isGroupSelected = (groupId: string) =>
-    selectedGroups.some((g) => g.id === groupId)
+  const isGroupSelected = (groupId: string) => selectedGroups.some((g) => g.id === groupId)
 
   const canSelectMore = !maxSelections || totalSelections < maxSelections
 
@@ -139,9 +136,7 @@ export const UserSearchSelector: React.FC<UserSearchSelectorProps> = ({
         {activeTab === 'users' ? (
           <div className="divide-y divide-gray-200 dark:divide-gray-700">
             {filteredUsers.length === 0 ? (
-              <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-                No users found
-              </div>
+              <div className="p-8 text-center text-gray-500 dark:text-gray-400">No users found</div>
             ) : (
               filteredUsers.map((user) => {
                 const selected = isUserSelected(user.id)
@@ -162,11 +157,7 @@ export const UserSearchSelector: React.FC<UserSearchSelectorProps> = ({
                   >
                     <div className="flex-shrink-0">
                       {user.avatar ? (
-                        <img
-                          src={user.avatar}
-                          alt={user.name}
-                          className="w-10 h-10 rounded-full"
-                        />
+                        <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full" />
                       ) : (
                         <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
                           <UserIcon className="w-5 h-5 text-gray-500 dark:text-gray-400" />
@@ -252,9 +243,7 @@ export const UserSearchSelector: React.FC<UserSearchSelectorProps> = ({
         <div className="text-sm text-gray-600 dark:text-gray-400">
           Selected: {totalSelections} / {maxSelections}
           {totalSelections >= maxSelections && (
-            <span className="text-orange-600 dark:text-orange-400 ml-2">
-              (Maximum reached)
-            </span>
+            <span className="text-orange-600 dark:text-orange-400 ml-2">(Maximum reached)</span>
           )}
         </div>
       )}

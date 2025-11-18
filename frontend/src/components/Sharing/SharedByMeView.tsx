@@ -27,9 +27,8 @@ export const SharedByMeView: React.FC<SharedByMeViewProps> = ({
 }) => {
   const [sortBy, setSortBy] = useState<'name' | 'date' | 'accesses'>('date')
 
-  const filteredItems = filter && filter !== 'all'
-    ? items.filter(item => item.share.status === filter)
-    : items
+  const filteredItems =
+    filter && filter !== 'all' ? items.filter((item) => item.share.status === filter) : items
 
   const sortedItems = [...filteredItems].sort((a, b) => {
     switch (sortBy) {
@@ -121,9 +120,7 @@ export const SharedByMeView: React.FC<SharedByMeViewProps> = ({
           <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
             No Shared Documents
           </h3>
-          <p className="text-gray-600 dark:text-gray-400">
-            Documents you share will appear here
-          </p>
+          <p className="text-gray-600 dark:text-gray-400">Documents you share will appear here</p>
         </div>
       ) : (
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -170,7 +167,8 @@ export const SharedByMeView: React.FC<SharedByMeViewProps> = ({
                             {item.document.name}
                           </div>
                           <div className="text-sm text-gray-500 dark:text-gray-400">
-                            {getShareTypeLabel(item.share)} • {format(new Date(item.share.createdAt), 'MMM d, yyyy')}
+                            {getShareTypeLabel(item.share)} •{' '}
+                            {format(new Date(item.share.createdAt), 'MMM d, yyyy')}
                           </div>
                         </div>
                       </div>
@@ -199,13 +197,17 @@ export const SharedByMeView: React.FC<SharedByMeViewProps> = ({
                     </td>
                     <td className="px-6 py-4">
                       {item.share.expiryDate ? (
-                        <div className={expiring ? 'text-orange-600 dark:text-orange-400' : 'text-gray-900 dark:text-white'}>
+                        <div
+                          className={
+                            expiring
+                              ? 'text-orange-600 dark:text-orange-400'
+                              : 'text-gray-900 dark:text-white'
+                          }
+                        >
                           <div className="text-sm">
                             {format(new Date(item.share.expiryDate), 'MMM d, yyyy')}
                           </div>
-                          {expiring && (
-                            <div className="text-xs">Expiring soon</div>
-                          )}
+                          {expiring && <div className="text-xs">Expiring soon</div>}
                         </div>
                       ) : (
                         <span className="text-sm text-gray-500 dark:text-gray-400">No expiry</span>

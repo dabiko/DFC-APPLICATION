@@ -90,7 +90,9 @@ export const VersionCard: FC<VersionCardProps> = ({
 
         <div className="flex items-center gap-2 text-sm">
           <span className="text-gray-600 dark:text-gray-400">Size:</span>
-          <span className="text-gray-900 dark:text-gray-100">{formatFileSize(version.fileSize)}</span>
+          <span className="text-gray-900 dark:text-gray-100">
+            {formatFileSize(version.fileSize)}
+          </span>
         </div>
 
         <div className="flex items-center gap-2 text-sm">

@@ -123,9 +123,7 @@ export const LegalHoldManager: React.FC<LegalHoldManagerProps> = ({
                     <ShieldExclamationIcon
                       className={`w-5 h-5 ${isActive ? 'text-red-600 dark:text-red-400' : 'text-gray-400'}`}
                     />
-                    <h3 className="font-semibold text-gray-900 dark:text-white">
-                      {hold.caseName}
-                    </h3>
+                    <h3 className="font-semibold text-gray-900 dark:text-white">{hold.caseName}</h3>
                   </div>
                   <div className="text-sm text-gray-600 dark:text-gray-400">
                     Case #{hold.caseNumber}
@@ -153,9 +151,7 @@ export const LegalHoldManager: React.FC<LegalHoldManagerProps> = ({
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                    Documents
-                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Documents</div>
                   <div className="flex items-center gap-1 text-sm text-gray-900 dark:text-white">
                     <DocumentTextIcon className="w-4 h-4" />
                     <span>{hold.documentsOnHold.toLocaleString()}</span>
@@ -169,9 +165,7 @@ export const LegalHoldManager: React.FC<LegalHoldManagerProps> = ({
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                    Custodians
-                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Custodians</div>
                   <div className="flex items-center gap-1 text-sm text-gray-900 dark:text-white">
                     <UserGroupIcon className="w-4 h-4" />
                     <span>{hold.custodians.length}</span>
@@ -199,9 +193,7 @@ export const LegalHoldManager: React.FC<LegalHoldManagerProps> = ({
                 <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
                   <div className="flex items-center gap-2 text-sm text-green-800 dark:text-green-300">
                     <CheckCircleIcon className="w-4 h-4" />
-                    <span>
-                      Released on {format(new Date(hold.releasedAt), 'MMM d, yyyy')}
-                    </span>
+                    <span>Released on {format(new Date(hold.releasedAt), 'MMM d, yyyy')}</span>
                   </div>
                   {hold.documentsReleased > 0 && (
                     <div className="text-xs text-green-700 dark:text-green-400 mt-1">

@@ -16,7 +16,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { cn } from '@utils/cn'
 import type { AuditLogEntry } from '@/types/audit'
-import { ACTION_TYPE_LABELS, formatAuditLogEntry } from '@/types/audit'
+import { ACTION_TYPE_LABELS } from '@/types/audit'
 import { formatDistanceToNow } from 'date-fns'
 
 export interface ActivityStreamProps {

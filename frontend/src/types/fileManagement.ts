@@ -335,15 +335,15 @@ export const SORT_OPTIONS: SortOption[] = [
 ]
 
 export const CONFIDENTIALITY_COLORS = {
-  'Public': 'gray',
-  'Internal': 'blue',
-  'Confidential': 'orange',
+  Public: 'gray',
+  Internal: 'blue',
+  Confidential: 'orange',
   'Highly Confidential': 'red',
 } as const
 
 export const CONFIDENTIALITY_ICONS = {
-  'Public': '🌐',
-  'Internal': '🏢',
-  'Confidential': '🔒',
+  Public: '🌐',
+  Internal: '🏢',
+  Confidential: '🔒',
   'Highly Confidential': '🔐',
 } as const

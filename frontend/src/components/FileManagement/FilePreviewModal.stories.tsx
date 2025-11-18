@@ -31,7 +31,8 @@ const mockMetadata: DocumentMetadata = {
   confidentialityLevel: 'Confidential',
   retentionPeriod: '7 years',
   keywords: ['Financial', 'Q4', '2024', 'Annual'],
-  description: 'Comprehensive financial report for Q4 2024 including revenue, expenses, and projections.',
+  description:
+    'Comprehensive financial report for Q4 2024 including revenue, expenses, and projections.',
   createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
   modifiedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
 }
@@ -126,11 +127,7 @@ const FilePreviewModalWrapper = (args: any) => {
       >
         Open Preview
       </button>
-      <FilePreviewModal
-        {...args}
-        isOpen={isOpen}
-        onClose={() => setIsOpen(false)}
-      />
+      <FilePreviewModal {...args} isOpen={isOpen} onClose={() => setIsOpen(false)} />
     </div>
   )
 }

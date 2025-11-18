@@ -26,9 +26,8 @@ export const ShareNotifications: React.FC<ShareNotificationsProps> = ({
   const [showSettings, setShowSettings] = useState(false)
   const [filter, setFilter] = useState<'all' | 'unread'>('all')
 
-  const filteredNotifications = filter === 'unread'
-    ? (notifications || []).filter(n => !n.isRead)
-    : (notifications || [])
+  const filteredNotifications =
+    filter === 'unread' ? (notifications || []).filter((n) => !n.isRead) : notifications || []
 
   const getNotificationIcon = (type: ShareNotification['type']) => {
     switch (type) {
@@ -183,9 +182,7 @@ export const ShareNotifications: React.FC<ShareNotificationsProps> = ({
 
             <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between mb-2">
-                <label className="text-sm text-gray-700 dark:text-gray-300">
-                  Quiet Hours
-                </label>
+                <label className="text-sm text-gray-700 dark:text-gray-300">Quiet Hours</label>
                 <input
                   type="checkbox"
                   className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
@@ -203,9 +200,7 @@ export const ShareNotifications: React.FC<ShareNotificationsProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-                    To
-                  </label>
+                  <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">To</label>
                   <input
                     type="time"
                     defaultValue="08:00"
@@ -241,9 +236,7 @@ export const ShareNotifications: React.FC<ShareNotificationsProps> = ({
             No Notifications
           </h3>
           <p className="text-gray-600 dark:text-gray-400">
-            {filter === 'unread'
-              ? "You're all caught up!"
-              : 'Notifications will appear here'}
+            {filter === 'unread' ? "You're all caught up!" : 'Notifications will appear here'}
           </p>
         </div>
       ) : (
@@ -258,18 +251,22 @@ export const ShareNotifications: React.FC<ShareNotificationsProps> = ({
             >
               <div className="flex gap-4">
                 {/* Icon */}
-                <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${getNotificationBgColor(notification.type)}`}>
+                <div
+                  className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${getNotificationBgColor(notification.type)}`}
+                >
                   {getNotificationIcon(notification.type)}
                 </div>
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2 mb-1">
-                    <h4 className={`text-sm font-medium ${
-                      !notification.isRead
-                        ? 'text-gray-900 dark:text-white'
-                        : 'text-gray-700 dark:text-gray-300'
-                    }`}>
+                    <h4
+                      className={`text-sm font-medium ${
+                        !notification.isRead
+                          ? 'text-gray-900 dark:text-white'
+                          : 'text-gray-700 dark:text-gray-300'
+                      }`}
+                    >
                       {getNotificationTitle(notification)}
                     </h4>
                     <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">

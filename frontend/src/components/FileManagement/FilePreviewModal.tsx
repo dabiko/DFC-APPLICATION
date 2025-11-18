@@ -36,11 +36,22 @@ export const FilePreviewModal: FC<FilePreviewModalProps> = ({
 
   if (!preview) return null
 
-  const { fileName, fileSize, mimeType, metadata, versions, canEdit, canDelete, canDownload, canShare } = preview
+  const {
+    fileName,
+    fileSize,
+    mimeType,
+    metadata,
+    versions,
+    canEdit,
+    canDelete,
+    canDownload,
+    canShare,
+  } = preview
 
   const getConfidentialityBadgeClass = () => {
     if (!metadata) return ''
-    const color = CONFIDENTIALITY_COLORS[metadata.confidentialityLevel as keyof typeof CONFIDENTIALITY_COLORS]
+    const color =
+      CONFIDENTIALITY_COLORS[metadata.confidentialityLevel as keyof typeof CONFIDENTIALITY_COLORS]
     const baseClass = 'inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium'
 
     switch (color) {
@@ -49,7 +60,10 @@ export const FilePreviewModal: FC<FilePreviewModalProps> = ({
       case 'blue':
         return cn(baseClass, 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300')
       case 'orange':
-        return cn(baseClass, 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300')
+        return cn(
+          baseClass,
+          'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
+        )
       case 'red':
         return cn(baseClass, 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300')
       default:
@@ -241,7 +255,11 @@ export const FilePreviewModal: FC<FilePreviewModalProps> = ({
                                     Confidentiality
                                   </h4>
                                   <span className={getConfidentialityBadgeClass()}>
-                                    {CONFIDENTIALITY_ICONS[metadata.confidentialityLevel as keyof typeof CONFIDENTIALITY_ICONS]}
+                                    {
+                                      CONFIDENTIALITY_ICONS[
+                                        metadata.confidentialityLevel as keyof typeof CONFIDENTIALITY_ICONS
+                                      ]
+                                    }
                                     {metadata.confidentialityLevel}
                                   </span>
                                 </div>
@@ -251,7 +269,9 @@ export const FilePreviewModal: FC<FilePreviewModalProps> = ({
                                   <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">
                                     Document Type
                                   </h4>
-                                  <p className="text-sm text-gray-900 dark:text-gray-100">{metadata.documentType}</p>
+                                  <p className="text-sm text-gray-900 dark:text-gray-100">
+                                    {metadata.documentType}
+                                  </p>
                                 </div>
 
                                 {/* Department */}
@@ -260,7 +280,9 @@ export const FilePreviewModal: FC<FilePreviewModalProps> = ({
                                     <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">
                                       Department
                                     </h4>
-                                    <p className="text-sm text-gray-900 dark:text-gray-100">{metadata.department}</p>
+                                    <p className="text-sm text-gray-900 dark:text-gray-100">
+                                      {metadata.department}
+                                    </p>
                                   </div>
                                 )}
 
@@ -272,12 +294,18 @@ export const FilePreviewModal: FC<FilePreviewModalProps> = ({
                                   <div className="space-y-1 text-sm">
                                     {metadata.createdAt && (
                                       <p className="text-gray-600 dark:text-gray-400">
-                                        Created: {formatDistanceToNow(new Date(metadata.createdAt), { addSuffix: true })}
+                                        Created:{' '}
+                                        {formatDistanceToNow(new Date(metadata.createdAt), {
+                                          addSuffix: true,
+                                        })}
                                       </p>
                                     )}
                                     {metadata.modifiedAt && (
                                       <p className="text-gray-600 dark:text-gray-400">
-                                        Modified: {formatDistanceToNow(new Date(metadata.modifiedAt), { addSuffix: true })}
+                                        Modified:{' '}
+                                        {formatDistanceToNow(new Date(metadata.modifiedAt), {
+                                          addSuffix: true,
+                                        })}
                                       </p>
                                     )}
                                   </div>
@@ -308,7 +336,9 @@ export const FilePreviewModal: FC<FilePreviewModalProps> = ({
                                     <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">
                                       Description
                                     </h4>
-                                    <p className="text-sm text-gray-900 dark:text-gray-100">{metadata.description}</p>
+                                    <p className="text-sm text-gray-900 dark:text-gray-100">
+                                      {metadata.description}
+                                    </p>
                                   </div>
                                 )}
                               </>
@@ -341,7 +371,9 @@ export const FilePreviewModal: FC<FilePreviewModalProps> = ({
                                       )}
                                     </div>
                                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                                      {formatDistanceToNow(new Date(version.createdAt), { addSuffix: true })}
+                                      {formatDistanceToNow(new Date(version.createdAt), {
+                                        addSuffix: true,
+                                      })}
                                     </p>
                                     {version.changeDescription && (
                                       <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">

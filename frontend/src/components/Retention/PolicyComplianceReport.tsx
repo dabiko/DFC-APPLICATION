@@ -78,9 +78,7 @@ export const PolicyComplianceReport: React.FC<PolicyComplianceReportProps> = ({
 
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-              At Risk
-            </span>
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">At Risk</span>
             <ExclamationTriangleIcon className="w-5 h-5 text-orange-600 dark:text-orange-400" />
           </div>
           <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
@@ -93,9 +91,7 @@ export const PolicyComplianceReport: React.FC<PolicyComplianceReportProps> = ({
 
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-              Violations
-            </span>
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Violations</span>
             <ExclamationTriangleIcon className="w-5 h-5 text-red-600 dark:text-red-400" />
           </div>
           <div className="text-2xl font-bold text-red-600 dark:text-red-400">
@@ -124,17 +120,13 @@ export const PolicyComplianceReport: React.FC<PolicyComplianceReportProps> = ({
               </span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600 dark:text-gray-400">
-                Documents Archived
-              </span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">Documents Archived</span>
               <span className="text-sm font-medium text-gray-900 dark:text-white">
                 {report.documentsArchived.toLocaleString()}
               </span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600 dark:text-gray-400">
-                Documents Deleted
-              </span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">Documents Deleted</span>
               <span className="text-sm font-medium text-gray-900 dark:text-white">
                 {report.documentsDeleted.toLocaleString()}
               </span>
@@ -154,9 +146,7 @@ export const PolicyComplianceReport: React.FC<PolicyComplianceReportProps> = ({
               </span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600 dark:text-gray-400">
-                Documents on Hold
-              </span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">Documents on Hold</span>
               <span className="text-sm font-medium text-gray-900 dark:text-white">
                 {report.documentsOnHold.toLocaleString()}
               </span>
@@ -310,9 +300,7 @@ export const PolicyComplianceReport: React.FC<PolicyComplianceReportProps> = ({
 
   const renderTrends = () => (
     <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
-        Compliance Trend
-      </h3>
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Compliance Trend</h3>
       <div className="space-y-2">
         {report.complianceTrend.map((trend, index) => (
           <div key={trend.date} className="flex items-center gap-3">

@@ -56,7 +56,10 @@ export const folderService = {
   /**
    * Get all folders
    */
-  getFolders: async (filters?: FolderFilterOptions, sort?: FolderSortOptions): Promise<Folder[]> => {
+  getFolders: async (
+    filters?: FolderFilterOptions,
+    sort?: FolderSortOptions
+  ): Promise<Folder[]> => {
     const params: Record<string, any> = {}
 
     if (filters) {
@@ -170,7 +173,9 @@ export const folderService = {
   /**
    * Get folder statistics
    */
-  getFolderStats: async (folderId: string): Promise<{
+  getFolderStats: async (
+    folderId: string
+  ): Promise<{
     totalFolders: number
     totalDocuments: number
     maxDepth: number
@@ -227,7 +232,10 @@ export const folderService = {
   /**
    * Export folder structure
    */
-  exportFolderStructure: async (folderId: string, format: 'json' | 'csv' = 'json'): Promise<Blob> => {
+  exportFolderStructure: async (
+    folderId: string,
+    format: 'json' | 'csv' = 'json'
+  ): Promise<Blob> => {
     const response = await api.get(`/folders/${folderId}/export/`, {
       params: { format },
       responseType: 'blob',

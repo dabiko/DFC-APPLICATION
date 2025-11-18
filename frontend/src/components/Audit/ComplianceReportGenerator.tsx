@@ -11,7 +11,11 @@ import {
   ChartBarIcon,
 } from '@heroicons/react/24/outline'
 import { cn } from '@utils/cn'
-import type { ComplianceReportGeneratorProps, ComplianceReportType, ComplianceReportParams } from '@/types/audit'
+import type {
+  ComplianceReportGeneratorProps,
+  ComplianceReportType,
+  ComplianceReportParams,
+} from '@/types/audit'
 import { format } from 'date-fns'
 
 const REPORT_TYPES: Array<{ type: ComplianceReportType; label: string; description: string }> = [
@@ -91,13 +95,20 @@ export const ComplianceReportGenerator: FC<ComplianceReportGeneratorProps> = ({
   }
 
   return (
-    <div className={cn('bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700', className)}>
+    <div
+      className={cn(
+        'bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700',
+        className
+      )}
+    >
       {/* Header */}
       <div className="p-6 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-3">
           <ChartBarIcon className="w-6 h-6 text-primary-600 dark:text-primary-400" />
           <div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Compliance Reports</h2>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+              Compliance Reports
+            </h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               Generate audit and compliance reports
             </p>
@@ -148,8 +159,17 @@ export const ComplianceReportGenerator: FC<ComplianceReportGeneratorProps> = ({
                     {reportType === report.type && (
                       <div className="flex-shrink-0 ml-3">
                         <div className="w-5 h-5 rounded-full bg-primary-600 flex items-center justify-center">
-                          <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 12 12">
-                            <path d="M10 3l-5.5 5.5L2 6" stroke="currentColor" strokeWidth="2" fill="none" />
+                          <svg
+                            className="w-3 h-3 text-white"
+                            fill="currentColor"
+                            viewBox="0 0 12 12"
+                          >
+                            <path
+                              d="M10 3l-5.5 5.5L2 6"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              fill="none"
+                            />
                           </svg>
                         </div>
                       </div>
@@ -246,9 +266,7 @@ export const ComplianceReportGenerator: FC<ComplianceReportGeneratorProps> = ({
                         </p>
                         <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-gray-400">
                           <ClockIcon className="w-3 h-3" />
-                          <span>
-                            {format(new Date(report.generatedAt), 'MMM d, yyyy h:mm a')}
-                          </span>
+                          <span>{format(new Date(report.generatedAt), 'MMM d, yyyy h:mm a')}</span>
                           <span>•</span>
                           <span>
                             {format(new Date(report.dateFrom), 'MMM d')} -{' '}
@@ -287,9 +305,7 @@ export const ComplianceReportGenerator: FC<ComplianceReportGeneratorProps> = ({
         {recentReports.length === 0 && !isGenerating && (
           <div className="py-12 text-center">
             <DocumentTextIcon className="w-12 h-12 mx-auto text-gray-400 mb-3" />
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              No reports generated yet
-            </p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">No reports generated yet</p>
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
               Generate your first compliance report above
             </p>

@@ -12,15 +12,8 @@ import {
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline'
 import { cn } from '@utils/cn'
-import type {
-  SecureUploadConfig,
-  EncryptionAlgorithm,
-  SecurityLevel,
-} from '@/types/encryption'
-import {
-  SECURITY_LEVEL_LABELS,
-  getDefaultSecureUploadConfig,
-} from '@/types/encryption'
+import type { SecureUploadConfig, EncryptionAlgorithm, SecurityLevel } from '@/types/encryption'
+import { SECURITY_LEVEL_LABELS, getDefaultSecureUploadConfig } from '@/types/encryption'
 
 export interface SecureUploadProps {
   /** Upload configuration */
@@ -114,7 +107,12 @@ export const SecureUpload: FC<SecureUploadProps> = ({
   ]
 
   return (
-    <div className={cn('bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700', className)}>
+    <div
+      className={cn(
+        'bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700',
+        className
+      )}
+    >
       {/* Header */}
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-3">
@@ -204,9 +202,7 @@ export const SecureUpload: FC<SecureUploadProps> = ({
                 <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
                   Drag and drop files here
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  or click to browse
-                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">or click to browse</p>
               </div>
               <label className="inline-block px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium cursor-pointer">
                 Choose Files
@@ -281,7 +277,9 @@ export const SecureUpload: FC<SecureUploadProps> = ({
                     </label>
                     <select
                       value={localConfig.algorithm}
-                      onChange={(e) => updateConfig({ algorithm: e.target.value as EncryptionAlgorithm })}
+                      onChange={(e) =>
+                        updateConfig({ algorithm: e.target.value as EncryptionAlgorithm })
+                      }
                       className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     >
                       {algorithmOptions.map((algo) => (
@@ -322,7 +320,9 @@ export const SecureUpload: FC<SecureUploadProps> = ({
                 </label>
                 <select
                   value={localConfig.defaultSecurityLevel}
-                  onChange={(e) => updateConfig({ defaultSecurityLevel: e.target.value as SecurityLevel })}
+                  onChange={(e) =>
+                    updateConfig({ defaultSecurityLevel: e.target.value as SecurityLevel })
+                  }
                   className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 >
                   {securityLevels.map((level) => (
@@ -388,9 +388,13 @@ export const SecureUpload: FC<SecureUploadProps> = ({
             <div className="text-xs text-blue-800 dark:text-blue-300">
               <p className="font-medium mb-1">Your files are secure</p>
               <ul className="space-y-0.5 list-disc list-inside">
-                {localConfig.encryptOnUpload && <li>Files encrypted with {localConfig.algorithm}</li>}
+                {localConfig.encryptOnUpload && (
+                  <li>Files encrypted with {localConfig.algorithm}</li>
+                )}
                 {localConfig.clientSideEncryption && <li>Client-side encryption enabled</li>}
-                {localConfig.secureTransfer && <li>Secure transfer (TLS {localConfig.minTlsVersion})</li>}
+                {localConfig.secureTransfer && (
+                  <li>Secure transfer (TLS {localConfig.minTlsVersion})</li>
+                )}
                 {localConfig.virusScan && <li>Automatic virus scanning</li>}
                 {localConfig.verifyIntegrity && <li>File integrity verification</li>}
               </ul>

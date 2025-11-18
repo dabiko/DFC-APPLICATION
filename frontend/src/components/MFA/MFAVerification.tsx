@@ -1,10 +1,5 @@
 import React, { useState } from 'react'
-import {
-  ShieldCheckIcon,
-  KeyIcon,
-  ExclamationTriangleIcon,
-  XMarkIcon,
-} from '@heroicons/react/24/outline'
+import { ShieldCheckIcon, KeyIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 import type { MFAVerificationProps, MFAVerificationState } from '@/types/mfa'
 import { validateMFACode, validateBackupCode, generateDeviceFingerprint } from '@/types/mfa'
 
@@ -32,7 +27,10 @@ export const MFAVerification: React.FC<MFAVerificationProps> = ({
       // Backup codes: alphanumeric
       setState({
         ...state,
-        code: value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10),
+        code: value
+          .toUpperCase()
+          .replace(/[^A-Z0-9]/g, '')
+          .slice(0, 10),
         error: undefined,
       })
     } else {
@@ -47,16 +45,12 @@ export const MFAVerification: React.FC<MFAVerificationProps> = ({
 
   const handleVerify = async () => {
     // Validate code format
-    const isValid = useBackupCode
-      ? validateBackupCode(state.code)
-      : validateMFACode(state.code)
+    const isValid = useBackupCode ? validateBackupCode(state.code) : validateMFACode(state.code)
 
     if (!isValid) {
       setState({
         ...state,
-        error: useBackupCode
-          ? 'Invalid backup code format'
-          : 'Code must be 6 digits',
+        error: useBackupCode ? 'Invalid backup code format' : 'Code must be 6 digits',
       })
       return
     }
@@ -166,11 +160,7 @@ export const MFAVerification: React.FC<MFAVerificationProps> = ({
         {/* Verify Button */}
         <button
           onClick={handleVerify}
-          disabled={
-            state.code.length < (useBackupCode ? 8 : 6) ||
-            state.isLocked ||
-            loading
-          }
+          disabled={state.code.length < (useBackupCode ? 8 : 6) || state.isLocked || loading}
           className="w-full px-4 py-3 text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors mb-3"
         >
           {loading ? 'Verifying...' : 'Verify'}

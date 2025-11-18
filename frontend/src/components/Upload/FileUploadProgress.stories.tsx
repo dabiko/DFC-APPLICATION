@@ -115,7 +115,11 @@ export const LargeFile: Story = {
   args: {
     upload: {
       id: 'upload-2',
-      file: createMockFile('Presentation_Final.pptx', 450 * 1024 * 1024, 'application/vnd.openxmlformats-officedocument.presentationml.presentation'),
+      file: createMockFile(
+        'Presentation_Final.pptx',
+        450 * 1024 * 1024,
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      ),
       status: 'uploading',
       progress: 12,
       uploadSpeed: 1024 * 1024 * 2.5, // 2.5 MB/s
@@ -152,9 +156,7 @@ export const WithoutDetails: Story = {
 export const MultipleStates: Story = {
   render: () => (
     <div className="space-y-4 max-w-2xl">
-      <FileUploadProgress
-        upload={{ ...baseUpload, id: '1', status: 'pending', progress: 0 }}
-      />
+      <FileUploadProgress upload={{ ...baseUpload, id: '1', status: 'pending', progress: 0 }} />
       <FileUploadProgress
         upload={{ ...baseUpload, id: '2', status: 'uploading', progress: 35 }}
         onCancel={(id) => console.log('Cancel:', id)}

@@ -15,7 +15,6 @@ import {
 import { cn } from '@utils/cn'
 import type { AuditLogViewerProps, AuditLogEntry } from '@/types/audit'
 import {
-  ACTION_TYPE_LABELS,
   RESOURCE_TYPE_LABELS,
   getSeverityColor,
   getOutcomeColor,
@@ -30,7 +29,7 @@ export const AuditLogViewer: FC<AuditLogViewerProps> = ({
   currentPage,
   pageSize,
   filters,
-  onFiltersChange,
+  onFiltersChange: _onFiltersChange,
   onPageChange,
   onEntryClick,
   onExport,
@@ -78,7 +77,12 @@ export const AuditLogViewer: FC<AuditLogViewerProps> = ({
   }
 
   return (
-    <div className={cn('bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700', className)}>
+    <div
+      className={cn(
+        'bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700',
+        className
+      )}
+    >
       {/* Header */}
       <div className="p-6 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between mb-4">
@@ -226,7 +230,9 @@ export const AuditLogViewer: FC<AuditLogViewerProps> = ({
 
                       {/* Error Message */}
                       {entry.errorMessage && (
-                        <p className="text-xs text-red-600 dark:text-red-400 mt-2">{entry.errorMessage}</p>
+                        <p className="text-xs text-red-600 dark:text-red-400 mt-2">
+                          {entry.errorMessage}
+                        </p>
                       )}
 
                       {/* Expanded Details */}
@@ -243,10 +249,12 @@ export const AuditLogViewer: FC<AuditLogViewerProps> = ({
                                 </span>
                                 <div className="mt-1 grid grid-cols-2 gap-2">
                                   <div className="text-red-600 dark:text-red-400">
-                                    <span className="font-medium">Old:</span> {String(change.oldValue)}
+                                    <span className="font-medium">Old:</span>{' '}
+                                    {String(change.oldValue)}
                                   </div>
                                   <div className="text-green-600 dark:text-green-400">
-                                    <span className="font-medium">New:</span> {String(change.newValue)}
+                                    <span className="font-medium">New:</span>{' '}
+                                    {String(change.newValue)}
                                   </div>
                                 </div>
                               </div>

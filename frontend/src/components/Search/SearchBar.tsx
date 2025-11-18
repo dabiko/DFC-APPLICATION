@@ -36,12 +36,15 @@ export const SearchBar: FC<SearchBarProps> = ({
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   const showDropdown = isFocused && (suggestions.length > 0 || recentSearches.length > 0)
-  const allSuggestions = [...suggestions, ...recentSearches.map(r => ({
-    text: r.query,
-    type: 'query' as const,
-    score: 0,
-    metadata: { icon: '🕐', description: `${r.resultCount} results` }
-  }))]
+  const allSuggestions = [
+    ...suggestions,
+    ...recentSearches.map((r) => ({
+      text: r.query,
+      type: 'query' as const,
+      score: 0,
+      metadata: { icon: '🕐', description: `${r.resultCount} results` },
+    })),
+  ]
 
   // Sync with external value
   useEffect(() => {
@@ -101,13 +104,11 @@ export const SearchBar: FC<SearchBarProps> = ({
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault()
-        setSelectedIndex(prev =>
-          prev < allSuggestions.length - 1 ? prev + 1 : prev
-        )
+        setSelectedIndex((prev) => (prev < allSuggestions.length - 1 ? prev + 1 : prev))
         break
       case 'ArrowUp':
         e.preventDefault()
-        setSelectedIndex(prev => (prev > 0 ? prev - 1 : -1))
+        setSelectedIndex((prev) => (prev > 0 ? prev - 1 : -1))
         break
       case 'Enter':
         e.preventDefault()

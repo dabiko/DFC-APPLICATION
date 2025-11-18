@@ -4,7 +4,13 @@
  */
 
 import { FC } from 'react'
-import { PencilIcon, ClockIcon, UserIcon, FolderIcon, ShieldCheckIcon } from '@heroicons/react/24/outline'
+import {
+  PencilIcon,
+  ClockIcon,
+  UserIcon,
+  FolderIcon,
+  ShieldCheckIcon,
+} from '@heroicons/react/24/outline'
 import type { MetadataDisplayProps } from '@/types/metadata'
 import {
   getDocumentTypeInfo,
@@ -44,7 +50,9 @@ export const MetadataDisplay: FC<MetadataDisplayProps> = ({
           <ConfidentialityBadge level={metadata.confidentialityLevel} />
         </div>
         <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-          <span>{documentTypeInfo?.icon} {documentTypeInfo?.label}</span>
+          <span>
+            {documentTypeInfo?.icon} {documentTypeInfo?.label}
+          </span>
           <span>•</span>
           <span>{departmentInfo?.label}</span>
           <span>•</span>
@@ -65,11 +73,15 @@ export const MetadataDisplay: FC<MetadataDisplayProps> = ({
   }
 
   return (
-    <div className={`bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 ${className}`}>
+    <div
+      className={`bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 ${className}`}
+    >
       {/* Header */}
       <div className="flex items-start justify-between p-6 border-b border-gray-200 dark:border-gray-700">
         <div className="flex-1">
-          <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">{metadata.title}</h3>
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+            {metadata.title}
+          </h3>
           <div className="flex items-center gap-2">
             <ConfidentialityBadge level={metadata.confidentialityLevel} size="md" />
             {metadata.isOnLegalHold && (
@@ -100,7 +112,9 @@ export const MetadataDisplay: FC<MetadataDisplayProps> = ({
           </h4>
           <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Document Type</dt>
+              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                Document Type
+              </dt>
               <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
                 {documentTypeInfo?.icon} {documentTypeInfo?.label}
               </dd>
@@ -110,7 +124,9 @@ export const MetadataDisplay: FC<MetadataDisplayProps> = ({
               <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
                 {identifierTypeInfo?.label || 'Identifier'}
               </dt>
-              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100 font-mono">{metadata.identifier}</dd>
+              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100 font-mono">
+                {metadata.identifier}
+              </dd>
             </div>
 
             <div>
@@ -118,7 +134,9 @@ export const MetadataDisplay: FC<MetadataDisplayProps> = ({
                 <ClockIcon className="w-4 h-4" />
                 Document Date
               </dt>
-              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{formatDate(metadata.date)}</dd>
+              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
+                {formatDate(metadata.date)}
+              </dd>
             </div>
 
             <div>
@@ -134,11 +152,15 @@ export const MetadataDisplay: FC<MetadataDisplayProps> = ({
                 <FolderIcon className="w-4 h-4" />
                 Department
               </dt>
-              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{departmentInfo?.label}</dd>
+              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
+                {departmentInfo?.label}
+              </dd>
             </div>
 
             <div>
-              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Retention Period</dt>
+              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                Retention Period
+              </dt>
               <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
                 {retentionInfo?.label}
                 {metadata.customRetentionYears && ` (${metadata.customRetentionYears} years)`}
@@ -170,7 +192,9 @@ export const MetadataDisplay: FC<MetadataDisplayProps> = ({
             <h4 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
               Description
             </h4>
-            <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{metadata.description}</p>
+            <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+              {metadata.description}
+            </p>
           </div>
         )}
 
@@ -188,20 +212,26 @@ export const MetadataDisplay: FC<MetadataDisplayProps> = ({
               {metadata.subject && (
                 <div>
                   <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Subject</dt>
-                  <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{metadata.subject}</dd>
+                  <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
+                    {metadata.subject}
+                  </dd>
                 </div>
               )}
 
               {metadata.customerName && (
                 <div>
                   <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Customer</dt>
-                  <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{metadata.customerName}</dd>
+                  <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
+                    {metadata.customerName}
+                  </dd>
                 </div>
               )}
 
               {metadata.contractValue !== undefined && (
                 <div>
-                  <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Contract Value</dt>
+                  <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    Contract Value
+                  </dt>
                   <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
                     {metadata.currency || 'USD'} {metadata.contractValue.toLocaleString()}
                   </dd>
@@ -210,14 +240,20 @@ export const MetadataDisplay: FC<MetadataDisplayProps> = ({
 
               {metadata.fiscalYear && (
                 <div>
-                  <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Fiscal Year</dt>
-                  <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{metadata.fiscalYear}</dd>
+                  <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    Fiscal Year
+                  </dt>
+                  <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
+                    {metadata.fiscalYear}
+                  </dd>
                 </div>
               )}
 
               {metadata.expirationDate && (
                 <div>
-                  <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Expiration Date</dt>
+                  <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    Expiration Date
+                  </dt>
                   <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
                     {formatDate(metadata.expirationDate)}
                   </dd>
@@ -227,14 +263,18 @@ export const MetadataDisplay: FC<MetadataDisplayProps> = ({
               {metadata.pageCount && (
                 <div>
                   <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Pages</dt>
-                  <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{metadata.pageCount}</dd>
+                  <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
+                    {metadata.pageCount}
+                  </dd>
                 </div>
               )}
 
               {metadata.language && (
                 <div>
                   <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Language</dt>
-                  <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{metadata.language}</dd>
+                  <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
+                    {metadata.language}
+                  </dd>
                 </div>
               )}
             </dl>
@@ -266,7 +306,9 @@ export const MetadataDisplay: FC<MetadataDisplayProps> = ({
             <h4 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
               Comments
             </h4>
-            <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{metadata.comments}</p>
+            <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+              {metadata.comments}
+            </p>
           </div>
         )}
 

@@ -32,13 +32,13 @@ export const MFABackupCodes: React.FC<MFABackupCodesProps> = ({
   const needsRegeneration = needsBackupCodeRegeneration(codes)
 
   const handleDownload = () => {
-    const codeStrings = codes.codes.map(c => c.code)
+    const codeStrings = codes.codes.map((c) => c.code)
     downloadBackupCodes(codeStrings)
     onDownload()
   }
 
   const handlePrint = () => {
-    const codeStrings = codes.codes.map(c => c.code)
+    const codeStrings = codes.codes.map((c) => c.code)
     printBackupCodes(codeStrings)
     onPrint()
   }
@@ -74,11 +74,7 @@ export const MFABackupCodes: React.FC<MFABackupCodesProps> = ({
           className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
           title={visible ? 'Hide codes' : 'Show codes'}
         >
-          {visible ? (
-            <EyeSlashIcon className="w-5 h-5" />
-          ) : (
-            <EyeIcon className="w-5 h-5" />
-          )}
+          {visible ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
         </button>
       </div>
 
@@ -98,8 +94,8 @@ export const MFABackupCodes: React.FC<MFABackupCodesProps> = ({
               usagePercentage > 80
                 ? 'bg-red-600'
                 : usagePercentage > 50
-                ? 'bg-orange-600'
-                : 'bg-green-600'
+                  ? 'bg-orange-600'
+                  : 'bg-green-600'
             }`}
             style={{ width: `${usagePercentage}%` }}
           />
@@ -134,22 +130,20 @@ export const MFABackupCodes: React.FC<MFABackupCodesProps> = ({
                 : 'bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600'
             }`}
           >
-            <span className="text-xs text-gray-500 dark:text-gray-400 mr-2">
-              {index + 1}.
-            </span>
-            <span className={`text-sm font-semibold ${
-              code.used
-                ? 'text-gray-500 dark:text-gray-500 line-through'
-                : visible
-                ? 'text-gray-900 dark:text-white'
-                : 'text-gray-400 dark:text-gray-500'
-            }`}>
+            <span className="text-xs text-gray-500 dark:text-gray-400 mr-2">{index + 1}.</span>
+            <span
+              className={`text-sm font-semibold ${
+                code.used
+                  ? 'text-gray-500 dark:text-gray-500 line-through'
+                  : visible
+                    ? 'text-gray-900 dark:text-white'
+                    : 'text-gray-400 dark:text-gray-500'
+              }`}
+            >
               {visible ? formatBackupCode(code.code) : '••••-••••'}
             </span>
             {code.used && (
-              <span className="block text-xs text-gray-500 dark:text-gray-500 mt-1">
-                Used
-              </span>
+              <span className="block text-xs text-gray-500 dark:text-gray-500 mt-1">Used</span>
             )}
           </div>
         ))}

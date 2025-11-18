@@ -15,11 +15,7 @@ import {
   XCircleIcon,
 } from '@heroicons/react/24/outline'
 import { cn } from '@utils/cn'
-import type {
-  EncryptionKey,
-  KeyStatus,
-  KeyRotationEvent,
-} from '@/types/encryption'
+import type { EncryptionKey, KeyStatus, KeyRotationEvent } from '@/types/encryption'
 import {
   getKeyStatusColor,
   KEY_STATUS_LABELS,
@@ -98,7 +94,12 @@ export const KeyManagement: FC<KeyManagementProps> = ({
   const selectedKeyData = keys.find((k) => k.id === selectedKey)
 
   return (
-    <div className={cn('bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700', className)}>
+    <div
+      className={cn(
+        'bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700',
+        className
+      )}
+    >
       {/* Header */}
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between">
@@ -183,7 +184,8 @@ export const KeyManagement: FC<KeyManagementProps> = ({
                         ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
                         : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600',
                       alertLevel === 'critical' && 'border-red-500 bg-red-50 dark:bg-red-900/20',
-                      alertLevel === 'warning' && 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20'
+                      alertLevel === 'warning' &&
+                        'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20'
                     )}
                   >
                     {/* Key Header */}
@@ -258,10 +260,14 @@ export const KeyManagement: FC<KeyManagementProps> = ({
                       {key.expiresAt && (
                         <div>
                           <span className="text-gray-500 dark:text-gray-400">Expires:</span>
-                          <p className={cn(
-                            'font-medium',
-                            isKeyExpired(key) ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'
-                          )}>
+                          <p
+                            className={cn(
+                              'font-medium',
+                              isKeyExpired(key)
+                                ? 'text-red-600 dark:text-red-400'
+                                : 'text-gray-900 dark:text-gray-100'
+                            )}
+                          >
                             {formatDistanceToNow(new Date(key.expiresAt), { addSuffix: true })}
                           </p>
                         </div>
@@ -269,11 +275,17 @@ export const KeyManagement: FC<KeyManagementProps> = ({
                       {key.nextRotationDue && (
                         <div>
                           <span className="text-gray-500 dark:text-gray-400">Next Rotation:</span>
-                          <p className={cn(
-                            'font-medium',
-                            needsRotation(key) ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-900 dark:text-gray-100'
-                          )}>
-                            {formatDistanceToNow(new Date(key.nextRotationDue), { addSuffix: true })}
+                          <p
+                            className={cn(
+                              'font-medium',
+                              needsRotation(key)
+                                ? 'text-yellow-600 dark:text-yellow-400'
+                                : 'text-gray-900 dark:text-gray-100'
+                            )}
+                          >
+                            {formatDistanceToNow(new Date(key.nextRotationDue), {
+                              addSuffix: true,
+                            })}
                           </p>
                         </div>
                       )}
@@ -330,17 +342,22 @@ export const KeyManagement: FC<KeyManagementProps> = ({
                           Key Rotation
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          {formatDistanceToNow(new Date(event.rotatedAt), { addSuffix: true })} by {event.rotatedBy}
+                          {formatDistanceToNow(new Date(event.rotatedAt), { addSuffix: true })} by{' '}
+                          {event.rotatedBy}
                         </p>
                       </div>
                     </div>
                     <span
                       className={cn(
                         'px-2 py-0.5 text-xs font-medium rounded',
-                        event.status === 'completed' && 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-                        event.status === 'in_progress' && 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-                        event.status === 'failed' && 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-                        event.status === 'pending' && 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
+                        event.status === 'completed' &&
+                          'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+                        event.status === 'in_progress' &&
+                          'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+                        event.status === 'failed' &&
+                          'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+                        event.status === 'pending' &&
+                          'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
                       )}
                     >
                       {event.status.replace('_', ' ')}
@@ -355,7 +372,9 @@ export const KeyManagement: FC<KeyManagementProps> = ({
                       </p>
                     </div>
                     <div>
-                      <span className="text-gray-500 dark:text-gray-400">Documents Re-encrypted:</span>
+                      <span className="text-gray-500 dark:text-gray-400">
+                        Documents Re-encrypted:
+                      </span>
                       <p className="text-gray-900 dark:text-gray-100 font-medium">
                         {event.documentsReencrypted.toLocaleString()}
                       </p>
@@ -366,7 +385,9 @@ export const KeyManagement: FC<KeyManagementProps> = ({
                     <div className="mt-3">
                       <div className="flex items-center justify-between text-xs mb-1">
                         <span className="text-gray-500 dark:text-gray-400">Progress</span>
-                        <span className="text-gray-900 dark:text-gray-100 font-medium">{event.progress}%</span>
+                        <span className="text-gray-900 dark:text-gray-100 font-medium">
+                          {event.progress}%
+                        </span>
                       </div>
                       <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                         <div
@@ -379,9 +400,7 @@ export const KeyManagement: FC<KeyManagementProps> = ({
 
                   {event.status === 'failed' && event.errorMessage && (
                     <div className="mt-3 p-2 bg-red-50 dark:bg-red-900/20 rounded">
-                      <p className="text-xs text-red-800 dark:text-red-300">
-                        {event.errorMessage}
-                      </p>
+                      <p className="text-xs text-red-800 dark:text-red-300">{event.errorMessage}</p>
                     </div>
                   )}
                 </div>

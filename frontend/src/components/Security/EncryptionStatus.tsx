@@ -250,9 +250,7 @@ export const EncryptionStatus: FC<EncryptionStatusProps> = ({
           <div className="flex items-start gap-2">
             <ExclamationTriangleIcon className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-medium text-red-800 dark:text-red-300">
-                Access Denied
-              </p>
+              <p className="text-sm font-medium text-red-800 dark:text-red-300">Access Denied</p>
               <p className="text-xs text-red-600 dark:text-red-400 mt-1">
                 {encryption.accessDeniedReason}
               </p>

@@ -259,7 +259,9 @@ export const Interactive: Story = {
           onFiltersChange={setFilters}
           onPageChange={setCurrentPage}
           onEntryClick={(entry) => console.log('Entry clicked:', entry)}
-          onExport={(format) => alert(`Exporting ${allEntries.length} entries as ${format.toUpperCase()}`)}
+          onExport={(format) =>
+            alert(`Exporting ${allEntries.length} entries as ${format.toUpperCase()}`)
+          }
         />
       </div>
     )

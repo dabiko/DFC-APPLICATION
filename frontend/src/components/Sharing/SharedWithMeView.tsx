@@ -154,7 +154,8 @@ export const SharedWithMeView: React.FC<SharedWithMeViewProps> = ({
                             )}
                           </div>
                           <div className="text-sm text-gray-500 dark:text-gray-400">
-                            {item.document.type} • {(item.document.size / 1024 / 1024).toFixed(2)} MB
+                            {item.document.type} • {(item.document.size / 1024 / 1024).toFixed(2)}{' '}
+                            MB
                           </div>
                         </div>
                       </div>
@@ -233,7 +234,10 @@ export const SharedWithMeView: React.FC<SharedWithMeViewProps> = ({
                             onClick={(e) => {
                               e.stopPropagation()
                               // Handle download
-                              window.open(`/api/v1/documents/${item.document.id}/download`, '_blank')
+                              window.open(
+                                `/api/v1/documents/${item.document.id}/download`,
+                                '_blank'
+                              )
                             }}
                             className="p-1.5 text-gray-500 hover:text-green-600 dark:text-gray-400 dark:hover:text-green-400 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
                             title="Download document"

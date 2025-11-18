@@ -6,7 +6,13 @@
 /**
  * Upload Status
  */
-export type UploadStatus = 'pending' | 'uploading' | 'processing' | 'completed' | 'error' | 'cancelled'
+export type UploadStatus =
+  | 'pending'
+  | 'uploading'
+  | 'processing'
+  | 'completed'
+  | 'error'
+  | 'cancelled'
 
 /**
  * File Upload Item

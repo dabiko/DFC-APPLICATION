@@ -213,11 +213,22 @@ export const GridViewMultiple: Story = {
         onSelect={(selected) => console.log('Selected:', selected)}
       />
       <SearchResultCard
-        result={{ ...baseResult, id: '2', confidentialityLevel: 'Highly Confidential', isLocked: true }}
+        result={{
+          ...baseResult,
+          id: '2',
+          confidentialityLevel: 'Highly Confidential',
+          isLocked: true,
+        }}
         viewMode="grid"
       />
       <SearchResultCard
-        result={{ ...baseResult, id: '3', confidentialityLevel: 'Public', isShared: true, score: 78 }}
+        result={{
+          ...baseResult,
+          id: '3',
+          confidentialityLevel: 'Public',
+          isShared: true,
+          score: 78,
+        }}
         viewMode="grid"
       />
     </div>
@@ -229,11 +240,23 @@ export const ListViewMultiple: Story = {
     <div className="space-y-2 max-w-4xl">
       <SearchResultCard result={baseResult} viewMode="list" />
       <SearchResultCard
-        result={{ ...baseResult, id: '2', confidentialityLevel: 'Highly Confidential', isLocked: true, score: 88 }}
+        result={{
+          ...baseResult,
+          id: '2',
+          confidentialityLevel: 'Highly Confidential',
+          isLocked: true,
+          score: 88,
+        }}
         viewMode="list"
       />
       <SearchResultCard
-        result={{ ...baseResult, id: '3', confidentialityLevel: 'Public', isShared: true, score: 72 }}
+        result={{
+          ...baseResult,
+          id: '3',
+          confidentialityLevel: 'Public',
+          isShared: true,
+          score: 72,
+        }}
         viewMode="list"
       />
     </div>
