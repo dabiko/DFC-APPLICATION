@@ -199,18 +199,18 @@ dfc_backend/
 **1.1 Development Environment Setup**
 
 1. **Install Core Dependencies**
-   - Python 3.11+ (using pyenv for version management)
-   - PostgreSQL 14+ (local instance + Docker)
+   - Python 3.14+ (using pyenv for version management)
+   - PostgreSQL 18+ (local instance + Docker)
    - MinIO server (Docker)
-   - Elasticsearch 8.x (Docker)
-   - Redis 7.x (Docker)
-   - RabbitMQ 3.x (Docker)
+   - Elasticsearch 9.x (Docker)
+   - Redis 8.x (Docker)
+   - RabbitMQ 4.x (Docker)
 
 2. **Create Docker Compose Development Environment**
    ```yaml
    services:
      db:
-       image: postgres:14-alpine
+       image: postgres:18-alpine
        environment:
          POSTGRES_DB: dfc_dev
          POSTGRES_USER: dfc_user
@@ -233,7 +233,7 @@ dfc_backend/
          - minio_data:/data
 
      elasticsearch:
-       image: elasticsearch:8.8.0
+       image: elasticsearch:9.2.1
        environment:
          - discovery.type=single-node
          - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
@@ -243,12 +243,12 @@ dfc_backend/
          - es_data:/usr/share/elasticsearch/data
 
      redis:
-       image: redis:7-alpine
+       image: redis:8-alpine
        ports:
          - "6379:6379"
 
      rabbitmq:
-       image: rabbitmq:3-management-alpine
+       image: rabbitmq:4-management-alpine
        ports:
          - "5672:5672"
          - "15672:15672"
