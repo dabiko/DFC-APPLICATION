@@ -102,6 +102,6 @@ npm run storybook       # Start Storybook
 ## Authors
 
 - Cedric Mbah
-- Njeck Clinton
+- DabiTech
 
 **Status**: Production Ready ✅
