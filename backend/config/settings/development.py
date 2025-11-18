@@ -11,14 +11,14 @@ ALLOWED_HOSTS = ['localhost', '127.0.0.1', '[::1]']
 
 # Development-specific apps
 INSTALLED_APPS += [
-    'django_extensions',
-    'debug_toolbar',
+    # 'django_extensions',  # Not installed yet
+    # 'debug_toolbar',  # Not installed yet
 ]
 
 # Debug Toolbar
-MIDDLEWARE += [
-    'debug_toolbar.middleware.DebugToolbarMiddleware',
-]
+# MIDDLEWARE += [
+#     'debug_toolbar.middleware.DebugToolbarMiddleware',
+# ]
 
 INTERNAL_IPS = [
     '127.0.0.1',

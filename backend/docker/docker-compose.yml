@@ -1,26 +1,25 @@
-version: '3.9'
 
 services:
-  # PostgreSQL Database
-  db:
-    image: postgres:18-alpine
-    container_name: dfc_postgres
-    environment:
-      POSTGRES_DB: dfc_dev
-      POSTGRES_USER: dfc_user
-      POSTGRES_PASSWORD: dev_password
-      PGDATA: /var/lib/postgresql/data/pgdata
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dfc_user -d dfc_dev"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - dfc_network
+   #PostgreSQL Database
+#  db:
+#    image: postgres:18-alpine
+#    container_name: dfc_postgres
+#    environment:
+#      POSTGRES_DB: dfc_database
+#      POSTGRES_USER: postgres
+#      POSTGRES_PASSWORD: dabiko
+#      POSTGRES_HOST_AUTH_METHOD: trust  # Trust all connections for development
+#    ports:
+#      - "5432:5432"
+#    volumes:
+#      - postgres_data:/var/lib/postgresql/data
+#    healthcheck:
+#      test: ["CMD-SHELL", "pg_isready -U dfc_user -d dfc_dev"]
+#      interval: 10s
+#      timeout: 5s
+#      retries: 5
+#    networks:
+#      - dfc_network
 
   # MinIO Object Storage (S3-compatible)
   minio:

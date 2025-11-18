@@ -2,10 +2,16 @@
 """Django's command-line utility for administrative tasks."""
 import os
 import sys
+from pathlib import Path
 
 
 def main():
     """Run administrative tasks."""
+    # Load environment variables from .env file
+    from dotenv import load_dotenv
+    env_path = Path(__file__).resolve().parent / '.env'
+    load_dotenv(dotenv_path=env_path)
+
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
     try:
         from django.core.management import execute_from_command_line

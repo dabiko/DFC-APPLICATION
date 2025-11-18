@@ -28,7 +28,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'drf_spectacular',
 
-    # Local apps (will be created)
+    # Local apps
     'apps.users',
     'apps.documents',
     'apps.folders',
@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     'apps.audit',
     'apps.permissions',
     'apps.workflows',
+    'apps.retention',
 ]
 
 MIDDLEWARE = [
@@ -77,8 +78,12 @@ DATABASES = {
         'NAME': os.getenv('DB_NAME', 'dfc_dev'),
         'USER': os.getenv('DB_USER', 'dfc_user'),
         'PASSWORD': os.getenv('DB_PASSWORD', 'dev_password'),
-        'HOST': os.getenv('DB_HOST', 'localhost'),
+        'HOST': os.getenv('DB_HOST', '127.0.0.1'),  # Use IPv4 explicitly
         'PORT': os.getenv('DB_PORT', '5432'),
+        'OPTIONS': {
+            'connect_timeout': 10,
+            'options': '-c search_path=public',
+        },
     }
 }
 

@@ -1,24 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dir:*)",
-      "Bash(venvScriptspip install -r requirements.txt)",
-      "Bash(./venv/Scripts/python:*)",
-      "Bash(npm run dev:*)",
-      "Bash(timeout 10 npm run storybook)",
-      "Bash(npm run storybook:*)",
-      "Bash(npm install:*)",
-      "Bash(npx kill-port:*)",
-      "Bash(npm run lint)",
-      "Bash(npm run lint:fix:*)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
-      "Bash(npm run lint:*)",
-      "Bash(npm run format:*)",
-      "Bash(cat:*)",
-      "Bash(python -m venv:*)",
-      "Bash(venvScriptspip install Django==5.1.3 djangorestframework==3.15.2)",
-      "Bash(./venv/Scripts/pip install:*)"
+      "Bash(docker exec:*)"
     ],
     "deny": [],
     "ask": []
