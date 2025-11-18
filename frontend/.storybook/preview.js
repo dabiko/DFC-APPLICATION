@@ -12,12 +12,6 @@ const preview = {
     backgrounds: {
       disable: true, // Disable default backgrounds since we're using dark mode
     },
-    darkMode: {
-      classTarget: 'html',
-      darkClass: 'dark',
-      lightClass: 'light',
-      stylePreview: true,
-    },
   },
   globalTypes: {
     theme: {
