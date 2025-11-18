@@ -20,7 +20,7 @@ def validate_company_email(value):
 
 
 class Department(models.Model):
-    """Organization departments"""
+    """Organization departments with storage quota management"""
     name = models.CharField(max_length=100)
     code = models.CharField(max_length=20, unique=True)
     parent = models.ForeignKey(
@@ -29,6 +29,10 @@ class Department(models.Model):
         blank=True,
         on_delete=models.CASCADE,
         related_name='children'
+    )
+    storage_quota_gb = models.IntegerField(
+        default=100,
+        help_text='Storage quota in gigabytes for this department'
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

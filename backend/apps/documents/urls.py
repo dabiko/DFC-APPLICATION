@@ -1,0 +1,86 @@
+"""
+URL configuration for documents app.
+"""
+from django.urls import path
+from apps.documents.views import (
+    DocumentUploadView,
+    DocumentListView,
+    DocumentDetailView,
+    DocumentUpdateView,
+    DocumentDeleteView,
+    DocumentDownloadView,
+    DocumentVersionCreateView,
+    TagListCreateView,
+    TagDetailView,
+    ChunkedUploadInitiateView,
+    ChunkedUploadChunkView,
+    ChunkedUploadStatusView,
+    StorageUsageView,
+    DepartmentQuotaView,
+    MetadataSchemaView,
+    DocumentMetadataUpdateView,
+    BulkMetadataUpdateView,
+    DocumentVersionUploadView,
+    DocumentVersionListView,
+    DocumentVersionDetailView,
+    DocumentVersionRestoreView,
+    DocumentVersionCompareView,
+    DocumentVersionStatsView,
+    BulkMoveDocumentsView,
+    BulkCopyDocumentsView,
+    BulkDeleteDocumentsView,
+    BulkExportDocumentsView,
+    DocumentGenerateThumbnailView,
+    DocumentConvertToPDFView,
+    DocumentThumbnailView,
+)
+
+app_name = 'documents'
+
+urlpatterns = [
+    # Document endpoints
+    path('upload/', DocumentUploadView.as_view(), name='document_upload'),
+    path('', DocumentListView.as_view(), name='document_list'),
+    path('<uuid:id>/', DocumentDetailView.as_view(), name='document_detail'),
+    path('<uuid:id>/update/', DocumentUpdateView.as_view(), name='document_update'),
+    path('<uuid:id>/delete/', DocumentDeleteView.as_view(), name='document_delete'),
+    path('<uuid:id>/download/', DocumentDownloadView.as_view(), name='document_download'),
+    path('<uuid:id>/versions/', DocumentVersionCreateView.as_view(), name='document_version_create'),
+
+    # Chunked upload endpoints
+    path('chunked-upload/initiate/', ChunkedUploadInitiateView.as_view(), name='chunked_upload_initiate'),
+    path('chunked-upload/<str:upload_id>/chunk/', ChunkedUploadChunkView.as_view(), name='chunked_upload_chunk'),
+    path('chunked-upload/<str:upload_id>/status/', ChunkedUploadStatusView.as_view(), name='chunked_upload_status'),
+
+    # Storage monitoring endpoints
+    path('storage/usage/', StorageUsageView.as_view(), name='storage_usage'),
+    path('storage/quota/<int:department_id>/', DepartmentQuotaView.as_view(), name='department_quota'),
+
+    # Tag endpoints
+    path('tags/', TagListCreateView.as_view(), name='tag_list_create'),
+    path('tags/<int:pk>/', TagDetailView.as_view(), name='tag_detail'),
+
+    # Metadata endpoints
+    path('metadata/schema/', MetadataSchemaView.as_view(), name='metadata_schema'),
+    path('<uuid:pk>/metadata/', DocumentMetadataUpdateView.as_view(), name='document_metadata_update'),
+    path('metadata/bulk-update/', BulkMetadataUpdateView.as_view(), name='bulk_metadata_update'),
+
+    # Document versioning endpoints
+    path('<uuid:pk>/versions/upload/', DocumentVersionUploadView.as_view(), name='version_upload'),
+    path('<uuid:pk>/versions/list/', DocumentVersionListView.as_view(), name='version_list'),
+    path('<uuid:pk>/versions/<int:version_number>/', DocumentVersionDetailView.as_view(), name='version_detail'),
+    path('<uuid:pk>/versions/restore/', DocumentVersionRestoreView.as_view(), name='version_restore'),
+    path('<uuid:pk>/versions/compare/', DocumentVersionCompareView.as_view(), name='version_compare'),
+    path('<uuid:pk>/versions/stats/', DocumentVersionStatsView.as_view(), name='version_stats'),
+
+    # Bulk operations endpoints
+    path('bulk-move/', BulkMoveDocumentsView.as_view(), name='bulk_move'),
+    path('bulk-copy/', BulkCopyDocumentsView.as_view(), name='bulk_copy'),
+    path('bulk-delete/', BulkDeleteDocumentsView.as_view(), name='bulk_delete'),
+    path('bulk-export/', BulkExportDocumentsView.as_view(), name='bulk_export'),
+
+    # Thumbnail and conversion endpoints
+    path('<uuid:id>/generate-thumbnail/', DocumentGenerateThumbnailView.as_view(), name='generate_thumbnail'),
+    path('<uuid:id>/convert-to-pdf/', DocumentConvertToPDFView.as_view(), name='convert_to_pdf'),
+    path('<uuid:id>/thumbnail/', DocumentThumbnailView.as_view(), name='get_thumbnail'),
+]
