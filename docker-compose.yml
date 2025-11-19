@@ -4,19 +4,20 @@ services:
   postgres:
     image: postgres:latest
     container_name: dfc_postgres
+    restart: always
     environment:
       POSTGRES_DB: dfc_database
-      POSTGRES_USER: dfc_user
+      POSTGRES_USER: dfc_admin_user
       POSTGRES_PASSWORD: dfc_password_2025
-      POSTGRES_HOST_AUTH_METHOD: trust
+     # POSTGRES_HOST_AUTH_METHOD: trust
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     networks:
       - dfc_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dfc_user -d dfc_dev"]
+      test: ["CMD-SHELL", "pg_isready -U dfc_admin_user -d dfc_database"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -25,8 +26,9 @@ services:
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: dfc_pgadmin
+    restart: always
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@dfc.local
+      PGADMIN_DEFAULT_EMAIL: admin@dfc.com
       PGADMIN_DEFAULT_PASSWORD: admin_password_2025
       PGADMIN_CONFIG_SERVER_MODE: 'False'
       PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
@@ -103,7 +105,7 @@ services:
 
   # RabbitMQ (Message Broker for Celery)
   rabbitmq:
-    image: rabbitmq:3-management-alpine
+    image: rabbitmq:4-management-alpine
     container_name: dfc_rabbitmq
     environment:
       RABBITMQ_DEFAULT_USER: dfc_rabbit
@@ -132,8 +134,8 @@ services:
       # Database
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_NAME: dfc_dev
-      DB_USER: dfc_user
+      DB_NAME: dfc_database
+      DB_USER: dfc_admin_user
       DB_PASSWORD: dfc_password_2025
 
       # MinIO
@@ -143,7 +145,7 @@ services:
       MINIO_BUCKET_NAME: dfc-documents
       MINIO_USE_SSL: 'False'
 
-      # Redis
+     # Redis
       REDIS_URL: redis://redis:6379/0
 
       # Celery
@@ -273,23 +275,23 @@ services:
     restart: unless-stopped
 
   # React Frontend Application
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: dfc_frontend
-    ports:
-      - "3000:80"  # Access frontend at http://localhost:3000
-    networks:
-      - dfc_network
-    depends_on:
-      - backend
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+#  frontend:
+#    build:
+#      context: ./frontend
+#      dockerfile: Dockerfile
+#    container_name: dfc_frontend
+#    ports:
+#      - "3000:80"  # Access frontend at http://localhost:3000
+#    networks:
+#      - dfc_network
+#    depends_on:
+#      - backend
+#    restart: unless-stopped
+#    healthcheck:
+#      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+#      interval: 30s
+#      timeout: 10s
+#      retries: 3
 
 volumes:
   postgres_data:

@@ -36,7 +36,7 @@ openpyxl==3.1.5
 Pillow==11.0.0
 pdf2image==1.17.0
 pytesseract==0.3.13
-python-magic-bin==0.4.14  # MIME type detection (Windows)
+python-magic==0.4.27  # MIME type detection (Linux)
 
 # Security and Encryption
 cryptography==44.0.0

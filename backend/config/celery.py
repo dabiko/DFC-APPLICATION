@@ -1,0 +1,26 @@
+"""
+Celery configuration for DFC Application.
+
+This file contains the Celery application instance and configuration.
+"""
+import os
+from celery import Celery
+
+# Set the default Django settings module for the 'celery' program.
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+
+# Create Celery app instance
+app = Celery('dfc')
+
+# Load configuration from Django settings with a namespace of 'CELERY'
+# This means all celery-related settings should have a `CELERY_` prefix
+app.config_from_object('django.conf:settings', namespace='CELERY')
+
+# Auto-discover tasks in all installed apps
+app.autodiscover_tasks()
+
+
+@app.task(bind=True, ignore_result=True)
+def debug_task(self):
+    """Debug task for testing Celery."""
+    print(f'Request: {self.request!r}')

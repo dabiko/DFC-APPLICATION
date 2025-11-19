@@ -4,7 +4,8 @@
       "Bash(docker exec:*)",
       "Bash(move organizations appsorganizations)",
       "Bash(python manage.py test:*)",
-      "Bash(docker-compose up:*)"
+      "Bash(docker-compose up:*)",
+      "Bash(timeout 2 docker-compose logs:*)"
     ],
     "deny": [],
     "ask": []
