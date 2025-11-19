@@ -10,6 +10,7 @@ Tasks include:
 from celery import shared_task
 from django.core.files.base import ContentFile
 from django.conf import settings
+from django.utils import timezone
 import logging
 import os
 import tempfile
@@ -469,6 +470,13 @@ def extract_document_text(self, document_id):
                 except Exception as e:
                     logger.warning(f"Failed to update Elasticsearch index: {e}")
 
+                # Trigger automatic classification after text extraction
+                try:
+                    classify_document_after_extraction.delay(str(document_id))
+                    logger.info(f"Classification triggered for document {document_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to trigger classification: {e}")
+
                 return {
                     'success': True,
                     'document_id': str(document_id),
@@ -654,6 +662,13 @@ def ocr_document(self, document_id):
                 except Exception as e:
                     logger.warning(f"Failed to update Elasticsearch index: {e}")
 
+                # Trigger automatic classification after OCR
+                try:
+                    classify_document_after_extraction.delay(str(document_id))
+                    logger.info(f"Classification triggered for document {document_id} after OCR")
+                except Exception as e:
+                    logger.warning(f"Failed to trigger classification: {e}")
+
                 return {
                     'success': True,
                     'document_id': str(document_id),
@@ -777,3 +792,256 @@ def batch_extract_text(document_ids):
 
     logger.info(f"Batch text extraction completed: {results}")
     return results
+
+
+# ========================================
+# Classification Tasks
+# ========================================
+
+@shared_task(bind=True, max_retries=2)
+def apply_classification_rules(self, document_id, triggered_by='auto'):
+    """
+    Apply classification rules to a document.
+
+    Automatically categorizes, tags, and organizes documents based on
+    predefined rules that match content, filename, and metadata.
+
+    Process:
+    1. Get all active classification rules (ordered by priority)
+    2. Check each rule's conditions against document
+    3. Apply actions for matching rules
+    4. Log all classification actions for audit trail
+
+    Args:
+        document_id: UUID of document to classify
+        triggered_by: How classification was triggered (auto, manual, bulk)
+
+    Returns:
+        dict: Summary of classification results
+
+    Example Actions:
+        - Move to specific folder based on content
+        - Set document type (INVOICE, CONTRACT, etc.)
+        - Add tags based on keywords
+        - Set confidentiality level
+        - Assign to department
+    """
+    from apps.documents.models import Document
+    from apps.classification.engine import ClassificationEngine
+
+    try:
+        # Get document
+        document = Document.objects.get(id=document_id)
+        logger.info(
+            f"Starting classification for document {document_id} "
+            f"({document.file_name}, triggered_by={triggered_by})"
+        )
+
+        # Apply classification rules
+        result = ClassificationEngine.classify_document(document, triggered_by=triggered_by)
+
+        if result['success']:
+            logger.info(
+                f"Classification complete for document {document_id}: "
+                f"{result['rules_applied']} rules applied, "
+                f"{result['total_actions']} total actions"
+            )
+
+            return {
+                'success': True,
+                'document_id': str(document_id),
+                'rules_applied': result['rules_applied'],
+                'total_actions': result['total_actions'],
+                'message': 'Classification completed successfully'
+            }
+        else:
+            logger.warning(f"No classification rules matched document {document_id}")
+            return {
+                'success': True,
+                'document_id': str(document_id),
+                'rules_applied': 0,
+                'total_actions': 0,
+                'message': 'No matching rules found'
+            }
+
+    except Document.DoesNotExist:
+        logger.error(f"Document {document_id} not found")
+        return {
+            'success': False,
+            'message': 'Document not found'
+        }
+
+    except Exception as e:
+        logger.error(f"Classification failed for {document_id}: {e}", exc_info=True)
+
+        # Retry with exponential backoff
+        try:
+            raise self.retry(exc=e, countdown=60 * (2 ** self.request.retries))
+        except self.MaxRetriesExceededError:
+            return {
+                'success': False,
+                'message': f'Classification failed after {self.max_retries} retries: {str(e)}'
+            }
+
+
+@shared_task
+def classify_document_after_extraction(document_id):
+    """
+    Classify document after text extraction completes.
+
+    This is the main entry point for automatic classification.
+    Called after text extraction so content-based rules can match.
+
+    Args:
+        document_id: UUID of document
+
+    Returns:
+        dict: Task execution result
+    """
+    logger.info(f"Scheduling classification for document {document_id} after extraction")
+
+    # Start classification task
+    result = apply_classification_rules.delay(str(document_id), triggered_by='auto')
+
+    return {
+        'task_id': result.id,
+        'document_id': str(document_id),
+        'message': 'Classification task scheduled'
+    }
+
+
+@shared_task
+def batch_classify_documents(document_ids, triggered_by='bulk'):
+    """
+    Apply classification rules to multiple documents in batch.
+
+    Useful for:
+    - Classifying existing documents after creating new rules
+    - Re-classifying documents after rule changes
+    - Bulk organization operations
+
+    Args:
+        document_ids: List of document UUIDs
+        triggered_by: How classification was triggered
+
+    Returns:
+        dict: Summary of batch classification results
+    """
+    from apps.documents.models import Document
+
+    results = {
+        'total': len(document_ids),
+        'success': 0,
+        'failed': 0,
+        'rules_applied': 0,
+        'total_actions': 0
+    }
+
+    logger.info(f"Starting batch classification for {len(document_ids)} documents")
+
+    for doc_id in document_ids:
+        try:
+            # Get document
+            document = Document.objects.get(id=doc_id, is_deleted=False)
+
+            # Apply classification
+            result = apply_classification_rules.delay(str(doc_id), triggered_by=triggered_by)
+
+            results['success'] += 1
+
+        except Document.DoesNotExist:
+            results['failed'] += 1
+            logger.warning(f"Document {doc_id} not found")
+        except Exception as e:
+            results['failed'] += 1
+            logger.error(f"Error in batch classification for {doc_id}: {e}")
+
+    logger.info(f"Batch classification completed: {results}")
+    return results
+
+
+@shared_task
+def reclassify_documents_for_rule(rule_id):
+    """
+    Reclassify all matching documents when a rule is updated.
+
+    Useful for testing new rules or updating classifications
+    after rule modifications.
+
+    Args:
+        rule_id: ID of ClassificationRule to apply
+
+    Returns:
+        dict: Summary of reclassification results
+    """
+    from apps.classification.models import ClassificationRule
+    from apps.classification.engine import ClassificationEngine
+    from apps.documents.models import Document
+
+    try:
+        rule = ClassificationRule.objects.get(id=rule_id)
+        logger.info(f"Reclassifying documents for rule '{rule.name}' (ID: {rule_id})")
+
+        # Get all non-deleted documents
+        documents = Document.objects.filter(is_deleted=False)
+
+        matched_count = 0
+        classified_count = 0
+
+        for document in documents:
+            try:
+                # Check if rule matches
+                if ClassificationEngine.matches_conditions(document, rule.conditions):
+                    matched_count += 1
+
+                    # Apply rule actions
+                    result = ClassificationEngine.apply_actions(document, rule.actions, rule)
+
+                    if result['success']:
+                        classified_count += 1
+
+                        # Create classification log
+                        from apps.classification.models import ClassificationLog
+                        ClassificationLog.objects.create(
+                            rule=rule,
+                            document=document,
+                            applied_at=timezone.now(),
+                            conditions_matched=rule.conditions,
+                            actions_applied=result['actions_applied'],
+                            success=True,
+                            triggered_by='rule_update'
+                        )
+
+                        # Update rule statistics
+                        rule.increment_applied_count()
+
+            except Exception as e:
+                logger.error(
+                    f"Error reclassifying document {document.id} with rule {rule_id}: {e}"
+                )
+
+        logger.info(
+            f"Reclassification complete for rule {rule_id}: "
+            f"{matched_count} documents matched, {classified_count} classified"
+        )
+
+        return {
+            'success': True,
+            'rule_id': rule_id,
+            'rule_name': rule.name,
+            'documents_matched': matched_count,
+            'documents_classified': classified_count
+        }
+
+    except ClassificationRule.DoesNotExist:
+        logger.error(f"Classification rule {rule_id} not found")
+        return {
+            'success': False,
+            'message': 'Classification rule not found'
+        }
+    except Exception as e:
+        logger.error(f"Reclassification failed for rule {rule_id}: {e}", exc_info=True)
+        return {
+            'success': False,
+            'message': str(e)
+        }

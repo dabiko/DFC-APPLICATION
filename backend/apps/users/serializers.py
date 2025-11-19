@@ -17,6 +17,18 @@ class DepartmentSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at']
 
 
+class UserBasicSerializer(serializers.ModelSerializer):
+    """
+    Basic user serializer for displaying user info in nested contexts.
+    Only includes essential fields.
+    """
+
+    class Meta:
+        model = CustomUser
+        fields = ['id', 'username', 'email', 'first_name', 'last_name']
+        read_only_fields = ['id', 'username', 'email', 'first_name', 'last_name']
+
+
 class UserSerializer(serializers.ModelSerializer):
     """
     Serializer for CustomUser model.

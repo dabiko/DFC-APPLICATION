@@ -38,6 +38,25 @@ class DocumentTagSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'created_by']
 
 
+class DocumentSearchSerializer(serializers.ModelSerializer):
+    """
+    Highly optimized serializer for search results.
+    Returns only essential fields to minimize response size and serialization time.
+    """
+    owner_name = serializers.CharField(source='owner.get_full_name', read_only=True)
+    department_name = serializers.CharField(source='department.name', read_only=True)
+
+    class Meta:
+        model = Document
+        fields = [
+            'id', 'title', 'file_name', 'file_size_mb',
+            'file_type', 'document_type', 'confidentiality_level',
+            'owner_name', 'department_name',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = fields
+
+
 class DocumentListSerializer(serializers.ModelSerializer):
     """
     Serializer for listing documents (minimal data for performance).

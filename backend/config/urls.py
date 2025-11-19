@@ -32,6 +32,21 @@ urlpatterns = [
     # API v1 - Search
     path('api/v1/search/', include('apps.search.urls', namespace='search')),
 
+    # API v1 - Classification
+    path('api/v1/classification/', include('apps.classification.urls', namespace='classification')),
+
+    # API v1 - Permissions (RBAC)
+    path('api/v1/permissions/', include('apps.permissions.urls', namespace='permissions')),
+
+    # API v1 - Audit Logs
+    path('api/v1/audit/', include('apps.audit.urls', namespace='audit')),
+
+    # API v1 - Retention & Legal Hold
+    path('api/v1/retention/', include('apps.retention.urls')),
+
+    # API v1 - Sharing & Collaboration
+    path('api/v1/', include('apps.sharing.urls')),
+
     # API Documentation
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),

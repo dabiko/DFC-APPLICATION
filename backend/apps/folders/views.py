@@ -21,6 +21,8 @@ from apps.folders.serializers import (
     SmartFolderCreateSerializer,
     SmartFolderUpdateSerializer,
 )
+from apps.permissions.decorators import HasFolderPermission, FolderPermissionMixin
+from apps.permissions.utils import PermissionChecker, check_permission
 import logging
 
 logger = logging.getLogger(__name__)
@@ -46,12 +48,12 @@ logger = logging.getLogger(__name__)
         200: FolderListSerializer(many=True),
     }
 )
-class FolderListCreateView(generics.ListCreateAPIView):
+class FolderListCreateView(FolderPermissionMixin, generics.ListCreateAPIView):
     """
     List folders or create a new folder.
 
     Supports filtering by parent folder and department.
-    Returns only folders the user has access to based on department.
+    Returns only folders the user has access to based on RBAC permissions.
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -61,17 +63,20 @@ class FolderListCreateView(generics.ListCreateAPIView):
         return FolderListSerializer
 
     def get_queryset(self):
-        """Get folders filtered by permissions and query parameters"""
+        """Get folders filtered by RBAC permissions and query parameters"""
         user = self.request.user
-        queryset = Folder.objects.select_related(
+
+        # Get base queryset with select_related
+        base_queryset = Folder.objects.select_related(
             'owner', 'department', 'parent', 'created_by'
         ).annotate(
             children_count=Count('children')
         )
 
-        # Filter by user's department unless staff
-        if not user.is_staff:
-            queryset = queryset.filter(department=user.department)
+        # Apply RBAC filtering using FolderPermissionMixin
+        queryset = super().get_queryset()
+        if queryset is None:
+            queryset = base_queryset
 
         # Filter by parent folder
         parent_id = self.request.query_params.get('parent')
@@ -118,20 +123,22 @@ class FolderDetailView(generics.RetrieveAPIView):
     - Document count
     """
     serializer_class = FolderDetailSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasFolderPermission]
+    required_permission = 'can_view'
     lookup_field = 'id'
 
     def get_queryset(self):
-        """Filter folders by user permissions"""
+        """Filter folders by RBAC permissions"""
         user = self.request.user
         queryset = Folder.objects.select_related(
             'owner', 'department', 'parent', 'created_by'
         ).prefetch_related('children')
 
-        if not user.is_staff:
-            queryset = queryset.filter(department=user.department)
+        # Use PermissionChecker to get accessible folders
+        checker = PermissionChecker(user)
+        accessible_folders = checker.get_accessible_folders(queryset)
 
-        return queryset
+        return accessible_folders
 
 
 @extend_schema(
@@ -149,21 +156,23 @@ class FolderUpdateView(generics.UpdateAPIView):
     Update folder metadata (name, description, confidentiality level).
 
     Note: To move a folder, use the folder move endpoint instead.
+    Requires 'can_edit' permission on the folder.
     """
     serializer_class = FolderUpdateSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasFolderPermission]
+    required_permission = 'can_edit'
     lookup_field = 'id'
 
     def get_queryset(self):
-        """Filter folders by user permissions"""
+        """Filter folders by RBAC permissions"""
         user = self.request.user
         queryset = Folder.objects.all()
 
-        # Only owner or staff can update
-        if not user.is_staff:
-            queryset = queryset.filter(owner=user)
+        # Use PermissionChecker to get editable folders
+        checker = PermissionChecker(user)
+        accessible_folders = checker.get_accessible_folders(queryset)
 
-        return queryset
+        return accessible_folders
 
     def update(self, request, *args, **kwargs):
         """Update folder and return full details"""
@@ -195,20 +204,22 @@ class FolderDeleteView(generics.DestroyAPIView):
     Delete a folder.
 
     Only empty folders (no documents, no subfolders) can be deleted.
+    Requires 'can_delete' permission on the folder.
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasFolderPermission]
+    required_permission = 'can_delete'
     lookup_field = 'id'
 
     def get_queryset(self):
-        """Filter folders by user permissions"""
+        """Filter folders by RBAC permissions"""
         user = self.request.user
         queryset = Folder.objects.all()
 
-        # Only owner or staff can delete
-        if not user.is_staff:
-            queryset = queryset.filter(owner=user)
+        # Use PermissionChecker to get deletable folders
+        checker = PermissionChecker(user)
+        accessible_folders = checker.get_accessible_folders(queryset)
 
-        return queryset
+        return accessible_folders
 
     def perform_destroy(self, instance):
         """Check if folder is empty before deleting"""
@@ -244,6 +255,7 @@ class FolderMoveView(APIView):
     Move a folder to a different parent location.
 
     Prevents circular references and maintains folder hierarchy integrity.
+    Requires 'can_edit' permission on the folder.
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -254,8 +266,8 @@ class FolderMoveView(APIView):
             user = request.user
             folder = Folder.objects.select_related('parent', 'department').get(id=id)
 
-            # Check permissions
-            if not user.is_staff and folder.owner != user:
+            # Check RBAC permissions
+            if not check_permission(user, 'can_edit', folder):
                 return Response(
                     {'error': 'You do not have permission to move this folder'},
                     status=status.HTTP_403_FORBIDDEN
@@ -303,6 +315,7 @@ class FolderBreadcrumbView(APIView):
     Get breadcrumb navigation trail for a folder.
 
     Returns the path from root to the specified folder.
+    Requires 'can_view' permission on the folder.
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -311,13 +324,12 @@ class FolderBreadcrumbView(APIView):
         try:
             folder = Folder.objects.select_related('department').get(id=id)
 
-            # Check permissions
-            if not request.user.is_staff:
-                if folder.department != request.user.department:
-                    return Response(
-                        {'error': 'Permission denied'},
-                        status=status.HTTP_403_FORBIDDEN
-                    )
+            # Check RBAC permissions
+            if not check_permission(request.user, 'can_view', folder):
+                return Response(
+                    {'error': 'Permission denied'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
 
             # Build breadcrumb list
             breadcrumbs = []
@@ -353,6 +365,7 @@ class FolderTreeView(APIView):
     Get hierarchical folder tree structure.
 
     Returns nested folder structure suitable for tree views.
+    Uses RBAC to filter accessible folders.
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -361,10 +374,10 @@ class FolderTreeView(APIView):
         user = request.user
         root_id = request.query_params.get('root')
 
-        # Base queryset with permissions
-        queryset = Folder.objects.select_related('owner', 'department')
-        if not user.is_staff:
-            queryset = queryset.filter(department=user.department)
+        # Base queryset with RBAC permissions
+        base_queryset = Folder.objects.select_related('owner', 'department')
+        checker = PermissionChecker(user)
+        queryset = checker.get_accessible_folders(base_queryset)
 
         if root_id:
             # Get tree from specific root

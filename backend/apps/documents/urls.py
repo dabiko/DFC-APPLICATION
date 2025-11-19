@@ -37,6 +37,7 @@ from apps.documents.views import (
     DocumentOCRView,
     DocumentExtractedTextView,
 )
+from apps.classification.views import ApplyClassificationManuallyView
 
 app_name = 'documents'
 
@@ -91,4 +92,7 @@ urlpatterns = [
     path('<uuid:id>/extract-text/', DocumentExtractTextView.as_view(), name='extract_text'),
     path('<uuid:id>/ocr/', DocumentOCRView.as_view(), name='ocr_document'),
     path('<uuid:id>/extracted-text/', DocumentExtractedTextView.as_view(), name='get_extracted_text'),
+
+    # Classification endpoint
+    path('<uuid:pk>/classify/', ApplyClassificationManuallyView.as_view(), name='classify_document'),
 ]

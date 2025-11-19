@@ -280,8 +280,18 @@ class DocumentDeleteView(generics.DestroyAPIView):
         return queryset
 
     def perform_destroy(self, instance):
-        """Soft delete instead of hard delete"""
+        """Soft delete instead of hard delete - with legal hold protection"""
         from django.utils import timezone
+        from rest_framework.exceptions import PermissionDenied
+
+        # Check for active legal holds
+        active_holds = instance.legal_holds.filter(is_active=True)
+        if active_holds.exists():
+            hold_cases = ', '.join([h.case_number for h in active_holds])
+            raise PermissionDenied(
+                f"Cannot delete document under legal hold. Active cases: {hold_cases}"
+            )
+
         instance.is_deleted = True
         instance.deleted_at = timezone.now()
         instance.save()

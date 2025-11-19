@@ -14,6 +14,15 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from elasticsearch_dsl import Search, Q
 from elasticsearch.exceptions import ConnectionError as ESConnectionError
+from django.core.cache import cache
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
+from django.views.decorators.vary import vary_on_headers
+from django.views.decorators.http import condition
+from django.utils.http import http_date
+from django.utils.cache import get_cache_key, patch_response_headers
+import hashlib
+import time
 
 from apps.search.documents import DocumentDocument
 from apps.search.utils import (
@@ -25,7 +34,7 @@ from apps.search.utils import (
     refresh_index,
     get_elasticsearch_client,
 )
-from apps.documents.serializers import DocumentListSerializer
+from apps.documents.serializers import DocumentListSerializer, DocumentSearchSerializer
 from apps.documents.models import Document
 
 import logging
@@ -79,11 +88,36 @@ class DocumentSearchView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    def _generate_cache_key(self, request):
+        """
+        Generate cache key based on query parameters and user permissions.
+        """
+        # Include user ID and query params in cache key
+        params = dict(request.query_params)
+        params['user_id'] = str(request.user.id)
+        # Sort for consistent keys
+        cache_str = str(sorted(params.items()))
+        cache_hash = hashlib.md5(cache_str.encode()).hexdigest()
+        return f'search_results_{cache_hash}'
+
     def get(self, request):
         """
-        Execute search query and return results.
+        Execute search query and return results with caching.
+        Cache results for 5 minutes to improve performance.
         """
         try:
+            # Check cache first
+            cache_key = self._generate_cache_key(request)
+            cached_response = cache.get(cache_key)
+
+            if cached_response:
+                logger.debug(f"Cache hit for search query: {cache_key}")
+                response = Response(cached_response)
+                response['X-Cache-Status'] = 'HIT'
+                return response
+
+            logger.debug(f"Cache miss for search query: {cache_key}")
+
             # Get search parameters
             query_text = request.query_params.get('q', '').strip()
             page = int(request.query_params.get('page', 1))
@@ -208,6 +242,19 @@ class DocumentSearchView(APIView):
             search.aggs.bucket('file_types', 'terms', field='file_type', size=10)
             search.aggs.bucket('departments', 'terms', field='department.name.raw', size=10)
 
+            # Add spell checking suggestions (if query text provided)
+            if query_text:
+                search = search.suggest(
+                    'title_suggestions',
+                    query_text,
+                    term={'field': 'title'}
+                )
+                search = search.suggest(
+                    'filename_suggestions',
+                    query_text,
+                    term={'field': 'file_name'}
+                )
+
             # Execute search
             response = search.execute()
 
@@ -224,8 +271,8 @@ class DocumentSearchView(APIView):
             docs_dict = {str(doc.id): doc for doc in documents}
             ordered_docs = [docs_dict[doc_id] for doc_id in doc_ids if doc_id in docs_dict]
 
-            # Serialize documents
-            serializer = DocumentListSerializer(ordered_docs, many=True)
+            # Serialize documents with optimized search serializer
+            serializer = DocumentSearchSerializer(ordered_docs, many=True)
 
             # Prepare facets
             facets = {
@@ -247,11 +294,38 @@ class DocumentSearchView(APIView):
                 },
             }
 
+            # Prepare spell checking suggestions
+            suggestions = {}
+            if query_text and hasattr(response, 'suggest'):
+                # Extract unique spelling suggestions
+                title_suggestions = []
+                filename_suggestions = []
+
+                if 'title_suggestions' in response.suggest:
+                    for suggestion in response.suggest.title_suggestions:
+                        for option in suggestion.options:
+                            if option.text not in title_suggestions:
+                                title_suggestions.append(option.text)
+
+                if 'filename_suggestions' in response.suggest:
+                    for suggestion in response.suggest.filename_suggestions:
+                        for option in suggestion.options:
+                            if option.text not in filename_suggestions:
+                                filename_suggestions.append(option.text)
+
+                # Combine unique suggestions
+                all_suggestions = list(set(title_suggestions + filename_suggestions))
+                if all_suggestions:
+                    suggestions = {
+                        'did_you_mean': all_suggestions[:5],  # Top 5 suggestions
+                        'original_query': query_text
+                    }
+
             # Prepare response
             total_results = response.hits.total.value
             total_pages = (total_results + page_size - 1) // page_size
 
-            return Response({
+            response_data = {
                 'count': total_results,
                 'results': serializer.data,
                 'facets': facets,
@@ -260,7 +334,27 @@ class DocumentSearchView(APIView):
                 'total_pages': total_pages,
                 'query': query_text,
                 'took_ms': response.took,  # Search execution time
-            })
+            }
+
+            # Add suggestions if available
+            if suggestions:
+                response_data['suggestions'] = suggestions
+
+            # Cache the response for 5 minutes (300 seconds)
+            cache.set(cache_key, response_data, 300)
+
+            # Create response with caching headers
+            response = Response(response_data)
+            response['X-Cache-Status'] = 'MISS'
+
+            # Generate ETag for response
+            etag = hashlib.md5(str(response_data).encode()).hexdigest()
+            response['ETag'] = f'"{etag}"'
+
+            # Add cache control headers (5 minutes)
+            response['Cache-Control'] = 'private, max-age=300'
+
+            return response
 
         except ESConnectionError:
             logger.error('Elasticsearch connection failed')

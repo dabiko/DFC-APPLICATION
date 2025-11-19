@@ -16,10 +16,29 @@ from apps.folders.models import Folder
 # Define the documents index
 documents_index = Index('documents')
 
-# Configure index settings
+# Configure index settings for optimal performance
 documents_index.settings(
-    number_of_shards=1,
-    number_of_replicas=0,
+    # Shard configuration for scalability
+    # 3 shards allows horizontal scaling and parallel query execution
+    number_of_shards=3,
+    # 1 replica for high availability and load distribution
+    number_of_replicas=1,
+
+    # Refresh interval - how often index is refreshed
+    # Higher value = better indexing performance, slight search delay
+    refresh_interval='5s',
+
+    # Maximum result window for pagination
+    max_result_window=50000,
+
+    # Additional performance settings as a settings dict
+    settings={
+        'index.number_of_routing_shards': 6,  # For future split operations
+        'index.codec': 'best_compression',  # Compress stored fields
+        'index.translog.durability': 'async',  # Better performance
+        'index.translog.sync_interval': '5s',
+    },
+
     analysis={
         'analyzer': {
             # Custom analyzer for full-text search with stemming
@@ -52,6 +71,13 @@ documents_index.settings(
                 'min_gram': 2,
                 'max_gram': 10,
                 'token_chars': ['letter', 'digit']
+            }
+        },
+        'normalizer': {
+            # Normalizer for keyword fields (lowercase without tokenization)
+            'lowercase': {
+                'type': 'custom',
+                'filter': ['lowercase', 'asciifolding']
             }
         }
     }
@@ -109,16 +135,17 @@ class DocumentDocument(Document):
     )
 
     # ========================================
-    # Metadata fields (for filtering)
+    # Metadata fields (for filtering and aggregations)
     # ========================================
 
-    document_type = fields.KeywordField()
-    identifier = fields.KeywordField()
-    confidentiality_level = fields.KeywordField()
-    document_date = fields.DateField()
+    # Keyword fields are optimized for filtering and aggregations
+    document_type = fields.KeywordField(normalizer='lowercase')
+    identifier = fields.KeywordField(normalizer='lowercase')
+    confidentiality_level = fields.KeywordField(normalizer='lowercase')
+    document_date = fields.DateField(format='yyyy-MM-dd||yyyy/MM/dd||epoch_millis')
 
-    file_type = fields.KeywordField()
-    file_size = fields.LongField()
+    file_type = fields.KeywordField(normalizer='lowercase')
+    file_size = fields.LongField(index=True)  # Enable range queries
 
     creator_source = fields.TextField(
         analyzer='custom_text_analyzer',

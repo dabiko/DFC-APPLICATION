@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     'django_elasticsearch_dsl',
 
     # Local apps
+    'apps.core',  # Core utilities, encryption, middleware
     'apps.users',
     'apps.documents',
     'apps.folders',
@@ -39,15 +40,20 @@ INSTALLED_APPS = [
     'apps.permissions',
     'apps.workflows',
     'apps.retention',
+    'apps.classification',
+    'apps.sharing',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'apps.core.middleware.SecurityHeadersMiddleware',  # Security headers
+    'django.middleware.gzip.GZipMiddleware',  # Response compression
     'corsheaders.middleware.CorsMiddleware',  # CORS middleware
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'apps.audit.middleware.AuditContextMiddleware',  # Audit context tracking
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'apps.documents.middleware.StorageQuotaMiddleware',
@@ -205,7 +211,7 @@ CACHES = {
     }
 }
 
-# MinIO Storage Configuration
+# MinIO Storage Configuration with Encryption
 DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 AWS_ACCESS_KEY_ID = os.getenv('MINIO_ACCESS_KEY', 'minioadmin')
 AWS_SECRET_ACCESS_KEY = os.getenv('MINIO_SECRET_KEY', 'minioadmin123')
@@ -217,7 +223,15 @@ AWS_DEFAULT_ACL = None
 AWS_S3_SIGNATURE_VERSION = 's3v4'
 AWS_S3_FILE_OVERWRITE = False
 
-# Elasticsearch Configuration
+# Server-side encryption for MinIO/S3
+AWS_S3_ENCRYPTION = True
+AWS_S3_SERVER_SIDE_ENCRYPTION = 'AES256'  # Use AES-256 encryption
+
+# Security settings
+AWS_QUERYSTRING_AUTH = True  # Use signed URLs
+AWS_QUERYSTRING_EXPIRE = 3600  # Signed URLs expire after 1 hour
+
+# Elasticsearch Configuration with TLS
 ELASTICSEARCH_DSL = {
     'default': {
         'hosts': [f"{os.getenv('ELASTICSEARCH_HOST', 'localhost')}:{os.getenv('ELASTICSEARCH_PORT', '9200')}"],
@@ -225,6 +239,9 @@ ELASTICSEARCH_DSL = {
             os.getenv('ELASTICSEARCH_USER', ''),
             os.getenv('ELASTICSEARCH_PASSWORD', ''),
         ) if os.getenv('ELASTICSEARCH_USER') else None,
+        'use_ssl': os.getenv('ELASTICSEARCH_USE_SSL', 'False') == 'True',
+        'verify_certs': os.getenv('ELASTICSEARCH_VERIFY_CERTS', 'True') == 'True',
+        'ssl_show_warn': False,
         'timeout': 30,
         'max_retries': 3,
         'retry_on_timeout': True,
@@ -285,3 +302,109 @@ LOGGING = {
         },
     },
 }
+
+# ==============================================================================
+# ENCRYPTION SETTINGS
+# ==============================================================================
+
+# Fernet Field-Level Encryption
+# Generate keys with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+FERNET_KEYS = [
+    os.getenv('FERNET_KEY_PRIMARY', None),  # Current encryption key
+    os.getenv('FERNET_KEY_SECONDARY', None),  # For key rotation (old key)
+]
+
+# Remove None values from keys list
+FERNET_KEYS = [k for k in FERNET_KEYS if k]
+
+# If no keys configured and in DEBUG mode, will auto-generate (for development only)
+if not FERNET_KEYS and not os.getenv('DJANGO_ENV') == 'production':
+    # In production, this will raise an error in the encrypted fields
+    pass
+
+# HashiCorp Vault Configuration (for production)
+VAULT_ADDR = os.getenv('VAULT_ADDR', 'http://localhost:8200')
+VAULT_TOKEN = os.getenv('VAULT_TOKEN', None)
+VAULT_VERIFY_SSL = os.getenv('VAULT_VERIFY_SSL', 'True') == 'True'
+
+# ==============================================================================
+# DJANGO SECURITY SETTINGS
+# ==============================================================================
+
+# SSL/HTTPS Settings (enforced in production)
+SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', 'False') == 'True'
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# Cookie Security
+SESSION_COOKIE_SECURE = os.getenv('SESSION_COOKIE_SECURE', 'False') == 'True'
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SECURE = os.getenv('CSRF_COOKIE_SECURE', 'False') == 'True'
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = 'Lax'
+
+# Security Headers (additional to middleware)
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'SAMEORIGIN'
+
+# HSTS (HTTP Strict Transport Security)
+SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', '0'))  # 0 in dev, 63072000 (2 years) in production
+SECURE_HSTS_INCLUDE_SUBDOMAINS = os.getenv('SECURE_HSTS_INCLUDE_SUBDOMAINS', 'False') == 'True'
+SECURE_HSTS_PRELOAD = os.getenv('SECURE_HSTS_PRELOAD', 'False') == 'True'
+
+# Allowed hosts (must be configured in production)
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+
+# CSRF Trusted Origins
+CSRF_TRUSTED_ORIGINS = os.getenv(
+    'CSRF_TRUSTED_ORIGINS',
+    'http://localhost:3000,http://localhost:5173'
+).split(',')
+
+# ==============================================================================
+# MONITORING & ALERTING CONFIGURATION
+# ==============================================================================
+
+# Alert System
+ENABLE_EMAIL_ALERTS = os.getenv('ENABLE_EMAIL_ALERTS', 'False') == 'True'
+ENABLE_SLACK_ALERTS = os.getenv('ENABLE_SLACK_ALERTS', 'False') == 'True'
+ENABLE_SMS_ALERTS = os.getenv('ENABLE_SMS_ALERTS', 'False') == 'True'
+
+ALERT_FROM_EMAIL = os.getenv('ALERT_FROM_EMAIL', 'alerts@dfc.cccplc.com')
+
+# Alert Recipients
+DEFAULT_ALERT_RECIPIENTS = os.getenv('DEFAULT_ALERT_RECIPIENTS', '').split(',')
+EMERGENCY_ALERT_RECIPIENTS = os.getenv('EMERGENCY_ALERT_RECIPIENTS', '').split(',')
+CRITICAL_ALERT_RECIPIENTS = os.getenv('CRITICAL_ALERT_RECIPIENTS', '').split(',')
+CERTIFICATE_ALERT_RECIPIENTS = os.getenv('CERTIFICATE_ALERT_RECIPIENTS', '').split(',')
+ENCRYPTION_ALERT_RECIPIENTS = os.getenv('ENCRYPTION_ALERT_RECIPIENTS', '').split(',')
+
+# Emergency SMS Numbers (for critical alerts)
+EMERGENCY_SMS_NUMBERS = os.getenv('EMERGENCY_SMS_NUMBERS', '').split(',')
+
+# Slack Webhook
+SLACK_WEBHOOK_URL = os.getenv('SLACK_WEBHOOK_URL', None)
+
+# Certificate Monitoring
+SSL_CERTIFICATE_PATHS = {
+    'nginx': os.getenv('SSL_CERT_PATH', '/etc/letsencrypt/live/dfc.cccplc.com/fullchain.pem'),
+}
+
+REMOTE_CERTIFICATE_CHECKS = {
+    'production': {
+        'hostname': os.getenv('PRODUCTION_HOSTNAME', 'dfc.cccplc.com'),
+        'port': 443,
+    },
+}
+
+# Encryption Monitoring Thresholds
+ENCRYPTION_FAILURE_THRESHOLD = float(os.getenv('ENCRYPTION_FAILURE_THRESHOLD', '1.0'))  # 1% failure rate
+KEY_ROTATION_INTERVAL_DAYS = int(os.getenv('KEY_ROTATION_INTERVAL_DAYS', '90'))  # 90 days
+
+# Security Monitoring Thresholds
+FAILED_AUTH_THRESHOLD = int(os.getenv('FAILED_AUTH_THRESHOLD', '100'))  # Per hour
+UNAUTHORIZED_ACCESS_THRESHOLD = int(os.getenv('UNAUTHORIZED_ACCESS_THRESHOLD', '50'))  # Per hour
+
+# Environment identifier for alerts
+ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')

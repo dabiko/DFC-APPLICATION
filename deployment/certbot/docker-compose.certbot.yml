@@ -1,0 +1,46 @@
+# ==============================================================================
+# Let's Encrypt Certbot Configuration for Automatic SSL Certificate Management
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  # ==============================================================================
+  # Certbot - Let's Encrypt Certificate Automation
+  # ==============================================================================
+  certbot:
+    image: certbot/certbot:latest
+    container_name: dfc_certbot
+    volumes:
+      # Certificate storage
+      - certbot_certificates:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+      # Renewal hooks
+      - ./certbot/renewal-hooks:/etc/letsencrypt/renewal-hooks
+    command: certonly --webroot --webroot-path=/var/www/certbot --email admin@cccplc.com --agree-tos --no-eff-email -d dfc.cccplc.com -d api.dfc.cccplc.com -d minio.dfc.cccplc.com
+    networks:
+      - dfc_network
+
+  # ==============================================================================
+  # Nginx for ACME Challenge (HTTP-01)
+  # ==============================================================================
+  nginx_certbot:
+    image: nginx:alpine
+    container_name: dfc_nginx_certbot
+    ports:
+      - "80:80"
+    volumes:
+      - certbot_www:/var/www/certbot:ro
+      - ./certbot/nginx-certbot.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - dfc_network
+
+networks:
+  dfc_network:
+    external: true
+
+volumes:
+  certbot_certificates:
+    driver: local
+  certbot_www:
+    driver: local

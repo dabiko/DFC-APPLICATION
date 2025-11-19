@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from apps.core.fields import EncryptedTextField, EncryptedCharField
 import uuid
 import hashlib
 
@@ -83,6 +84,33 @@ class Document(models.Model):
     retention_period_years = models.IntegerField(
         default=7,
         help_text='Number of years to retain this document'
+    )
+
+    # Encrypted Sensitive Fields
+    # These fields are encrypted at rest using Fernet symmetric encryption
+    # Cannot be directly queried in database filters (use search index for searchable encrypted data)
+    customer_id = EncryptedCharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text='Encrypted customer identifier (PII)'
+    )
+    account_number = EncryptedCharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text='Encrypted account number (sensitive financial data)'
+    )
+    tax_id = EncryptedCharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text='Encrypted tax ID/SSN (PII - Personally Identifiable Information)'
+    )
+    notes = EncryptedTextField(
+        null=True,
+        blank=True,
+        help_text='Encrypted internal notes (may contain sensitive information)'
     )
 
     # Relationships
