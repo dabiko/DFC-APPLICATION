@@ -202,7 +202,24 @@ class RetentionScheduleSerializer(serializers.ModelSerializer):
             'updated_at',
             'deleted_at',
         ]
-        read_only_fields = '__all__'  # All fields are read-only
+        read_only_fields = [
+            'id',
+            'document',
+            'document_title',
+            'document_type',
+            'policy',
+            'policy_name',
+            'retention_end_date',
+            'notification_date',
+            'deletion_date',
+            'status',
+            'notification_sent',
+            'can_delete',
+            'days_until_deletion',
+            'created_at',
+            'updated_at',
+            'deleted_at',
+        ]  # All fields are read-only
 
     def get_can_delete(self, obj):
         """Check if document can be deleted (no legal holds)"""

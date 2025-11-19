@@ -65,17 +65,33 @@ class SecurityHeadersMiddleware:
 
         # Content Security Policy
         # Define allowed sources for content
-        response['Content-Security-Policy'] = (
-            "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "  # TODO: Remove unsafe-* in production
-            "style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data: https:; "
-            "font-src 'self' data:; "
-            "connect-src 'self'; "
-            "frame-ancestors 'self'; "
-            "form-action 'self'; "
-            "base-uri 'self';"
-        )
+        # Relax CSP for API documentation endpoints
+        if request.path.startswith('/api/docs/') or request.path.startswith('/api/redoc/'):
+            # Allow CDN resources for Swagger UI and ReDoc
+            response['Content-Security-Policy'] = (
+                "default-src 'self'; "
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; "
+                "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                "img-src 'self' data: https:; "
+                "font-src 'self' data: https://cdn.jsdelivr.net; "
+                "connect-src 'self' https://cdn.jsdelivr.net; "  # Allow CDN for source maps
+                "frame-ancestors 'self'; "
+                "form-action 'self'; "
+                "base-uri 'self';"
+            )
+        else:
+            # Strict CSP for other endpoints
+            response['Content-Security-Policy'] = (
+                "default-src 'self'; "
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "  # TODO: Remove unsafe-* in production
+                "style-src 'self' 'unsafe-inline'; "
+                "img-src 'self' data: https:; "
+                "font-src 'self' data:; "
+                "connect-src 'self'; "
+                "frame-ancestors 'self'; "
+                "form-action 'self'; "
+                "base-uri 'self';"
+            )
 
         # Permissions Policy (formerly Feature-Policy)
         # Disable sensitive browser features
@@ -86,8 +102,7 @@ class SecurityHeadersMiddleware:
             "payment=(), "
             "usb=(), "
             "magnetometer=(), "
-            "gyroscope=(), "
-            "speaker=()"
+            "gyroscope=()"
         )
 
         # Additional security header for cross-origin policies
