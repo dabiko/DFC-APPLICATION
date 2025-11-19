@@ -19,7 +19,7 @@ The DFC serves as a digital transformation solution for managing vast volumes of
 
 ### Backend
 - **Framework**: Django 4.2+ (Python web framework)
-- **Python Version**: 3.11+
+- **Python Version**: 3.13.5 (3.13+ required)
 - **API**: Django Rest Framework (DRF) for RESTful APIs
 - **Database**: PostgreSQL (for metadata, user accounts, folder hierarchy, audit logs)
 - **File Storage**: MinIO (S3-compatible object storage for elastic scalability within intranet)

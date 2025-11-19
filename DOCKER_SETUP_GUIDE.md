@@ -523,7 +523,7 @@ The React frontend is containerized using a **multi-stage Docker build**:
 ### Backend Architecture
 
 The Django backend runs in development mode with:
-- Python 3.11-slim base image
+- Python 3.13-slim base image (matches local development)
 - Hot-reload enabled (code changes reflected immediately)
 - Volume mounting for real-time code updates
 - Connected to all supporting services via Docker network

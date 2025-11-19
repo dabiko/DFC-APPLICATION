@@ -10,7 +10,7 @@ Django-based REST API backend for the Digital Filing Cabinet document management
 - **Search Engine**: Elasticsearch 8.x
 - **Cache**: Redis 8.x
 - **Task Queue**: Celery with RabbitMQ
-- **Python**: 3.11+
+- **Python**: 3.13.5 (3.13+ required)
 
 ## Project Structure
 
