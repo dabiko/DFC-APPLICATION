@@ -235,10 +235,13 @@ class DocumentUploadSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         """
         Create document with file upload and checksum calculation.
+        Uploads file to MinIO for secure storage.
         """
+        from apps.storage.services import storage_service
+
         request = self.context.get('request')
         tags_data = validated_data.pop('tags', [])
-        uploaded_file = validated_data.get('file')
+        uploaded_file = validated_data.pop('file')
 
         # Calculate checksum
         checksum = Document.calculate_checksum(uploaded_file)
@@ -256,7 +259,7 @@ class DocumentUploadSerializer(serializers.ModelSerializer):
         file_size = uploaded_file.size
         file_type = mimetypes.guess_type(file_name)[0] or 'application/octet-stream'
 
-        # Create document
+        # Create document instance (without file for now)
         document = Document.objects.create(
             **validated_data,
             file_name=file_name,
@@ -267,6 +270,43 @@ class DocumentUploadSerializer(serializers.ModelSerializer):
             created_by=request.user,
             version_number=1
         )
+
+        # Upload file to MinIO
+        try:
+            result = storage_service.upload_file(
+                file_obj=uploaded_file,
+                organization_id=str(request.user.organization.id),
+                document_id=str(document.id),
+                filename=file_name,
+                version=1,
+                metadata={
+                    'title': document.title,
+                    'document_type': document.document_type,
+                    'confidentiality': document.confidentiality_level,
+                    'uploaded_by': request.user.username
+                }
+            )
+
+            if result['success']:
+                # Update document with MinIO storage details
+                document.minio_bucket = result['bucket']
+                document.minio_object_key = result['object_key']
+                document.minio_etag = result['etag']
+                document.file_type = result['mime_type']  # Use accurate MIME type from magic
+                document.save(update_fields=['minio_bucket', 'minio_object_key', 'minio_etag', 'file_type'])
+            else:
+                # If MinIO upload fails, delete the document and raise error
+                document.delete()
+                raise serializers.ValidationError({
+                    'file': f'Failed to upload file to storage: {result.get("error", "Unknown error")}'
+                })
+
+        except Exception as e:
+            # Clean up on error
+            document.delete()
+            raise serializers.ValidationError({
+                'file': f'Storage error: {str(e)}'
+            })
 
         # Apply tags
         if tags_data:

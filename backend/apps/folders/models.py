@@ -13,6 +13,7 @@ class Folder(models.Model):
     - Depth tracking for UI rendering
     - Confidentiality level inheritance
     - Unique folder names within same parent
+    - Multi-tenant organization support
     """
 
     CONFIDENTIALITY_CHOICES = [
@@ -23,6 +24,17 @@ class Folder(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    # Multi-tenant organization
+    organization = models.ForeignKey(
+        'organizations.Organization',
+        on_delete=models.PROTECT,
+        related_name='folders',
+        null=True,  # Nullable for migration - will be non-null after data migration
+        blank=True,
+        help_text='Organization this folder belongs to'
+    )
+
     name = models.CharField(max_length=255)
     parent = models.ForeignKey(
         'self',

@@ -29,10 +29,14 @@ INSTALLED_APPS = [
     'corsheaders',
     'drf_spectacular',
     'django_elasticsearch_dsl',
+    'django_otp',
+    'django_otp.plugins.otp_totp',
 
     # Local apps
     'apps.core',  # Core utilities, encryption, middleware
     'apps.users',
+    'apps.organizations',  # Multi-tenant organization management
+    'apps.storage',  # MinIO storage integration
     'apps.documents',
     'apps.folders',
     'apps.search',
@@ -53,6 +57,10 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'apps.organizations.middleware.TenantMiddleware',  # Multi-tenant organization context
+    'django_otp.middleware.OTPMiddleware',  # MFA middleware
+    'apps.users.mfa_middleware.MFAEnforcementMiddleware',  # MFA enforcement for admin
+    'apps.users.mfa_middleware.MFASessionMiddleware',  # MFA session management
     'apps.audit.middleware.AuditContextMiddleware',  # Audit context tracking
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -139,7 +147,7 @@ AUTH_USER_MODEL = 'users.CustomUser'
 # Django REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'apps.users.mfa_authentication.MFAJWTAuthentication',  # Custom JWT with MFA check
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',

@@ -17,6 +17,7 @@ class Document(models.Model):
     - Confidentiality levels
     - Full-text search support (extracted text)
     - OCR support for scanned documents
+    - Multi-tenant organization support
     """
 
     CONFIDENTIALITY_CHOICES = [
@@ -45,6 +46,16 @@ class Document(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
+    # Multi-tenant organization
+    organization = models.ForeignKey(
+        'organizations.Organization',
+        on_delete=models.PROTECT,
+        related_name='documents',
+        null=True,  # Nullable for migration - will be non-null after data migration
+        blank=True,
+        help_text='Organization this document belongs to'
+    )
+
     # File information
     title = models.CharField(max_length=500)
     file = models.FileField(upload_to='documents/%Y/%m/%d/')
@@ -55,6 +66,28 @@ class Document(models.Model):
         max_length=64,
         unique=True,
         help_text='SHA-256 checksum for file integrity'
+    )
+
+    # MinIO/S3 Storage fields
+    minio_bucket = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text='MinIO bucket name where file is stored'
+    )
+    minio_object_key = models.CharField(
+        max_length=500,
+        blank=True,
+        help_text='MinIO object key (path) for the file'
+    )
+    minio_etag = models.CharField(
+        max_length=64,
+        blank=True,
+        help_text='S3 ETag for file integrity verification'
+    )
+    storage_region = models.CharField(
+        max_length=50,
+        default='us-east-1',
+        help_text='Storage region'
     )
 
     # Mandatory Metadata
@@ -413,6 +446,23 @@ class DocumentVersion(models.Model):
     checksum = models.CharField(
         max_length=64,
         help_text='SHA-256 checksum for version integrity verification'
+    )
+
+    # MinIO/S3 Storage fields for versions
+    minio_bucket = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text='MinIO bucket name where version file is stored'
+    )
+    minio_object_key = models.CharField(
+        max_length=500,
+        blank=True,
+        help_text='MinIO object key (path) for the version file'
+    )
+    minio_etag = models.CharField(
+        max_length=64,
+        blank=True,
+        help_text='S3 ETag for version file integrity verification'
     )
 
     # Version metadata

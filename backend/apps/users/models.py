@@ -8,19 +8,32 @@ from datetime import timedelta
 
 def validate_company_email(value):
     """
-    Validate that email address belongs to cccplc.net domain.
-    Only users with @cccplc.net emails can access the application.
+    Validate that email address belongs to a business domain.
+
+    DEPRECATED: This validator is kept for backward compatibility.
+    Multi-tenant email validation is now handled by apps.organizations.validators.validate_business_email
+
+    For now, this just validates it's a proper email format.
+    Domain validation is enforced during organization creation/invitation.
     """
-    allowed_domain = 'cccplc.net'
-    if not value.lower().endswith(f'@{allowed_domain}'):
-        raise ValidationError(
-            f'Access denied. Only email addresses with @{allowed_domain} domain are allowed. '
-            f'Please contact your system administrator if you believe this is an error.'
-        )
+    # For multi-tenant, we'll validate the domain matches organization during user creation
+    # This is just a basic email format check now
+    if '@' not in value:
+        raise ValidationError('Please enter a valid email address.')
 
 
 class Department(models.Model):
     """Organization departments with storage quota management"""
+    # Multi-tenant organization
+    organization = models.ForeignKey(
+        'organizations.Organization',
+        on_delete=models.PROTECT,
+        related_name='departments',
+        null=True,  # Nullable for migration - will be non-null after data migration
+        blank=True,
+        help_text='Organization this department belongs to'
+    )
+
     name = models.CharField(max_length=100)
     code = models.CharField(max_length=20, unique=True)
     parent = models.ForeignKey(
@@ -52,12 +65,24 @@ class CustomUser(AbstractUser):
     Extended user model with additional fields for DFC.
 
     Security Features:
-    - Email domain restriction to cccplc.net
+    - Email domain restriction to cccplc.net (deprecated - now handled by organization)
     - Account lockout after 5 failed login attempts
     - Failed login attempt tracking
     - Multi-factor authentication support
+    - Multi-tenant organization support
     """
     employee_id = models.CharField(max_length=50, unique=True)
+
+    # Multi-tenant organization (nullable initially for migration)
+    organization = models.ForeignKey(
+        'organizations.Organization',
+        on_delete=models.PROTECT,
+        related_name='users',
+        null=True,  # Nullable for migration - will be non-null after data migration
+        blank=True,
+        help_text='Organization this user belongs to'
+    )
+
     department = models.ForeignKey(
         Department,
         on_delete=models.PROTECT,
@@ -237,3 +262,7 @@ class CustomUser(AbstractUser):
         """Override save to run full validation"""
         self.full_clean()
         super().save(*args, **kwargs)
+
+
+# Import MFA models
+from apps.users.mfa_models import MFABackupCode, MFASettings

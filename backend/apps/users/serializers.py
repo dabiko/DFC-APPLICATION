@@ -36,6 +36,8 @@ class UserSerializer(serializers.ModelSerializer):
     """
     department_name = serializers.CharField(source='department.name', read_only=True)
     department_code = serializers.CharField(source='department.code', read_only=True)
+    organization_name = serializers.CharField(source='organization.name', read_only=True)
+    organization_id = serializers.UUIDField(source='organization.id', read_only=True)
 
     class Meta:
         model = CustomUser
@@ -43,6 +45,7 @@ class UserSerializer(serializers.ModelSerializer):
             'id', 'username', 'email', 'employee_id',
             'first_name', 'last_name', 'phone_number',
             'department', 'department_name', 'department_code',
+            'organization', 'organization_name', 'organization_id',
             'avatar', 'is_staff', 'is_superuser', 'is_active',
             'mfa_enabled', 'date_joined', 'last_login',
             'created_at', 'updated_at'
@@ -50,7 +53,7 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'id', 'employee_id', 'date_joined', 'last_login',
             'created_at', 'updated_at', 'is_staff', 'is_superuser',
-            'mfa_enabled'
+            'mfa_enabled', 'organization', 'organization_name', 'organization_id'
         ]
         extra_kwargs = {
             'password': {'write_only': True}
@@ -61,6 +64,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     """
     Serializer for user registration.
     Validates email domain and password strength.
+    Automatically creates or joins organization based on email domain.
     """
     password = serializers.CharField(
         write_only=True,
@@ -73,6 +77,8 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         style={'input_type': 'password'}
     )
     department_name = serializers.CharField(source='department.name', read_only=True)
+    organization_name = serializers.CharField(source='organization.name', read_only=True)
+    organization_id = serializers.UUIDField(source='organization.id', read_only=True)
 
     class Meta:
         model = CustomUser
@@ -80,9 +86,10 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             'id', 'username', 'email', 'password', 'password_confirm',
             'first_name', 'last_name', 'phone_number',
             'department', 'department_name', 'employee_id',
+            'organization', 'organization_name', 'organization_id',
             'created_at'
         ]
-        read_only_fields = ['id', 'employee_id', 'created_at']
+        read_only_fields = ['id', 'employee_id', 'organization', 'organization_name', 'organization_id', 'created_at']
         extra_kwargs = {
             'first_name': {'required': True},
             'last_name': {'required': True},
@@ -91,12 +98,14 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
     def validate_email(self, value):
         """
-        Validate that email ends with @cccplc.net
+        Validate that email is a business email (not free email provider).
+        Uses organization validators to block Gmail, Yahoo, etc.
         """
-        if not value.endswith('@cccplc.net'):
-            raise serializers.ValidationError(
-                "Email must be a valid @cccplc.net address"
-            )
+        from apps.organizations.validators import validate_business_email
+
+        # Validate it's a business email (not Gmail, Yahoo, etc.)
+        validate_business_email(value)
+
         return value.lower()
 
     def validate(self, attrs):
@@ -122,13 +131,52 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         """
-        Create user with hashed password
+        Create user with hashed password and auto-create/join organization.
+
+        Multi-tenant logic:
+        1. Extract domain from user's email
+        2. Check if organization with that domain already exists
+        3. If yes: Join existing organization as 'member'
+        4. If no: Create new organization and join as 'owner'
         """
+        from django.db import transaction
+        from apps.organizations.models import Organization, OrganizationMember
+        from apps.organizations.validators import extract_domain_from_email
+
         password = validated_data.pop('password')
-        user = CustomUser.objects.create_user(
-            password=password,
-            **validated_data
-        )
+        email = validated_data.get('email')
+
+        # Extract domain from email
+        domain = extract_domain_from_email(email)
+
+        with transaction.atomic():
+            # Check if organization exists for this domain
+            organization, created = Organization.objects.get_or_create(
+                domain=domain,
+                defaults={
+                    'name': domain.split('.')[0].upper(),  # e.g., 'cccplc' from 'cccplc.net'
+                    'subscription_plan': 'free',
+                    'subscription_status': 'trial',
+                }
+            )
+
+            # Create the user with organization assigned
+            user = CustomUser.objects.create_user(
+                password=password,
+                organization=organization,
+                **validated_data
+            )
+
+            # Create organization membership
+            # If organization was just created, user is owner; otherwise member
+            role = 'owner' if created else 'member'
+            OrganizationMember.objects.create(
+                user=user,
+                organization=organization,
+                role=role,
+                is_active=True
+            )
+
         return user
 
 
@@ -162,7 +210,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         # Record successful login
         user.record_successful_login()
 
-        # Add custom claims
+        # Add custom claims including organization context
         data['user'] = {
             'id': user.id,
             'username': user.username,
@@ -174,6 +222,10 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'is_staff': user.is_staff,
             'is_superuser': user.is_superuser,
             'mfa_enabled': user.mfa_enabled,
+            # Organization context for multi-tenant SaaS
+            'organization_id': str(user.organization.id) if user.organization else None,
+            'organization_name': user.organization.name if user.organization else None,
+            'organization_domain': user.organization.domain if user.organization else None,
         }
 
         return data
@@ -181,15 +233,30 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
         """
-        Add custom claims to token
+        Add custom claims to token including organization context.
+        This allows frontend to access organization info without additional API calls.
         """
         token = super().get_token(user)
 
-        # Add custom claims
+        # Add custom user claims
         token['username'] = user.username
         token['email'] = user.email
         token['employee_id'] = user.employee_id
         token['department'] = user.department.name if user.department else None
+
+        # Add organization claims for multi-tenant context
+        if user.organization:
+            token['organization_id'] = str(user.organization.id)
+            token['organization_name'] = user.organization.name
+            token['organization_domain'] = user.organization.domain
+            token['subscription_plan'] = user.organization.subscription_plan
+            token['subscription_status'] = user.organization.subscription_status
+        else:
+            token['organization_id'] = None
+            token['organization_name'] = None
+            token['organization_domain'] = None
+            token['subscription_plan'] = None
+            token['subscription_status'] = None
 
         return token
 

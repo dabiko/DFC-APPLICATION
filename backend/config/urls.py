@@ -22,6 +22,10 @@ urlpatterns = [
 
     # API v1 - Authentication & Users
     path('api/v1/auth/', include('apps.users.urls', namespace='users')),
+    path('api/v1/auth/mfa/', include('apps.users.mfa_urls', namespace='mfa')),
+
+    # API v1 - Organizations (Multi-tenant)
+    path('api/v1/organizations/', include('apps.organizations.urls', namespace='organizations')),
 
     # API v1 - Documents
     path('api/v1/documents/', include('apps.documents.urls', namespace='documents')),

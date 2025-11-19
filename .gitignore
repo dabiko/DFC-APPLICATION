@@ -102,3 +102,4 @@ backend/celerybeat.pid
 # Local development
 .DS_Store
 *.local
+nul
