@@ -54,6 +54,28 @@ class Organization(models.Model):
         help_text="URL-friendly organization identifier"
     )
 
+    # Company Details (from registration)
+    registration_number = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Company registration number"
+    )
+    tax_id = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Tax identification number"
+    )
+    industry = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Industry/business sector"
+    )
+    country = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Country where organization is located"
+    )
+
     # Subscription Management
     subscription_plan = models.CharField(
         max_length=50,

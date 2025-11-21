@@ -4,7 +4,6 @@
  */
 
 import type { DocumentMetadata } from './metadata'
-import type { FileListItem } from './fileManagement'
 
 /**
  * Search Query Types

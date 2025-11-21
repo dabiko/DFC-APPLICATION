@@ -13,10 +13,12 @@ from apps.users.models import CustomUser, Department
 from apps.users.serializers import (
     UserSerializer,
     UserRegistrationSerializer,
+    ComprehensiveRegistrationSerializer,
     CustomTokenObtainPairSerializer,
     PasswordChangeSerializer,
     DepartmentSerializer
 )
+from apps.users.emails import send_welcome_email
 
 
 @extend_schema(
@@ -126,6 +128,93 @@ class RegisterView(generics.CreateAPIView):
                 }
             },
             status=status.HTTP_201_CREATED
+        )
+
+
+@extend_schema(
+    tags=['Authentication'],
+    request=ComprehensiveRegistrationSerializer,
+    responses={
+        201: OpenApiResponse(description='User registered successfully with complete profile'),
+        400: OpenApiResponse(description='Validation error'),
+    }
+)
+class ComprehensiveRegisterView(APIView):
+    """
+    Comprehensive user registration endpoint matching frontend signup form.
+
+    Collects and stores:
+    - Company information (name, registration number, tax ID, industry)
+    - Personal information (name, email, phone, job title)
+    - Address information (full address with country)
+    - Security (password with validation)
+    - Compliance (terms, privacy, marketing consent)
+
+    Process:
+    1. Validates business email domain
+    2. Creates or updates Organization
+    3. Creates default Department
+    4. Auto-generates username and employee_id
+    5. Creates CustomUser with all profile data
+    6. Creates OrganizationMember (owner for new org, member for existing)
+    7. Sends welcome email
+    8. Returns JWT tokens for immediate login
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        """Handle comprehensive registration"""
+        serializer = ComprehensiveRegistrationSerializer(data=request.data)
+
+        if serializer.is_valid():
+            # Create user with all data
+            user = serializer.save()
+
+            # Send welcome email (non-blocking, failure won't prevent registration)
+            try:
+                company_name = request.data.get('company_name')
+                send_welcome_email(user, company_name=company_name)
+            except Exception as e:
+                # Log the error but don't fail the registration
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to send welcome email to {user.email}: {str(e)}")
+
+            # Generate JWT tokens
+            refresh = RefreshToken.for_user(user)
+
+            return Response(
+                {
+                    'success': True,
+                    'message': 'Registration successful',
+                    'user': {
+                        'id': user.id,
+                        'username': user.username,
+                        'email': user.email,
+                        'first_name': user.first_name,
+                        'last_name': user.last_name,
+                        'employee_id': user.employee_id,
+                        'organization': {
+                            'id': str(user.organization.id) if user.organization else None,
+                            'name': user.organization.name if user.organization else None,
+                            'domain': user.organization.domain if user.organization else None,
+                        },
+                        'department': user.department.name if user.department else None,
+                    },
+                    'tokens': {
+                        'refresh': str(refresh),
+                        'access': str(refresh.access_token),
+                    }
+                },
+                status=status.HTTP_201_CREATED
+            )
+
+        return Response(
+            {
+                'success': False,
+                'errors': serializer.errors
+            },
+            status=status.HTTP_400_BAD_REQUEST
         )
 
 

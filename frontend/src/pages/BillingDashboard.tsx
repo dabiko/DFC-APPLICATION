@@ -294,7 +294,7 @@ export function BillingDashboard() {
             <SubscriptionPlans
               currentPlanId={subscription.subscription?.planId}
               recommendedPlanId="professional"
-              onSelectPlan={(planId, cycle) => {
+              onSelectPlan={(_planId, _cycle) => {
                 modals.open('upgrade')
               }}
             />

@@ -1,0 +1,55 @@
+WELCOME TO DIGITAL FILING CABINET
+
+Hello {{ user_first_name }},
+
+We're excited to have you join {{ company_name }} on our secure document management platform!
+
+Your account has been successfully created, and you're now ready to experience enterprise-grade document storage, organization, and collaboration.
+
+ACCESS YOUR DASHBOARD
+{{ login_url }}
+
+YOUR ACCOUNT DETAILS
+---------------------
+Email: {{ user_email }}
+Username: {{ username }}
+Employee ID: {{ employee_id }}
+Organization: {{ company_name }}
+
+WHAT YOU CAN DO WITH DIGITAL FILING CABINET
+--------------------------------------------
+✓ Upload & Organize: Store unlimited documents in a hierarchical folder structure with powerful metadata tagging.
+
+✓ Search Instantly: Find any document in seconds with full-text search powered by advanced indexing.
+
+✓ Collaborate Securely: Share documents with role-based access controls and audit trails.
+
+✓ Stay Compliant: Automated retention policies and legal hold features ensure regulatory compliance.
+
+✓ Track Everything: Complete audit logs for all document activities and user actions.
+
+GETTING STARTED
+---------------
+1. Visit the link above to log in to your dashboard
+2. Complete your profile setup
+3. Explore the folder structure and upload your first document
+4. Invite team members to collaborate
+
+NEED HELP?
+----------
+Our support team is here to help you get started.
+Contact us at: support@digitalfilingcabinet.com
+Help Center: {{ help_url }}
+
+---
+
+Digital Filing Cabinet
+Secure Document Management for Modern Enterprises
+
+This email was sent to {{ user_email }} because you registered for an account at Digital Filing Cabinet.
+
+Terms of Service: {{ terms_url }}
+Privacy Policy: {{ privacy_url }}
+Help Center: {{ help_url }}
+
+© 2025 Digital Filing Cabinet. All rights reserved.

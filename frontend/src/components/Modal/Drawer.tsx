@@ -69,11 +69,7 @@ export function Drawer({
 }: DrawerProps) {
   return (
     <Transition appear show={open} as={Fragment}>
-      <Dialog
-        as="div"
-        className="relative z-modal"
-        onClose={closeOnOverlayClick ? onClose : () => {}}
-      >
+      <Dialog as="div" className="relative z-50" onClose={closeOnOverlayClick ? onClose : () => {}}>
         {/* Backdrop */}
         <Transition.Child
           as={Fragment}

@@ -183,13 +183,17 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     """
     Custom JWT token serializer that includes additional user information.
-    Also handles account lockout mechanism.
+    Also handles account lockout mechanism and Remember Me functionality.
     """
+    remember_me = serializers.BooleanField(default=False, required=False)
 
     def validate(self, attrs):
         """
         Override to check for account lockout and track failed login attempts
         """
+        # Extract remember_me before calling parent validate (it's not a standard field)
+        remember_me = attrs.pop('remember_me', False)
+
         username = attrs.get('username')
 
         # First, try to authenticate
@@ -209,6 +213,20 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
         # Record successful login
         user.record_successful_login()
+
+        # If remember_me is True, generate longer-lived refresh token
+        if remember_me:
+            from datetime import timedelta
+            from rest_framework_simplejwt.tokens import RefreshToken
+
+            # Create custom refresh token with extended lifetime
+            refresh = RefreshToken.for_user(user)
+            # Extend refresh token lifetime to 30 days for remember me
+            refresh.set_exp(lifetime=timedelta(days=30))
+
+            # Update tokens in response
+            data['refresh'] = str(refresh)
+            data['access'] = str(refresh.access_token)
 
         # Add custom claims including organization context
         data['user'] = {
@@ -259,6 +277,185 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             token['subscription_status'] = None
 
         return token
+
+
+class ComprehensiveRegistrationSerializer(serializers.Serializer):
+    """
+    Comprehensive registration serializer that matches frontend signup form.
+    Handles company information, personal/KYC data, address, and compliance.
+    """
+    # Step 1: Company Information
+    company_name = serializers.CharField(max_length=200)
+    company_registration_number = serializers.CharField(max_length=100)
+    company_tax_id = serializers.CharField(max_length=100)
+    industry = serializers.CharField(max_length=100)
+
+    # Step 2: Personal Information & KYC
+    first_name = serializers.CharField(max_length=150)
+    last_name = serializers.CharField(max_length=150)
+    email = serializers.EmailField()
+    phone = serializers.CharField(max_length=20)
+    country = serializers.CharField(max_length=100)
+    job_title = serializers.CharField(max_length=100)
+
+    # Address Information
+    address_line1 = serializers.CharField(max_length=255)
+    address_line2 = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    city = serializers.CharField(max_length=100)
+    state = serializers.CharField(max_length=100)
+    postal_code = serializers.CharField(max_length=20)
+
+    # Step 3: Security
+    password = serializers.CharField(
+        write_only=True,
+        required=True,
+        style={'input_type': 'password'}
+    )
+    confirm_password = serializers.CharField(
+        write_only=True,
+        required=True,
+        style={'input_type': 'password'}
+    )
+
+    # Agreements
+    terms_accepted = serializers.BooleanField()
+    privacy_accepted = serializers.BooleanField()
+    marketing_accepted = serializers.BooleanField(default=False)
+
+    def validate_email(self, value):
+        """Validate business email"""
+        from apps.organizations.validators import validate_business_email
+        validate_business_email(value)
+        return value.lower()
+
+    def validate(self, attrs):
+        """Validate passwords match and compliance accepted"""
+        if attrs['password'] != attrs['confirm_password']:
+            raise serializers.ValidationError(
+                {"confirm_password": "Passwords do not match"}
+            )
+
+        if not attrs.get('terms_accepted'):
+            raise serializers.ValidationError(
+                {"terms_accepted": "You must accept the Terms of Service"}
+            )
+
+        if not attrs.get('privacy_accepted'):
+            raise serializers.ValidationError(
+                {"privacy_accepted": "You must accept the Privacy Policy"}
+            )
+
+        # Validate password strength
+        try:
+            validate_password(attrs['password'])
+        except django_exceptions.ValidationError as e:
+            raise serializers.ValidationError({"password": list(e.messages)})
+
+        return attrs
+
+    def create(self, validated_data):
+        """
+        Create complete user account with organization and all details.
+
+        Process:
+        1. Create or get Organization from email domain
+        2. Add company details to Organization
+        3. Create default Department if needed
+        4. Generate username and employee_id
+        5. Create CustomUser with all profile data
+        6. Create OrganizationMember (owner for new org)
+        """
+        from django.db import transaction
+        from django.utils import timezone
+        from apps.organizations.models import Organization, OrganizationMember
+        from apps.organizations.validators import extract_domain_from_email
+        import uuid
+
+        # Extract domain
+        email = validated_data['email']
+        domain = extract_domain_from_email(email)
+
+        with transaction.atomic():
+            # Create or get organization
+            organization, org_created = Organization.objects.get_or_create(
+                domain=domain,
+                defaults={
+                    'name': validated_data['company_name'],
+                    'registration_number': validated_data['company_registration_number'],
+                    'tax_id': validated_data['company_tax_id'],
+                    'industry': validated_data['industry'],
+                    'country': validated_data['country'],
+                    'subscription_plan': 'free',
+                    'subscription_status': 'trial',
+                }
+            )
+
+            # Update organization if it already existed
+            if not org_created:
+                organization.name = validated_data['company_name']
+                organization.registration_number = validated_data['company_registration_number']
+                organization.tax_id = validated_data['company_tax_id']
+                organization.industry = validated_data['industry']
+                organization.country = validated_data['country']
+                organization.save()
+
+            # Create default department if needed
+            department, _ = Department.objects.get_or_create(
+                organization=organization,
+                code='GENERAL',
+                defaults={
+                    'name': 'General',
+                    'storage_quota_gb': 100
+                }
+            )
+
+            # Generate username and employee_id
+            username = email.split('@')[0]
+            # Ensure username is unique
+            base_username = username
+            counter = 1
+            while CustomUser.objects.filter(username=username).exists():
+                username = f"{base_username}{counter}"
+                counter += 1
+
+            employee_id = f"EMP-{uuid.uuid4().hex[:8].upper()}"
+
+            # Create user
+            user = CustomUser.objects.create_user(
+                username=username,
+                email=email,
+                password=validated_data['password'],
+                first_name=validated_data['first_name'],
+                last_name=validated_data['last_name'],
+                employee_id=employee_id,
+                organization=organization,
+                department=department,
+                # Profile fields
+                phone_number=validated_data['phone'],
+                job_title=validated_data['job_title'],
+                # Address fields
+                address_line1=validated_data['address_line1'],
+                address_line2=validated_data.get('address_line2', ''),
+                city=validated_data['city'],
+                state=validated_data['state'],
+                postal_code=validated_data['postal_code'],
+                country=validated_data['country'],
+                # Compliance fields
+                terms_accepted_at=timezone.now() if validated_data['terms_accepted'] else None,
+                privacy_accepted_at=timezone.now() if validated_data['privacy_accepted'] else None,
+                marketing_consent=validated_data.get('marketing_accepted', False),
+            )
+
+            # Create organization membership
+            role = 'owner' if org_created else 'member'
+            OrganizationMember.objects.create(
+                user=user,
+                organization=organization,
+                role=role,
+                is_active=True
+            )
+
+        return user
 
 
 class PasswordChangeSerializer(serializers.Serializer):

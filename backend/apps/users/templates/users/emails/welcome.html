@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to Digital Filing Cabinet</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f5f5f5;
+            color: #333333;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 20px;
+            text-align: center;
+        }
+        .logo {
+            font-size: 28px;
+            font-weight: 700;
+            color: #ffffff;
+            margin: 0;
+            letter-spacing: -0.5px;
+        }
+        .logo-icon {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            vertical-align: middle;
+            margin-right: 10px;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .greeting {
+            font-size: 24px;
+            font-weight: 600;
+            color: #1a202c;
+            margin: 0 0 20px 0;
+        }
+        .message {
+            font-size: 16px;
+            line-height: 1.6;
+            color: #4a5568;
+            margin: 0 0 30px 0;
+        }
+        .cta-container {
+            text-align: center;
+            margin: 40px 0;
+        }
+        .cta-button {
+            display: inline-block;
+            padding: 16px 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            transition: transform 0.2s;
+            box-shadow: 0 4px 14px rgba(102, 126, 234, 0.4);
+        }
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+        }
+        .features {
+            background-color: #f7fafc;
+            border-radius: 8px;
+            padding: 30px;
+            margin: 30px 0;
+        }
+        .feature-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2d3748;
+            margin: 0 0 20px 0;
+        }
+        .feature-list {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+        .feature-item {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+        .feature-icon {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            background-color: #48bb78;
+            border-radius: 50%;
+            margin-right: 12px;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+        .feature-text {
+            font-size: 15px;
+            color: #4a5568;
+            margin: 0;
+        }
+        .credentials-box {
+            background-color: #edf2f7;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 4px;
+        }
+        .credentials-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #2d3748;
+            margin: 0 0 12px 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .credential-item {
+            margin: 8px 0;
+            font-size: 14px;
+            color: #4a5568;
+        }
+        .credential-label {
+            font-weight: 600;
+            color: #2d3748;
+        }
+        .help-section {
+            background-color: #fffaf0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 30px 0;
+            border: 1px solid #fbd38d;
+        }
+        .help-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #744210;
+            margin: 0 0 10px 0;
+        }
+        .help-text {
+            font-size: 14px;
+            color: #975a16;
+            margin: 0;
+            line-height: 1.5;
+        }
+        .footer {
+            background-color: #2d3748;
+            padding: 30px;
+            text-align: center;
+        }
+        .footer-text {
+            font-size: 13px;
+            color: #a0aec0;
+            margin: 5px 0;
+            line-height: 1.5;
+        }
+        .footer-link {
+            color: #90cdf4;
+            text-decoration: none;
+        }
+        .divider {
+            height: 1px;
+            background-color: #e2e8f0;
+            margin: 30px 0;
+        }
+        @media only screen and (max-width: 600px) {
+            .content {
+                padding: 30px 20px;
+            }
+            .greeting {
+                font-size: 22px;
+            }
+            .message {
+                font-size: 15px;
+            }
+            .cta-button {
+                padding: 14px 30px;
+                font-size: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <!-- Header -->
+        <div class="header">
+            <h1 class="logo">
+                <span class="logo-icon"></span>
+                Digital Filing Cabinet
+            </h1>
+        </div>
+
+        <!-- Main Content -->
+        <div class="content">
+            <h2 class="greeting">Welcome to Digital Filing Cabinet, {{ user_first_name }}!</h2>
+
+            <p class="message">
+                We're excited to have you join <strong>{{ company_name }}</strong> on our secure document management platform.
+                Your account has been successfully created, and you're now ready to experience enterprise-grade document storage,
+                organization, and collaboration.
+            </p>
+
+            <!-- CTA Button -->
+            <div class="cta-container">
+                <a href="{{ login_url }}" class="cta-button">Access Your Dashboard</a>
+            </div>
+
+            <!-- Account Credentials -->
+            <div class="credentials-box">
+                <div class="credentials-title">Your Account Details</div>
+                <div class="credential-item">
+                    <span class="credential-label">Email:</span> {{ user_email }}
+                </div>
+                <div class="credential-item">
+                    <span class="credential-label">Username:</span> {{ username }}
+                </div>
+                <div class="credential-item">
+                    <span class="credential-label">Employee ID:</span> {{ employee_id }}
+                </div>
+                <div class="credential-item">
+                    <span class="credential-label">Organization:</span> {{ company_name }}
+                </div>
+            </div>
+
+            <!-- Features Section -->
+            <div class="features">
+                <h3 class="feature-title">What You Can Do with Digital Filing Cabinet</h3>
+                <ul class="feature-list">
+                    <li class="feature-item">
+                        <span class="feature-icon"></span>
+                        <p class="feature-text"><strong>Upload & Organize:</strong> Store unlimited documents in a hierarchical folder structure with powerful metadata tagging.</p>
+                    </li>
+                    <li class="feature-item">
+                        <span class="feature-icon"></span>
+                        <p class="feature-text"><strong>Search Instantly:</strong> Find any document in seconds with full-text search powered by advanced indexing.</p>
+                    </li>
+                    <li class="feature-item">
+                        <span class="feature-icon"></span>
+                        <p class="feature-text"><strong>Collaborate Securely:</strong> Share documents with role-based access controls and audit trails.</p>
+                    </li>
+                    <li class="feature-item">
+                        <span class="feature-icon"></span>
+                        <p class="feature-text"><strong>Stay Compliant:</strong> Automated retention policies and legal hold features ensure regulatory compliance.</p>
+                    </li>
+                    <li class="feature-item">
+                        <span class="feature-icon"></span>
+                        <p class="feature-text"><strong>Track Everything:</strong> Complete audit logs for all document activities and user actions.</p>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- Next Steps -->
+            <p class="message">
+                <strong>Getting Started:</strong><br>
+                1. Click the button above to log in to your dashboard<br>
+                2. Complete your profile setup<br>
+                3. Explore the folder structure and upload your first document<br>
+                4. Invite team members to collaborate
+            </p>
+
+            <!-- Help Section -->
+            <div class="help-section">
+                <h3 class="help-title">Need Help?</h3>
+                <p class="help-text">
+                    Our support team is here to help you get started. Contact us at
+                    <a href="mailto:support@digitalfilingcabinet.com" style="color: #744210; font-weight: 600;">support@digitalfilingcabinet.com</a>
+                    or visit our Help Center for guides and tutorials.
+                </p>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p class="footer-text">
+                <strong>Digital Filing Cabinet</strong><br>
+                Secure Document Management for Modern Enterprises
+            </p>
+            <p class="footer-text">
+                This email was sent to {{ user_email }} because you registered for an account at Digital Filing Cabinet.
+            </p>
+            <p class="footer-text">
+                <a href="{{ terms_url }}" class="footer-link">Terms of Service</a> |
+                <a href="{{ privacy_url }}" class="footer-link">Privacy Policy</a> |
+                <a href="{{ help_url }}" class="footer-link">Help Center</a>
+            </p>
+            <p class="footer-text" style="margin-top: 15px; color: #718096;">
+                &copy; 2025 Digital Filing Cabinet. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

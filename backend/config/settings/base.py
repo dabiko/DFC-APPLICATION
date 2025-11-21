@@ -184,7 +184,7 @@ SIMPLE_JWT = {
 # CORS Settings
 CORS_ALLOWED_ORIGINS = os.getenv(
     'CORS_ALLOWED_ORIGINS',
-    'http://localhost:3000,http://localhost:5173'
+    'http://localhost:3000,http://localhost:3002,http://localhost:5173'
 ).split(',')
 
 CORS_ALLOW_CREDENTIALS = True
@@ -192,7 +192,7 @@ CORS_ALLOW_CREDENTIALS = True
 # CSRF Settings
 CSRF_TRUSTED_ORIGINS = os.getenv(
     'CSRF_TRUSTED_ORIGINS',
-    'http://localhost:3000,http://localhost:5173'
+    'http://localhost:3000,http://localhost:3002,http://localhost:5173'
 ).split(',')
 
 # Spectacular Settings (API Documentation)
@@ -241,15 +241,19 @@ AWS_QUERYSTRING_AUTH = True  # Use signed URLs
 AWS_QUERYSTRING_EXPIRE = 3600  # Signed URLs expire after 1 hour
 
 # Elasticsearch Configuration with TLS
+# Note: scheme (http/https) is included in hosts URL
+es_scheme = 'https' if os.getenv('ELASTICSEARCH_USE_SSL', 'False') == 'True' else 'http'
+es_host = os.getenv('ELASTICSEARCH_HOST', 'localhost')
+es_port = os.getenv('ELASTICSEARCH_PORT', '9200')
+
 ELASTICSEARCH_DSL = {
     'default': {
-        'hosts': [f"{os.getenv('ELASTICSEARCH_HOST', 'localhost')}:{os.getenv('ELASTICSEARCH_PORT', '9200')}"],
+        'hosts': [f"{es_scheme}://{es_host}:{es_port}"],
         'http_auth': (
             os.getenv('ELASTICSEARCH_USER', ''),
             os.getenv('ELASTICSEARCH_PASSWORD', ''),
         ) if os.getenv('ELASTICSEARCH_USER') else None,
-        'use_ssl': os.getenv('ELASTICSEARCH_USE_SSL', 'False') == 'True',
-        'verify_certs': os.getenv('ELASTICSEARCH_VERIFY_CERTS', 'True') == 'True',
+        'verify_certs': os.getenv('ELASTICSEARCH_VERIFY_CERTS', 'False') == 'True',
         'ssl_show_warn': False,
         'timeout': 30,
         'max_retries': 3,

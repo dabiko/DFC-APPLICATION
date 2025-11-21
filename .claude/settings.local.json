@@ -5,7 +5,12 @@
       "Bash(move organizations appsorganizations)",
       "Bash(python manage.py test:*)",
       "Bash(docker-compose up:*)",
-      "Bash(timeout 2 docker-compose logs:*)"
+      "Bash(timeout 2 docker-compose logs:*)",
+      "Bash(ping:*)",
+      "Bash(nul)",
+      "Bash(curl:*)",
+      "Bash(../.venv/Scripts/python.exe:*)",
+      "Bash(npm run lint:*)"
     ],
     "deny": [],
     "ask": []

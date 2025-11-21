@@ -8,7 +8,6 @@ import type {
   Folder,
   CreateFolderData,
   UpdateFolderData,
-  MoveFolderData,
   FolderFilterOptions,
   FolderSortOptions,
 } from '@/types/folder'

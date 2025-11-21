@@ -27,6 +27,11 @@ INTERNAL_IPS = [
 # Email backend for development (prints to console)
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
+# Email settings
+import os  # noqa
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@digitalfilingcabinet.com')
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
+
 # Disable SSL redirect in development
 SECURE_SSL_REDIRECT = False
 
@@ -42,3 +47,7 @@ LOGGING['loggers']['apps'] = {  # noqa
     'level': 'DEBUG',
     'propagate': False,
 }
+
+# CORS Settings for Development (allow all origins for easier testing)
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True

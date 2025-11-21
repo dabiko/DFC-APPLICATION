@@ -3,7 +3,7 @@
  * Helper functions for folder tree operations
  */
 
-import type { Folder, FlattenedFolder, FolderTreeNode } from '@/types/folder'
+import type { Folder, FolderTreeNode } from '@/types/folder'
 
 /**
  * Build tree structure from flat folder list

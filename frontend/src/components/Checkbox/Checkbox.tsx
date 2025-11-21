@@ -1,12 +1,12 @@
-import { InputHTMLAttributes, forwardRef } from 'react'
+import { InputHTMLAttributes, forwardRef, ReactNode, useRef, useImperativeHandle } from 'react'
 import { cn } from '@utils/cn'
 import { CheckIcon, MinusIcon } from '@heroicons/react/24/outline'
 
 export type CheckboxSize = 'sm' | 'md' | 'lg'
 
 export interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> {
-  /** Label text */
-  label?: string
+  /** Label text or element */
+  label?: ReactNode
   /** Helper text below checkbox */
   helperText?: string
   /** Error message */
@@ -67,14 +67,19 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
     },
     ref
   ) => {
-    const checkboxId = id || label?.toLowerCase().replace(/\s+/g, '-')
+    const checkboxId =
+      id || (typeof label === 'string' ? label.toLowerCase().replace(/\s+/g, '-') : undefined)
+    const inputRef = useRef<HTMLInputElement>(null)
+
+    // Forward the ref to parent if provided
+    useImperativeHandle(ref, () => inputRef.current!)
 
     return (
       <div className={cn('flex flex-col gap-1', className)}>
         <div className="flex items-start gap-2">
           <div className="relative flex items-center">
             <input
-              ref={ref}
+              ref={inputRef}
               id={checkboxId}
               type="checkbox"
               checked={checked}
@@ -85,19 +90,18 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
             <div
               className={cn(
                 'rounded border-2 flex items-center justify-center transition-colors cursor-pointer',
-                'peer-focus:ring-2 peer-focus:ring-offset-2 peer-focus:ring-primary-500',
+                'peer-focus:ring-2 peer-focus:ring-offset-2 peer-focus:ring-blue-500',
                 error
-                  ? 'border-error-500 peer-checked:bg-error-600 peer-checked:border-error-600'
-                  : 'border-gray-300 dark:border-gray-700 peer-checked:bg-primary-600 peer-checked:border-primary-600',
+                  ? 'border-red-500 peer-checked:bg-red-600 peer-checked:border-red-600'
+                  : 'border-gray-300 dark:border-gray-700 peer-checked:bg-blue-600 peer-checked:border-blue-600',
                 disabled &&
                   'opacity-50 cursor-not-allowed bg-gray-50 dark:bg-gray-800 peer-checked:bg-gray-400',
-                indeterminate && 'bg-primary-600 border-primary-600',
+                indeterminate && 'bg-blue-600 border-blue-600',
                 sizeStyles[size].container
               )}
               onClick={() => {
-                if (!disabled) {
-                  const input = document.getElementById(checkboxId) as HTMLInputElement
-                  input?.click()
+                if (!disabled && inputRef.current) {
+                  inputRef.current.click()
                 }
               }}
             >
@@ -131,7 +135,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
           <p
             className={cn(
               'text-sm ml-7',
-              error ? 'text-error-600 dark:text-error-400' : 'text-gray-500 dark:text-gray-400'
+              error ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'
             )}
           >
             {error || helperText}

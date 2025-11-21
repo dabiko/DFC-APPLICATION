@@ -35,7 +35,7 @@ class Department(models.Model):
     )
 
     name = models.CharField(max_length=100)
-    code = models.CharField(max_length=20, unique=True)
+    code = models.CharField(max_length=20)  # Removed unique=True - will use unique_together
     parent = models.ForeignKey(
         'self',
         null=True,
@@ -55,6 +55,8 @@ class Department(models.Model):
         verbose_name = 'Department'
         verbose_name_plural = 'Departments'
         ordering = ['code']
+        # Department code must be unique within each organization
+        unique_together = [['organization', 'code']]
 
     def __str__(self):
         return f"{self.code} - {self.name}"
@@ -97,6 +99,61 @@ class CustomUser(AbstractUser):
     )
     phone_number = models.CharField(max_length=20, blank=True)
     avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
+
+    # Profile Information (from registration)
+    job_title = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text='User job title/position'
+    )
+
+    # Address Information
+    address_line1 = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text='Primary address line'
+    )
+    address_line2 = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text='Secondary address line (optional)'
+    )
+    city = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text='City'
+    )
+    state = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text='State/Province/Region'
+    )
+    postal_code = models.CharField(
+        max_length=20,
+        blank=True,
+        help_text='Postal/ZIP code'
+    )
+    country = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text='Country'
+    )
+
+    # Compliance & Consent (GDPR, Terms of Service)
+    terms_accepted_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Timestamp when user accepted Terms of Service'
+    )
+    privacy_accepted_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Timestamp when user accepted Privacy Policy'
+    )
+    marketing_consent = models.BooleanField(
+        default=False,
+        help_text='User consent for marketing communications'
+    )
 
     # Multi-Factor Authentication
     mfa_enabled = models.BooleanField(default=False)

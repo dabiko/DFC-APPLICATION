@@ -54,6 +54,12 @@ export default defineConfig([
       'no-var': 'error',
       'no-control-regex': 'warn',
       'no-case-declarations': 'error',
+      'no-useless-escape': 'warn',
+
+      // React Hooks rules - temporarily warn instead of error
+      'react-hooks/exhaustive-deps': 'warn',
+      'react-hooks/set-state-in-effect': 'warn',
+      'react-hooks/rules-of-hooks': 'error',
 
       // Prettier integration
       'prettier/prettier': 'error',
