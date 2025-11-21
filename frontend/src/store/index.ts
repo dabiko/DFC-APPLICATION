@@ -2,6 +2,7 @@ import { configureStore } from '@reduxjs/toolkit'
 import { type TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux'
 import authReducer from './slices/authSlice'
 import folderReducer from './slices/folderSlice'
+import billingReducer from './slices/billingSlice'
 
 // Import your reducers here as you create them
 // import documentsReducer from './slices/documentsSlice'
@@ -10,6 +11,7 @@ export const store = configureStore({
   reducer: {
     auth: authReducer,
     folder: folderReducer,
+    billing: billingReducer,
     // Add more reducers here as you create them
     // documents: documentsReducer,
   },

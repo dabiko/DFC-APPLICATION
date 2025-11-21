@@ -121,3 +121,49 @@ export const Radio = forwardRef<HTMLInputElement, RadioProps>(
 )
 
 Radio.displayName = 'Radio'
+
+// RadioGroup Component
+export interface RadioGroupProps {
+  /** Children radio elements */
+  children: React.ReactNode
+  /** Additional CSS classes */
+  className?: string
+  /** ARIA label for the group */
+  'aria-label'?: string
+  /** Fieldset legend */
+  legend?: string
+}
+
+/**
+ * RadioGroup component
+ *
+ * Groups related radio buttons together with optional legend.
+ * Provides semantic structure and accessibility.
+ *
+ * @example
+ * ```tsx
+ * <RadioGroup legend="Choose a plan">
+ *   <Radio name="plan" value="basic" label="Basic" />
+ *   <Radio name="plan" value="pro" label="Pro" />
+ * </RadioGroup>
+ * ```
+ */
+export const RadioGroup = ({
+  children,
+  className,
+  legend,
+  'aria-label': ariaLabel,
+}: RadioGroupProps) => {
+  return (
+    <fieldset className={cn('space-y-2', className)} aria-label={ariaLabel}>
+      {legend && (
+        <legend className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
+          {legend}
+        </legend>
+      )}
+      <div className="space-y-2">{children}</div>
+    </fieldset>
+  )
+}
+
+RadioGroup.displayName = 'RadioGroup'

@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     'apps.core',  # Core utilities, encryption, middleware
     'apps.users',
     'apps.organizations',  # Multi-tenant organization management
+    'apps.billing',  # Billing & subscription management
     'apps.storage',  # MinIO storage integration
     'apps.documents',
     'apps.folders',

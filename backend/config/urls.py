@@ -51,6 +51,9 @@ urlpatterns = [
     # API v1 - Sharing & Collaboration
     path('api/v1/', include('apps.sharing.urls')),
 
+    # API v1 - Billing & Subscriptions
+    path('api/billing/', include('apps.billing.urls', namespace='billing')),
+
     # API Documentation
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),

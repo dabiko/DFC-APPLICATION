@@ -1,5 +1,7 @@
 @import 'tailwindcss';
 
+@custom-variant dark (.dark &);
+
 @theme {
   /* Confidentiality level colors */
   --color-confidentiality-public: #6b7280;
@@ -125,6 +127,18 @@
     animation: fade-in 0.5s ease-out forwards;
     opacity: 0;
   }
+
+  .animate-fadeIn {
+    animation: fadeIn 0.6s ease-out forwards;
+  }
+
+  .animate-slideUp {
+    animation: slideUp 0.8s ease-out forwards;
+  }
+
+  .animate-fadeInUp {
+    animation: fadeInUp 0.6s ease-out forwards;
+  }
 }
 
 /* Custom keyframe animations */
@@ -160,6 +174,37 @@
   from {
     opacity: 0;
     transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
   }
   to {
     opacity: 1;
