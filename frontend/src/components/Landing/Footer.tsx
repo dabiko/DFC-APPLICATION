@@ -73,7 +73,7 @@ const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
   }
 
   return (
-    <footer className="bg-gray-900 dark:bg-black text-gray-300 pt-16 pb-8">
+    <footer className="bg-gray-900 dark:bg-gray-950 text-gray-300 dark:text-gray-400 pt-16 pb-8">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Main Footer Content */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-8 mb-12">
@@ -86,11 +86,11 @@ const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               </div>
               <div>
                 <h3 className="text-xl font-bold text-white">DabiTech Inc</h3>
-                <p className="text-sm text-gray-400">Digital Filing Cabinet</p>
+                <p className="text-sm text-gray-400 dark:text-gray-500">Digital Filing Cabinet</p>
               </div>
             </div>
 
-            <p className="text-sm text-gray-400 mb-6 leading-relaxed">
+            <p className="text-sm text-gray-400 dark:text-gray-500 mb-6 leading-relaxed">
               Enterprise-grade document management system with military-level security. Trusted by
               financial institutions worldwide.
             </p>
@@ -98,19 +98,25 @@ const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             {/* Contact Info */}
             <div className="space-y-2 text-sm">
               <div className="flex items-center space-x-2">
-                <Mail className="w-4 h-4 text-blue-400" />
-                <a href="mailto:hello@dabitech.com" className="hover:text-white transition-colors">
+                <Mail className="w-4 h-4 text-blue-400 dark:text-blue-500" />
+                <a
+                  href="mailto:hello@dabitech.com"
+                  className="hover:text-white dark:hover:text-gray-200 transition-colors"
+                >
                   hello@dabitech.com
                 </a>
               </div>
               <div className="flex items-center space-x-2">
-                <Phone className="w-4 h-4 text-blue-400" />
-                <a href="tel:+1234567890" className="hover:text-white transition-colors">
+                <Phone className="w-4 h-4 text-blue-400 dark:text-blue-500" />
+                <a
+                  href="tel:+1234567890"
+                  className="hover:text-white dark:hover:text-gray-200 transition-colors"
+                >
                   +1 (234) 567-890
                 </a>
               </div>
               <div className="flex items-center space-x-2">
-                <MapPin className="w-4 h-4 text-blue-400" />
+                <MapPin className="w-4 h-4 text-blue-400 dark:text-blue-500" />
                 <span>San Francisco, CA 94103</span>
               </div>
             </div>
@@ -125,7 +131,7 @@ const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                   <li key={linkIndex}>
                     <button
                       onClick={() => scrollToSection(link.href)}
-                      className="text-sm hover:text-white transition-colors duration-200 text-left"
+                      className="text-sm hover:text-white dark:hover:text-gray-200 transition-colors duration-200 text-left"
                     >
                       {link.label}
                     </button>
@@ -137,19 +143,19 @@ const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
         </div>
 
         {/* Newsletter Subscription */}
-        <div className="border-t border-gray-800 pt-8 mb-8">
+        <div className="border-t border-gray-800 dark:border-gray-900 pt-8 mb-8">
           <div className="max-w-md mx-auto text-center">
             <h4 className="text-white font-semibold mb-2">Stay Updated</h4>
-            <p className="text-sm text-gray-400 mb-4">
+            <p className="text-sm text-gray-400 dark:text-gray-500 mb-4">
               Get the latest updates on new features and security improvements
             </p>
             <div className="flex space-x-2">
               <input
                 type="email"
                 placeholder="Enter your email"
-                className="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:border-blue-500 text-white placeholder-gray-500"
+                className="flex-1 px-4 py-2 bg-gray-800 dark:bg-gray-900 border border-gray-700 dark:border-gray-800 rounded-lg focus:outline-none focus:border-blue-500 dark:focus:border-blue-600 text-white placeholder-gray-500 dark:placeholder-gray-600"
               />
-              <button className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors duration-200">
+              <button className="px-6 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white font-medium rounded-lg transition-colors duration-200">
                 Subscribe
               </button>
             </div>
@@ -157,10 +163,10 @@ const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
         </div>
 
         {/* Bottom Bar */}
-        <div className="border-t border-gray-800 pt-8">
+        <div className="border-t border-gray-800 dark:border-gray-900 pt-8">
           <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
             {/* Copyright */}
-            <div className="text-sm text-gray-400">
+            <div className="text-sm text-gray-400 dark:text-gray-500">
               © {currentYear} DabiTech Inc. All rights reserved.
             </div>
 
@@ -170,7 +176,7 @@ const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                 <a
                   key={index}
                   href={social.href}
-                  className="w-10 h-10 bg-gray-800 hover:bg-gray-700 rounded-lg flex items-center justify-center transition-colors duration-200"
+                  className="w-10 h-10 bg-gray-800 hover:bg-gray-700 dark:bg-gray-900 dark:hover:bg-gray-800 rounded-lg flex items-center justify-center transition-colors duration-200"
                   aria-label={social.label}
                 >
                   {social.icon}
@@ -179,7 +185,7 @@ const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             </div>
 
             {/* Certifications */}
-            <div className="flex items-center space-x-4 text-xs text-gray-500">
+            <div className="flex items-center space-x-4 text-xs text-gray-500 dark:text-gray-600">
               <span>SOC 2 Type II</span>
               <span>•</span>
               <span>ISO 27001</span>

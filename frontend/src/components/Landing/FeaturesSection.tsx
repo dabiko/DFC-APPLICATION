@@ -124,7 +124,7 @@ const FeaturesSection: React.FC = () => {
               Manage Documents
             </span>
           </h2>
-          <p className="text-lg sm:text-xl text-gray-600 dark:text-gray-300">
+          <p className="text-lg sm:text-xl text-gray-600 dark:text-gray-400">
             Enterprise-grade features designed for financial institutions, legal firms, and large
             organizations
           </p>
@@ -135,7 +135,7 @@ const FeaturesSection: React.FC = () => {
           {features.map((feature, index) => (
             <div
               key={index}
-              className="group relative bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-850 p-6 sm:p-8 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-gray-200 dark:border-gray-700"
+              className="group relative bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 p-6 sm:p-8 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border border-gray-200 dark:border-gray-600"
               style={{
                 animation: 'fadeInUp 0.6s ease-out forwards',
                 animationDelay: `${index * 0.05}s`,
@@ -155,7 +155,7 @@ const FeaturesSection: React.FC = () => {
               </h3>
 
               {/* Description */}
-              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 leading-relaxed">
+              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 leading-relaxed">
                 {feature.description}
               </p>
 
@@ -167,10 +167,10 @@ const FeaturesSection: React.FC = () => {
 
         {/* Bottom CTA */}
         <div className="mt-12 sm:mt-16 text-center">
-          <p className="text-gray-600 dark:text-gray-400 mb-6">
+          <p className="text-gray-600 dark:text-gray-300 mb-6">
             And many more features to streamline your document management
           </p>
-          <button className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300">
+          <button className="px-8 py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300">
             Explore All Features
           </button>
         </div>

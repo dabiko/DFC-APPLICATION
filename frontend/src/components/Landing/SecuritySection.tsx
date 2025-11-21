@@ -72,7 +72,7 @@ const SecuritySection: React.FC = () => {
               Built-In
             </span>
           </h2>
-          <p className="text-lg sm:text-xl text-gray-600 dark:text-gray-300">
+          <p className="text-lg sm:text-xl text-gray-600 dark:text-gray-400">
             Trusted by financial institutions, legal firms, and healthcare organizations worldwide
           </p>
         </div>
@@ -82,7 +82,7 @@ const SecuritySection: React.FC = () => {
           {securityFeatures.map((feature, index) => (
             <div
               key={index}
-              className="bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-200 dark:border-gray-700"
+              className="bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-200 dark:border-gray-600"
               style={{
                 animation: 'fadeInUp 0.6s ease-out forwards',
                 animationDelay: `${index * 0.1}s`,
@@ -100,7 +100,7 @@ const SecuritySection: React.FC = () => {
               </h3>
 
               {/* Description */}
-              <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+              <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
                 {feature.description}
               </p>
             </div>
@@ -108,7 +108,7 @@ const SecuritySection: React.FC = () => {
         </div>
 
         {/* Compliance Badges */}
-        <div className="bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-850 p-8 sm:p-12 rounded-3xl shadow-xl">
+        <div className="bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-900 p-8 sm:p-12 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700">
           <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white text-center mb-8 sm:mb-12">
             Compliance Certifications
           </h3>
@@ -117,7 +117,7 @@ const SecuritySection: React.FC = () => {
             {compliance.map((cert, index) => (
               <div
                 key={index}
-                className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 text-center border-2 border-gray-200 dark:border-gray-700"
+                className="bg-white dark:bg-gray-700 p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 text-center border-2 border-gray-200 dark:border-gray-600"
                 style={{
                   animation: 'fadeInUp 0.6s ease-out forwards',
                   animationDelay: `${index * 0.1 + 0.3}s`,
@@ -127,12 +127,12 @@ const SecuritySection: React.FC = () => {
                 <div className="font-bold text-lg text-gray-900 dark:text-white mb-2">
                   {cert.name}
                 </div>
-                <div className="text-xs text-gray-600 dark:text-gray-400">{cert.description}</div>
+                <div className="text-xs text-gray-600 dark:text-gray-300">{cert.description}</div>
               </div>
             ))}
           </div>
 
-          <p className="text-center text-gray-600 dark:text-gray-400 mt-8 sm:mt-12">
+          <p className="text-center text-gray-600 dark:text-gray-300 mt-8 sm:mt-12">
             Independently audited and certified by leading security organizations
           </p>
         </div>
@@ -143,7 +143,7 @@ const SecuritySection: React.FC = () => {
             <div className="text-4xl sm:text-5xl font-bold text-blue-600 dark:text-blue-400 mb-2">
               500+
             </div>
-            <p className="text-gray-600 dark:text-gray-400 font-medium">
+            <p className="text-gray-600 dark:text-gray-300 font-medium">
               Financial Institutions Trust Us
             </p>
           </div>
@@ -151,13 +151,13 @@ const SecuritySection: React.FC = () => {
             <div className="text-4xl sm:text-5xl font-bold text-green-600 dark:text-green-400 mb-2">
               99.9%
             </div>
-            <p className="text-gray-600 dark:text-gray-400 font-medium">Uptime SLA Guaranteed</p>
+            <p className="text-gray-600 dark:text-gray-300 font-medium">Uptime SLA Guaranteed</p>
           </div>
           <div className="p-6">
             <div className="text-4xl sm:text-5xl font-bold text-purple-600 dark:text-purple-400 mb-2">
               Zero
             </div>
-            <p className="text-gray-600 dark:text-gray-400 font-medium">Security Breaches Ever</p>
+            <p className="text-gray-600 dark:text-gray-300 font-medium">Security Breaches Ever</p>
           </div>
         </div>
       </div>

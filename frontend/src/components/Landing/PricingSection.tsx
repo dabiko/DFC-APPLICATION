@@ -124,7 +124,7 @@ const PricingSection: React.FC<PricingSectionProps> = ({ onNavigate }) => {
               Pricing
             </span>
           </h2>
-          <p className="text-lg sm:text-xl text-gray-600 dark:text-gray-300 mb-8">
+          <p className="text-lg sm:text-xl text-gray-600 dark:text-gray-400 mb-8">
             Choose the plan that fits your organization's needs
           </p>
 
@@ -164,7 +164,7 @@ const PricingSection: React.FC<PricingSectionProps> = ({ onNavigate }) => {
               className={`relative bg-white dark:bg-gray-800 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border-2 ${
                 plan.popular
                   ? 'border-blue-500 dark:border-blue-400'
-                  : 'border-gray-200 dark:border-gray-700'
+                  : 'border-gray-200 dark:border-gray-600'
               }`}
               style={{
                 animation: 'fadeInUp 0.6s ease-out forwards',
@@ -189,7 +189,7 @@ const PricingSection: React.FC<PricingSectionProps> = ({ onNavigate }) => {
                 </h3>
 
                 {/* Tagline */}
-                <p className="text-gray-600 dark:text-gray-400 mb-6">{plan.tagline}</p>
+                <p className="text-gray-600 dark:text-gray-300 mb-6">{plan.tagline}</p>
 
                 {/* Price */}
                 <div className="mb-6">
@@ -197,7 +197,7 @@ const PricingSection: React.FC<PricingSectionProps> = ({ onNavigate }) => {
                     <span className="text-4xl sm:text-5xl font-bold text-gray-900 dark:text-white">
                       {getPrice(plan)}
                     </span>
-                    <span className="ml-2 text-gray-600 dark:text-gray-400">
+                    <span className="ml-2 text-gray-600 dark:text-gray-300">
                       {getPricePeriod(plan)}
                     </span>
                   </div>
@@ -228,7 +228,7 @@ const PricingSection: React.FC<PricingSectionProps> = ({ onNavigate }) => {
                   {plan.features.map((feature, idx) => (
                     <div key={idx} className="flex items-start space-x-3">
                       <Check className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
-                      <span className="text-sm text-gray-600 dark:text-gray-400">{feature}</span>
+                      <span className="text-sm text-gray-600 dark:text-gray-300">{feature}</span>
                     </div>
                   ))}
                 </div>
@@ -239,10 +239,10 @@ const PricingSection: React.FC<PricingSectionProps> = ({ onNavigate }) => {
 
         {/* Bottom Note */}
         <div className="mt-12 sm:mt-16 text-center">
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
+          <p className="text-gray-600 dark:text-gray-300 mb-4">
             All plans include 14-day free trial • No credit card required • Cancel anytime
           </p>
-          <p className="text-sm text-gray-500 dark:text-gray-500">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             Need a custom plan?{' '}
             <button className="text-blue-600 dark:text-blue-400 hover:underline font-medium">
               Contact Sales

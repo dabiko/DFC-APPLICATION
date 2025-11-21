@@ -69,7 +69,7 @@ const StatsSection: React.FC = () => {
           {stats.map((stat, index) => (
             <div
               key={index}
-              className="relative bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-850 p-6 sm:p-8 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-2 border border-gray-200 dark:border-gray-700 text-center"
+              className="relative bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 p-6 sm:p-8 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-2 border border-gray-200 dark:border-gray-600 text-center"
               style={{
                 animation: 'fadeInUp 0.6s ease-out forwards',
                 animationDelay: `${index * 0.1}s`,
@@ -94,7 +94,7 @@ const StatsSection: React.FC = () => {
               </div>
 
               {/* Description */}
-              <p className="text-sm text-gray-600 dark:text-gray-400">{stat.description}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-300">{stat.description}</p>
             </div>
           ))}
         </div>
@@ -109,7 +109,7 @@ const StatsSection: React.FC = () => {
             {testimonials.map((testimonial, index) => (
               <div
                 key={index}
-                className="bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-850 p-6 sm:p-8 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-200 dark:border-gray-700"
+                className="bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-900 p-6 sm:p-8 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-200 dark:border-gray-600"
                 style={{
                   animation: 'fadeInUp 0.6s ease-out forwards',
                   animationDelay: `${index * 0.15 + 0.3}s`,
@@ -135,7 +135,7 @@ const StatsSection: React.FC = () => {
                   <div className="font-bold text-gray-900 dark:text-white">
                     {testimonial.author}
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">{testimonial.role}</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-300">{testimonial.role}</div>
                   <div className="text-sm font-medium text-blue-600 dark:text-blue-400 mt-1">
                     {testimonial.company}
                   </div>
