@@ -15,6 +15,11 @@ function ToastItem({ id, message, type, duration = 5000, action, onClose }: Toas
   const [isVisible, setIsVisible] = useState(false)
   const [isExiting, setIsExiting] = useState(false)
 
+  const handleClose = () => {
+    setIsExiting(true)
+    setTimeout(() => onClose(id), 300) // Match animation duration
+  }
+
   useEffect(() => {
     // Trigger enter animation
     const showTimer = setTimeout(() => setIsVisible(true), 10)
@@ -28,12 +33,8 @@ function ToastItem({ id, message, type, duration = 5000, action, onClose }: Toas
       clearTimeout(showTimer)
       clearTimeout(hideTimer)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [duration])
-
-  const handleClose = () => {
-    setIsExiting(true)
-    setTimeout(() => onClose(id), 300) // Match animation duration
-  }
 
   const typeStyles = {
     success: 'bg-green-50 text-green-800 border-green-200',
