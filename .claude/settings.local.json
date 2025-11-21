@@ -10,7 +10,8 @@
       "Bash(nul)",
       "Bash(curl:*)",
       "Bash(../.venv/Scripts/python.exe:*)",
-      "Bash(npm run lint:*)"
+      "Bash(npm run lint:*)",
+      "Bash(.env.example)"
     ],
     "deny": [],
     "ask": []

@@ -1,57 +1,184 @@
-# Python
+# ===================================
+# Python bytecode & cache
+# ===================================
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+*.egg
 *.egg-info/
 dist/
 build/
+.eggs/
+pip-log.txt
+pip-delete-this-directory.txt
 
-# Virtual environments
+# ===================================
+# Virtual environments (NEVER include in image)
+# ===================================
 venv/
 env/
 ENV/
-.venv
+.venv/
+*.venv
 
-# IDE
+# ===================================
+# IDE & Editor files
+# ===================================
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
 
-# Testing
+# ===================================
+# Testing & Coverage
+# ===================================
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
 .tox/
+.nox/
+*.cover
+.hypothesis/
+.cache
 
-# Database
+# ===================================
+# Database files (use volumes instead)
+# ===================================
 *.sqlite3
+*.sqlite3-journal
 *.db
 
-# Media files (will be in volumes)
+# ===================================
+# Media & Static files (use volumes)
+# ===================================
 media/
 staticfiles/
+static/
+# Exception: Keep static source files for collectstatic
+!static/
 
-# Logs
+# ===================================
+# Logs (use volumes or external logging)
+# ===================================
 *.log
+*.log.*
 logs/
 
-# Git
+# ===================================
+# Git files
+# ===================================
 .git/
 .gitignore
+.gitattributes
+.github/
 
-# Documentation
+# ===================================
+# Documentation (not needed in image)
+# ===================================
 *.md
+README*
 docs/
+*.pdf
+*.txt
+# Exception: Keep requirements files
+!requirements.txt
+!requirements/*.txt
 
-# Environment files
+# ===================================
+# Environment files (CRITICAL - NEVER include)
+# ===================================
 .env
 .env.local
 .env.*.local
+.env.production
+.env.staging
+*.env
 
-# OS
+# ===================================
+# OS files
+# ===================================
 .DS_Store
 Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ===================================
+# Celery runtime files
+# ===================================
+celerybeat-schedule
+celerybeat.pid
+
+# ===================================
+# Temporary files
+# ===================================
+*.tmp
+*.temp
+*.bak
+*.swp
+.cache/
+tmp/
+temp/
+
+# ===================================
+# Docker files (don't copy into image)
+# ===================================
+Dockerfile
+Dockerfile.*
+docker-compose*.yml
+.dockerignore
+
+# ===================================
+# CI/CD files
+# ===================================
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile
+.circleci/
+
+# ===================================
+# Development scripts & test data
+# ===================================
+test_*.py
+*_test.py
+scripts/
+fixtures/
+# Exception: Keep management commands
+!manage.py
+!apps/*/management/
+
+# ===================================
+# Security & Secrets (CRITICAL)
+# ===================================
+*.pem
+*.key
+*.cert
+*.crt
+*.p12
+*.pfx
+secrets.yml
+secrets.json
+credentials.json
+
+# ===================================
+# MyPy & type checking
+# ===================================
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+
+# ===================================
+# Optional: Migrations (uncomment if building from fresh DB)
+# ===================================
+# */migrations/*.py
+# !*/migrations/__init__.py

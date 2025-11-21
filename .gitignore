@@ -1,7 +1,15 @@
+# ===================================
 # Dependencies
+# ===================================
 node_modules/
 frontend/node_modules/
 backend/venv/
+backend/env/
+backend/.venv/
+.venv/
+*.egg-info/
+
+# Python cache
 backend/__pycache__/
 backend/**/__pycache__/
 backend/**/*.pyc
@@ -10,28 +18,53 @@ backend/**/*.pyd
 backend/.Python
 backend/pip-log.txt
 backend/pip-delete-this-directory.txt
+*.py[cod]
+*$py.class
+*.so
 
+# ===================================
 # Build outputs
+# ===================================
 frontend/dist/
 frontend/build/
 frontend/.storybook-build/
+frontend/storybook-static/
 backend/staticfiles/
 backend/media/
+backend/dist/
+backend/build/
+backend/.eggs/
 
-# Environment files
+# ===================================
+# Environment files (NEVER COMMIT)
+# ===================================
 .env
 .env.local
 .env.*.local
+.env.production
+.env.staging
 backend/.env
 backend/.env.local
+frontend/.env
+frontend/.env.local
+**/.env
+**/.env.local
 
+# ===================================
 # Database
+# ===================================
 backend/db.sqlite3
+backend/db.sqlite3-journal
 backend/*.db
 backend/*.sqlite
 backend/*.sqlite3
+*.db
+*.sqlite
+*.sqlite3
 
-# IDE
+# ===================================
+# IDE & Editors
+# ===================================
 .idea/
 .vscode/
 *.swp
@@ -40,22 +73,35 @@ backend/*.sqlite3
 .project
 .pydevproject
 .settings/
+*.sublime-project
+*.sublime-workspace
+.vscode/settings.json
 
-# OS
+# ===================================
+# OS files
+# ===================================
 .DS_Store
 Thumbs.db
 *.DS_Store
+ehthumbs.db
+Desktop.ini
 
+# ===================================
 # Logs
+# ===================================
 *.log
+*.log.*
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
+pnpm-debug.log*
 backend/logs/
-*.log.*
+logs/
 
+# ===================================
 # Testing
+# ===================================
 frontend/coverage/
 frontend/.nyc_output/
 frontend/cypress/videos/
@@ -64,42 +110,83 @@ backend/htmlcov/
 backend/.coverage
 backend/.pytest_cache/
 backend/.tox/
+backend/.nox/
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
 
+# ===================================
 # Temporary files
+# ===================================
 *.tmp
 *.temp
 *.cache
+*.bak
+nul
+.cache/
+.temp/
+tmp/
 
-# Documentation (large PDFs - keep in separate doc repo or cloud)
-# Uncomment the line below if you don't want to commit PDFs
-# *.pdf
-
-# Lock files (keep package-lock.json for reproducibility)
-# Uncomment if using yarn or pnpm instead
-# yarn.lock
-# pnpm-lock.yaml
-
+# ===================================
 # Build info
+# ===================================
 frontend/.tsbuildinfo
 frontend/node_modules/.cache/
-frontend/.env.local
 frontend/.storybook/tsconfig.tsbuildinfo
+frontend/.vite/
 
-# Python specific
-backend/*.egg-info/
-backend/dist/
-backend/build/
-backend/.eggs/
-
+# ===================================
 # Celery
+# ===================================
 backend/celerybeat-schedule
 backend/celerybeat.pid
+celerybeat-schedule
+celerybeat.pid
 
-# Django migrations (uncomment if you don't want to commit migrations)
-# backend/*/migrations/*.py
-# !backend/*/migrations/__init__.py
+# ===================================
+# Docker (development volumes & temp files)
+# ===================================
+# Don't ignore Dockerfile, docker-compose.yml, .dockerignore
+# Only ignore runtime data
+docker-compose.override.yml
+.docker/
 
-# Local development
-.DS_Store
+# ===================================
+# Security & Secrets (CRITICAL - NEVER COMMIT)
+# ===================================
+*.pem
+*.key
+*.cert
+*.crt
+*.p12
+*.pfx
+secrets.yml
+secrets.json
+credentials.json
+
+# ===================================
+# Optional: Migrations (uncomment to ignore)
+# ===================================
+# backend/apps/*/migrations/*.py
+# backend/apps/*/migrations/*.pyc
+# !backend/apps/*/migrations/__init__.py
+
+# ===================================
+# Optional: Lock files (uncomment if needed)
+# ===================================
+# yarn.lock
+# pnpm-lock.yaml
+# Keep package-lock.json for reproducibility
+
+# ===================================
+# Test scripts (optional - uncomment to ignore)
+# ===================================
+test_*.py
+*_test.py
+
+# ===================================
+# Local development overrides
+# ===================================
 *.local
-nul
+local_settings.py
