@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { Provider } from 'react-redux'
 import { store } from '@store'
-import { ToastContainer } from './components/common'
+import { ToastContainer } from '@components/common'
 import { BillingDashboard } from './pages/BillingDashboard'
 import LandingPage from './pages/LandingPage'
 
