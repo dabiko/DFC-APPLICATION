@@ -3,6 +3,7 @@ import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { Input } from '@components/Input/Input'
 import { Button } from '@components/Button/Button'
 import { AuthHeader } from '@components/Auth/AuthHeader'
+import { PasswordStrengthIndicator } from '@components/Auth/PasswordStrengthIndicator'
 import { LockClosedIcon } from '@heroicons/react/24/outline'
 
 interface ResetPasswordFormData {
@@ -41,12 +42,53 @@ export function ResetPassword() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [validatingToken, setValidatingToken] = useState(true)
+  const [tokenError, setTokenError] = useState<string | null>(null)
+  const [tokenData, setTokenData] = useState<{
+    userEmail?: string
+    expiresInMinutes?: number
+  } | null>(null)
 
-  // Redirect if no token
+  // Validate token on mount
   useEffect(() => {
-    if (!token) {
-      navigate('/forgot-password')
+    const validateToken = async () => {
+      if (!token) {
+        navigate('/forgot-password')
+        return
+      }
+
+      setValidatingToken(true)
+      setTokenError(null)
+
+      try {
+        const { authService } = await import('@/services/auth.service')
+        const response = await authService.validateResetToken(token)
+
+        if (!response.valid) {
+          // Token is invalid or expired
+          if (response.expired) {
+            setTokenError(
+              'This password reset link has expired. Please request a new password reset.'
+            )
+          } else {
+            setTokenError('Invalid password reset link. Please request a new password reset.')
+          }
+        } else {
+          // Token is valid - store data
+          setTokenData({
+            userEmail: response.user_email,
+            expiresInMinutes: response.expires_in_minutes,
+          })
+        }
+      } catch (error) {
+        console.error('Token validation failed:', error)
+        setTokenError('Unable to validate reset link. Please request a new password reset.')
+      } finally {
+        setValidatingToken(false)
+      }
     }
+
+    validateToken()
   }, [token, navigate])
 
   // Background Animation
@@ -260,6 +302,7 @@ export function ResetPassword() {
     }
   }
 
+  // Success state - Password reset completed
   if (success) {
     return (
       <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-4">
@@ -299,6 +342,99 @@ export function ResetPassword() {
     )
   }
 
+  // Loading state - Validating token
+  if (validatingToken) {
+    return (
+      <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-4">
+        <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" style={{ zIndex: 0 }} />
+        <div
+          className="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-transparent to-purple-50/30 dark:from-blue-950/20 dark:via-transparent dark:to-purple-950/20"
+          style={{ zIndex: 1 }}
+        />
+
+        <div className="relative z-10 w-full max-w-md bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-2xl shadow-2xl p-8">
+          <div className="text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full mb-4">
+              <svg
+                className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              Validating Reset Link
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400">
+              Please wait while we verify your password reset link...
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Error state - Invalid or expired token
+  if (tokenError) {
+    return (
+      <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-4">
+        <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" style={{ zIndex: 0 }} />
+        <div
+          className="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-transparent to-purple-50/30 dark:from-blue-950/20 dark:via-transparent dark:to-purple-950/20"
+          style={{ zIndex: 1 }}
+        />
+
+        <div className="relative z-10 w-full max-w-md bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-2xl shadow-2xl p-8">
+          <div className="text-center">
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full mb-6">
+              <svg
+                className="w-10 h-10 text-red-600 dark:text-red-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
+              </svg>
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+              Invalid Reset Link
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400 mb-10 px-4">{tokenError}</p>
+
+            <div className="space-y-3">
+              <Link to="/forgot-password">
+                <Button variant="primary" size="lg" fullWidth>
+                  Request New Reset Link
+                </Button>
+              </Link>
+
+              <div className="pt-2">
+                <Link to="/login">
+                  <Button variant="outline" size="lg" fullWidth>
+                    Back to Sign In
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Valid token - Show password reset form
   return (
     <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-4">
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" style={{ zIndex: 0 }} />
@@ -317,30 +453,49 @@ export function ResetPassword() {
           <p className="text-gray-600 dark:text-gray-400">
             Choose a strong password to secure your account
           </p>
+          {tokenData?.userEmail && (
+            <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
+              Resetting password for: <span className="font-medium">{tokenData.userEmail}</span>
+            </p>
+          )}
+          {tokenData?.expiresInMinutes && tokenData.expiresInMinutes < 30 && (
+            <p className="text-sm text-orange-600 dark:text-orange-400 mt-1">
+              Link expires in {tokenData.expiresInMinutes} minutes
+            </p>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="relative">
-            <Input
-              label="New Password"
-              type={showPassword ? 'text' : 'password'}
-              placeholder="Enter new password"
-              value={formData.password}
-              onChange={(e) => handleChange('password', e.target.value)}
-              onBlur={() => handleBlur('password')}
-              error={touched.password ? errors.password : undefined}
-              leftIcon={<LockClosedIcon className="h-5 w-5" />}
-              disabled={loading}
-              fullWidth
-              required
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-9 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
-            >
-              {showPassword ? 'Hide' : 'Show'}
-            </button>
+          <div className="space-y-2">
+            <div className="relative">
+              <Input
+                label="New Password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Enter new password"
+                value={formData.password}
+                onChange={(e) => handleChange('password', e.target.value)}
+                onBlur={() => handleBlur('password')}
+                error={touched.password ? errors.password : undefined}
+                leftIcon={<LockClosedIcon className="h-5 w-5" />}
+                disabled={loading}
+                fullWidth
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-9 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+              >
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
+
+            {/* Password Strength Indicator */}
+            {formData.password && (
+              <div className="mt-3">
+                <PasswordStrengthIndicator password={formData.password} showFeedback={true} />
+              </div>
+            )}
           </div>
 
           <div className="relative">

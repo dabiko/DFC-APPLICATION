@@ -74,7 +74,7 @@ class AuditLog(models.Model):
     # Action details
     action = models.CharField(max_length=50, choices=ACTION_CHOICES)
     resource_type = models.CharField(max_length=50, choices=RESOURCE_TYPE_CHOICES)
-    resource_id = models.UUIDField(null=True, blank=True)
+    resource_id = models.CharField(max_length=255, null=True, blank=True)  # Changed from UUIDField to support both UUID and integer IDs
     resource_name = models.CharField(max_length=500)
 
     # Timestamp
@@ -135,9 +135,17 @@ class AuditLog(models.Model):
         return f"{user_str} - {self.action} - {self.resource_type} - {self.timestamp}"
 
     def save(self, *args, **kwargs):
-        """Only allow creation, not updates"""
-        if self.pk is not None:
+        """
+        Only allow creation, not updates.
+        Audit logs are immutable - once created, they cannot be modified.
+        """
+        # Check if this is an update operation (not a new creation)
+        # We check _state.adding which is False for existing objects
+        if not self._state.adding and self.pk is not None:
+            # This is an attempt to update an existing audit log
             raise ValueError("Audit logs cannot be modified after creation")
+
+        # Allow creation (first save)
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):

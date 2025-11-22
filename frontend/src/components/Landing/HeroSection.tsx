@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from 'react'
-import { ArrowRight, FileText, Shield, Zap, CheckCircle } from 'lucide-react'
+import React, { useEffect, useRef, useState } from 'react'
+import { ArrowRight, FileText, Shield, Zap, CheckCircle, LayoutDashboard } from 'lucide-react'
+import { authService } from '@/services/auth.service'
 
 interface HeroSectionProps {
   onNavigate: (path: string) => void
@@ -11,6 +12,12 @@ interface HeroSectionProps {
  */
 const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+
+  useEffect(() => {
+    // Check authentication status on component mount
+    setIsAuthenticated(authService.isAuthenticated())
+  }, [])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -270,19 +277,34 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
             className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6 animate-slideUp"
             style={{ animationDelay: '0.3s' }}
           >
-            <button
-              onClick={() => onNavigate('/register')}
-              className="group w-full sm:w-auto px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 flex items-center justify-center space-x-2"
-            >
-              <span>Start Free Trial</span>
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
-            </button>
-            <button
-              onClick={() => onNavigate('/demo')}
-              className="w-full sm:w-auto px-8 py-4 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-gray-200 dark:border-gray-700"
-            >
-              Watch Demo
-            </button>
+            {isAuthenticated ? (
+              // Show Dashboard button when logged in
+              <button
+                onClick={() => onNavigate('/dashboard')}
+                className="group w-full sm:w-auto px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 flex items-center justify-center space-x-2"
+              >
+                <LayoutDashboard className="w-5 h-5" />
+                <span>Go to Dashboard</span>
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
+              </button>
+            ) : (
+              // Show Start Free Trial when not logged in
+              <>
+                <button
+                  onClick={() => onNavigate('/register')}
+                  className="group w-full sm:w-auto px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 flex items-center justify-center space-x-2"
+                >
+                  <span>Start Free Trial</span>
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
+                </button>
+                <button
+                  onClick={() => onNavigate('/demo')}
+                  className="w-full sm:w-auto px-8 py-4 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-gray-200 dark:border-gray-700"
+                >
+                  Watch Demo
+                </button>
+              </>
+            )}
           </div>
 
           {/* Trust Indicators */}

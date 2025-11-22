@@ -247,6 +247,16 @@ class CustomUser(AbstractUser):
                 'locked_by_failed_attempts',
                 'updated_at'
             ])
+
+            # Send account locked email notification
+            try:
+                from apps.users.emails import send_account_locked_email
+                send_account_locked_email(self)
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to send account locked email: {str(e)}")
+
             return {
                 'locked': True,
                 'remaining_attempts': 0,
@@ -323,3 +333,13 @@ class CustomUser(AbstractUser):
 
 # Import MFA models
 from apps.users.mfa_models import MFABackupCode, MFASettings
+
+# Import Password History models
+from apps.users.models_password_history import (
+    PasswordHistory,
+    PasswordResetAttempt,
+    PasswordResetToken
+)
+
+# Import OTP models
+from apps.users.models_otp import EmailOTP, PhoneOTP

@@ -174,10 +174,9 @@ export function Login() {
     switch (name) {
       case 'email':
         if (!value) {
-          error = 'Email is required'
-        } else if (typeof value === 'string' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-          error = 'Please enter a valid email address'
+          error = 'Email or username is required'
         }
+        // Allow both email and username format (no validation on format)
         break
 
       case 'password':
@@ -253,17 +252,27 @@ export function Login() {
 
       // Redirect to dashboard
       navigate('/dashboard')
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login failed:', error)
 
-      // Handle specific error messages
+      // Handle specific error messages with account lockout info
       const errorMessage =
         error instanceof Error ? error.message : 'Login failed. Please try again.'
 
-      // Check for account lockout message
-      if (errorMessage.includes('Account locked')) {
+      // Check if account is locked
+      if (error.locked === true || errorMessage.includes('Account locked')) {
+        const lockedUntil = error.locked_until
+          ? new Date(error.locked_until).toLocaleString()
+          : 'unknown time'
         setErrors({
-          submit: errorMessage,
+          submit: `${errorMessage}\nYour account will be unlocked at: ${lockedUntil}`,
+        })
+      } else if (error.remaining_attempts !== undefined) {
+        // Show remaining attempts warning
+        const attemptsText =
+          error.remaining_attempts === 1 ? '1 attempt' : `${error.remaining_attempts} attempts`
+        setErrors({
+          submit: `Invalid credentials. You have ${attemptsText} remaining before your account is locked.`,
         })
       } else if (errorMessage.includes('Invalid')) {
         setErrors({
@@ -310,11 +319,11 @@ export function Login() {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Email */}
+          {/* Email or Username */}
           <Input
-            label="Email Address"
-            type="email"
-            placeholder="dabiko.bleaise@company.com"
+            label="Email or Username"
+            type="text"
+            placeholder="admin@cccplc.net or admin"
             value={formData.email}
             onChange={(e) => handleChange('email', e.target.value)}
             onBlur={() => handleBlur('email')}

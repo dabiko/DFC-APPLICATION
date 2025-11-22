@@ -45,11 +45,17 @@ export interface AuthError {
   username?: string[]
   password?: string[]
   non_field_errors?: string[]
+  locked?: boolean
+  locked_until?: string
+  remaining_attempts?: number
 }
 
 class AuthService {
   /**
-   * Login user with email and password
+   * Login user with email/username and password
+   * @param email - Can be either email address or username
+   * @param password - User's password
+   * @param rememberMe - Whether to extend token lifetime
    */
   async login(
     email: string,
@@ -62,7 +68,7 @@ class AuthService {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        username: email, // Backend expects 'username' field
+        username: email, // Backend expects 'username' field (accepts both email and username)
         password: password,
         remember_me: rememberMe, // Send remember_me flag for extended token lifetime
       }),
@@ -70,7 +76,13 @@ class AuthService {
 
     if (!response.ok) {
       const error: AuthError = await response.json()
-      throw new Error(this.getErrorMessage(error))
+      // Throw the full error object so Login page can access all fields
+      const customError: any = new Error(this.getErrorMessage(error))
+      customError.locked = error.locked
+      customError.locked_until = error.locked_until
+      customError.remaining_attempts = error.remaining_attempts
+      customError.fullError = error
+      throw customError
     }
 
     return response.json()
@@ -144,6 +156,27 @@ class AuthService {
       const error = await response.json()
       throw new Error(error.detail || 'Password reset request failed')
     }
+  }
+
+  /**
+   * Validate password reset token
+   */
+  async validateResetToken(token: string): Promise<{
+    valid: boolean
+    detail: string
+    expired?: boolean
+    user_email?: string
+    expires_in_minutes?: number
+  }> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/password/reset/validate/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ token }),
+    })
+
+    return response.json()
   }
 
   /**

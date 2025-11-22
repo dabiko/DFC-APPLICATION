@@ -23,6 +23,7 @@ const PERSONAL_EMAIL_PROVIDERS = [
   '163.com',
   '126.com',
   'yeah.net',
+  'mailinator.com',
 ]
 
 /**

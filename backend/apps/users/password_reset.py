@@ -101,13 +101,20 @@ class PasswordResetRequestView(APIView):
             frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
             reset_url = f"{frontend_url}/reset-password?token={uid}-{token}"
 
-            # Send email
-            subject = 'Password Reset Request - Digital Filing Cabinet'
-            message = render_to_string('users/password_reset_email.html', {
+            # Prepare email context
+            base_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+            email_context = {
                 'user': user,
                 'reset_url': reset_url,
                 'expiry_hours': 1,
-            })
+                'base_url': base_url,
+            }
+
+            # Render both HTML and plain text versions
+            html_message = render_to_string('users/password_reset_email_enterprise.html', email_context)
+            text_message = render_to_string('users/password_reset_email.txt', email_context)
+
+            subject = 'Password Reset Request - Digital Filing Cabinet'
 
             # For development, print to console
             if settings.DEBUG:
@@ -119,13 +126,17 @@ class PasswordResetRequestView(APIView):
                 print("=" * 80)
 
             try:
-                send_mail(
+                from django.core.mail import EmailMultiAlternatives
+
+                # Create email with both text and HTML versions
+                email = EmailMultiAlternatives(
                     subject=subject,
-                    message=message,
+                    body=text_message,
                     from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[user.email],
-                    fail_silently=False,
+                    to=[user.email],
                 )
+                email.attach_alternative(html_message, "text/html")
+                email.send(fail_silently=False)
             except Exception as e:
                 # Log error but don't reveal to user
                 print(f"Failed to send email: {e}")

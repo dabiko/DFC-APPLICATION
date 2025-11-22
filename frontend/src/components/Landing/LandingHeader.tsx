@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { Moon, Sun, Menu, X } from 'lucide-react'
+import { Moon, Sun, Menu, X, LayoutDashboard, LogOut } from 'lucide-react'
+import { authService } from '@/services/auth.service'
 
 interface LandingHeaderProps {
   theme: string
@@ -14,6 +15,7 @@ interface LandingHeaderProps {
 const LandingHeader: React.FC<LandingHeaderProps> = ({ theme, onToggleTheme, onNavigate }) => {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   useEffect(() => {
     const handleScroll = () => {
@@ -21,6 +23,11 @@ const LandingHeader: React.FC<LandingHeaderProps> = ({ theme, onToggleTheme, onN
     }
     window.addEventListener('scroll', handleScroll)
     return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  useEffect(() => {
+    // Check authentication status on component mount
+    setIsAuthenticated(authService.isAuthenticated())
   }, [])
 
   const navLinks = [
@@ -35,6 +42,27 @@ const LandingHeader: React.FC<LandingHeaderProps> = ({ theme, onToggleTheme, onN
     if (element) {
       element.scrollIntoView({ behavior: 'smooth' })
       setIsMobileMenuOpen(false)
+    }
+  }
+
+  /**
+   * Handle user logout
+   */
+  const handleLogout = async () => {
+    try {
+      const refreshToken = authService.getRefreshToken()
+      if (refreshToken) {
+        await authService.logout(refreshToken)
+      }
+    } catch (error) {
+      console.error('Logout error:', error)
+    } finally {
+      // Clear tokens and update state
+      authService.clearTokens()
+      setIsAuthenticated(false)
+      setIsMobileMenuOpen(false)
+      // Redirect to login page
+      onNavigate('/login')
     }
   }
 
@@ -107,18 +135,41 @@ const LandingHeader: React.FC<LandingHeaderProps> = ({ theme, onToggleTheme, onN
 
             {/* Desktop CTA Buttons */}
             <div className="hidden md:flex items-center space-x-3">
-              <button
-                onClick={() => onNavigate('/login')}
-                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors duration-200"
-              >
-                Sign In
-              </button>
-              <button
-                onClick={() => onNavigate('/register')}
-                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
-              >
-                Get Started
-              </button>
+              {isAuthenticated ? (
+                // Show Dashboard and Logout buttons when logged in
+                <>
+                  <button
+                    onClick={() => onNavigate('/dashboard')}
+                    className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
+                  >
+                    <LayoutDashboard className="w-4 h-4" />
+                    <span>Dashboard</span>
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 font-medium transition-colors duration-200 flex items-center gap-2"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Logout</span>
+                  </button>
+                </>
+              ) : (
+                // Show Sign In and Get Started when not logged in
+                <>
+                  <button
+                    onClick={() => onNavigate('/login')}
+                    className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors duration-200"
+                  >
+                    Sign In
+                  </button>
+                  <button
+                    onClick={() => onNavigate('/register')}
+                    className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
+                  >
+                    Get Started
+                  </button>
+                </>
+              )}
             </div>
 
             {/* Mobile Menu Button */}
@@ -150,24 +201,50 @@ const LandingHeader: React.FC<LandingHeaderProps> = ({ theme, onToggleTheme, onN
                 </button>
               ))}
               <div className="flex flex-col space-y-2 px-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-                <button
-                  onClick={() => {
-                    onNavigate('/login')
-                    setIsMobileMenuOpen(false)
-                  }}
-                  className="py-2 text-center text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors duration-200"
-                >
-                  Sign In
-                </button>
-                <button
-                  onClick={() => {
-                    onNavigate('/register')
-                    setIsMobileMenuOpen(false)
-                  }}
-                  className="py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-lg transition-all duration-200"
-                >
-                  Get Started
-                </button>
+                {isAuthenticated ? (
+                  // Show Dashboard and Logout buttons when logged in
+                  <>
+                    <button
+                      onClick={() => {
+                        onNavigate('/dashboard')
+                        setIsMobileMenuOpen(false)
+                      }}
+                      className="py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
+                    >
+                      <LayoutDashboard className="w-4 h-4" />
+                      <span>Dashboard</span>
+                    </button>
+                    <button
+                      onClick={handleLogout}
+                      className="py-2 text-center text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 font-medium transition-colors duration-200 rounded-lg flex items-center justify-center gap-2"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span>Logout</span>
+                    </button>
+                  </>
+                ) : (
+                  // Show Sign In and Get Started when not logged in
+                  <>
+                    <button
+                      onClick={() => {
+                        onNavigate('/login')
+                        setIsMobileMenuOpen(false)
+                      }}
+                      className="py-2 text-center text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors duration-200"
+                    >
+                      Sign In
+                    </button>
+                    <button
+                      onClick={() => {
+                        onNavigate('/register')
+                        setIsMobileMenuOpen(false)
+                      }}
+                      className="py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-lg transition-all duration-200"
+                    >
+                      Get Started
+                    </button>
+                  </>
+                )}
               </div>
             </nav>
           </div>

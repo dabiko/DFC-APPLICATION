@@ -16,9 +16,16 @@ from apps.users.views import (
     DepartmentListView,
     DepartmentDetailView,
 )
-from apps.users.password_reset import (
-    PasswordResetRequestView,
-    PasswordResetConfirmView,
+from apps.users.password_reset_enterprise import (
+    EnterprisePasswordResetRequestView,
+    TokenValidationView,
+    EnterprisePasswordResetConfirmView,
+)
+from apps.users.views_otp import (
+    send_email_otp_view,
+    verify_email_otp_view,
+    send_phone_otp_view,
+    verify_phone_otp_view,
 )
 
 app_name = 'users'
@@ -31,9 +38,16 @@ urlpatterns = [
     path('register/comprehensive/', ComprehensiveRegisterView.as_view(), name='comprehensive_register'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 
-    # Password reset endpoints
-    path('password/reset/request/', PasswordResetRequestView.as_view(), name='password_reset_request'),
-    path('password/reset/confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
+    # Enterprise Password reset endpoints
+    path('password/reset/request/', EnterprisePasswordResetRequestView.as_view(), name='password_reset_request'),
+    path('password/reset/validate/', TokenValidationView.as_view(), name='password_reset_validate'),
+    path('password/reset/confirm/', EnterprisePasswordResetConfirmView.as_view(), name='password_reset_confirm'),
+
+    # OTP verification endpoints
+    path('otp/email/send/', send_email_otp_view, name='send_email_otp'),
+    path('otp/email/verify/', verify_email_otp_view, name='verify_email_otp'),
+    path('otp/phone/send/', send_phone_otp_view, name='send_phone_otp'),
+    path('otp/phone/verify/', verify_phone_otp_view, name='verify_phone_otp'),
 
     # User management endpoints
     path('me/', CurrentUserView.as_view(), name='current_user'),

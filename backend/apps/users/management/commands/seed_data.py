@@ -5,6 +5,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 from apps.users.models import Department, CustomUser
+from apps.organizations.models import Organization, OrganizationMember
 from apps.folders.models import Folder, FolderTemplate
 from apps.documents.models import Tag
 from apps.retention.models import RetentionPolicy
@@ -28,14 +29,19 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS('Starting data seeding...'))
 
         with transaction.atomic():
+            # Create organization
+            self.stdout.write('Creating organization...')
+            organization = self.create_organization()
+            self.stdout.write(self.style.SUCCESS(f'✓ Created organization: {organization.name}'))
+
             # Create departments
             self.stdout.write('Creating departments...')
-            departments = self.create_departments()
+            departments = self.create_departments(organization)
             self.stdout.write(self.style.SUCCESS(f'✓ Created {len(departments)} departments'))
 
             # Create users
             self.stdout.write('Creating users...')
-            users = self.create_users(departments)
+            users = self.create_users(departments, organization)
             self.stdout.write(self.style.SUCCESS(f'✓ Created {len(users)} users'))
 
             # Create retention policies
@@ -67,13 +73,34 @@ class Command(BaseCommand):
     def clear_data(self):
         """Clear existing seed data"""
         CustomUser.objects.filter(email__endswith='@cccplc.net').delete()
-        Department.objects.all().delete()
+        Department.objects.filter(organization__domain='cccplc.net').delete()
+        Organization.objects.filter(domain='cccplc.net').delete()
         Folder.objects.all().delete()
         FolderTemplate.objects.all().delete()
         Tag.objects.all().delete()
         RetentionPolicy.objects.all().delete()
 
-    def create_departments(self):
+    def create_organization(self):
+        """Create test organization"""
+        organization, created = Organization.objects.get_or_create(
+            domain='cccplc.net',
+            defaults={
+                'name': 'CCC PLC Financial Services',
+                'registration_number': 'RC123456',
+                'tax_id': 'TAX-987654',
+                'industry': 'Financial Services',
+                'country': 'Nigeria',
+                'subscription_plan': 'professional',
+                'subscription_status': 'active',
+                'max_users': 50,
+                'max_storage_gb': 500,
+                'max_documents': 50000,
+                'is_active': True,
+            }
+        )
+        return organization
+
+    def create_departments(self, organization):
         """Create organization departments"""
         departments = []
 
@@ -91,13 +118,14 @@ class Command(BaseCommand):
         for data in dept_data:
             dept, created = Department.objects.get_or_create(
                 code=data['code'],
+                organization=organization,
                 defaults={'name': data['name']}
             )
             departments.append(dept)
 
         return departments
 
-    def create_users(self, departments):
+    def create_users(self, departments, organization):
         """Create test users"""
         users = []
 
@@ -110,11 +138,19 @@ class Command(BaseCommand):
             first_name='Admin',
             last_name='User',
             department=departments[0],  # Executive Management
+            organization=organization,
             is_staff=True,
             is_superuser=True,
             phone_number='+1234567890',
         )
         users.append(admin)
+
+        # Create organization membership for admin
+        OrganizationMember.objects.get_or_create(
+            organization=organization,
+            user=admin,
+            defaults={'role': 'owner'}
+        )
 
         # Manager user
         manager = CustomUser.objects.create_user(
@@ -125,10 +161,16 @@ class Command(BaseCommand):
             first_name='John',
             last_name='Doe',
             department=departments[1],  # Engagements
+            organization=organization,
             is_staff=True,
             phone_number='+1234567891',
         )
         users.append(manager)
+        OrganizationMember.objects.get_or_create(
+            organization=organization,
+            user=manager,
+            defaults={'role': 'manager'}
+        )
 
         # Regular staff user
         staff = CustomUser.objects.create_user(
@@ -139,10 +181,16 @@ class Command(BaseCommand):
             first_name='Jane',
             last_name='Smith',
             department=departments[2],  # Accounting
+            organization=organization,
             is_staff=False,
             phone_number='+1234567892',
         )
         users.append(staff)
+        OrganizationMember.objects.get_or_create(
+            organization=organization,
+            user=staff,
+            defaults={'role': 'member'}
+        )
 
         # IT user
         it_user = CustomUser.objects.create_user(
@@ -153,10 +201,16 @@ class Command(BaseCommand):
             first_name='Mike',
             last_name='Tech',
             department=departments[3],  # IT
+            organization=organization,
             is_staff=True,
             phone_number='+1234567893',
         )
         users.append(it_user)
+        OrganizationMember.objects.get_or_create(
+            organization=organization,
+            user=it_user,
+            defaults={'role': 'admin'}
+        )
 
         # Compliance user
         compliance_user = CustomUser.objects.create_user(
@@ -167,10 +221,16 @@ class Command(BaseCommand):
             first_name='Sarah',
             last_name='Comply',
             department=departments[4],  # Compliance
+            organization=organization,
             is_staff=True,
             phone_number='+1234567894',
         )
         users.append(compliance_user)
+        OrganizationMember.objects.get_or_create(
+            organization=organization,
+            user=compliance_user,
+            defaults={'role': 'member'}
+        )
 
         return users
 

@@ -184,32 +184,84 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     """
     Custom JWT token serializer that includes additional user information.
     Also handles account lockout mechanism and Remember Me functionality.
+    Accepts both email and username for login.
     """
     remember_me = serializers.BooleanField(default=False, required=False)
 
     def validate(self, attrs):
         """
-        Override to check for account lockout and track failed login attempts
+        Override to check for account lockout and track failed login attempts.
+        Accepts both email and username for authentication.
         """
         # Extract remember_me before calling parent validate (it's not a standard field)
         remember_me = attrs.pop('remember_me', False)
 
-        username = attrs.get('username')
+        username_or_email = attrs.get('username', '')
+        password = attrs.get('password', '')
 
-        # First, try to authenticate
-        data = super().validate(attrs)
+        # Try to find the user by username or email
+        user = None
+        if '@' in username_or_email:
+            # Looks like an email
+            try:
+                user = CustomUser.objects.get(email=username_or_email)
+                # Replace email with username for parent validation
+                attrs['username'] = user.username
+            except CustomUser.DoesNotExist:
+                pass
+        else:
+            # Looks like a username
+            try:
+                user = CustomUser.objects.get(username=username_or_email)
+            except CustomUser.DoesNotExist:
+                pass
 
-        # Get the authenticated user (set by parent's validate method)
-        user = self.user
-
-        # Check if account is locked
-        if user.is_account_locked:
+        # Check if account is locked BEFORE authentication attempt
+        if user and user.is_account_locked:
             raise serializers.ValidationError(
                 {
                     "detail": f"Account locked due to too many failed login attempts. "
-                            f"Please try again after {user.account_locked_until.strftime('%Y-%m-%d %H:%M:%S UTC')}"
+                            f"Please try again after {user.account_locked_until.strftime('%Y-%m-%d %H:%M:%S UTC')}",
+                    "locked": True,
+                    "locked_until": user.account_locked_until.isoformat() if user.account_locked_until else None
                 }
             )
+
+        # Try to authenticate
+        try:
+            data = super().validate(attrs)
+        except Exception as e:
+            # Authentication failed - record failed login attempt if user exists
+            if user:
+                lockout_info = user.record_failed_login()
+
+                if lockout_info['locked']:
+                    # Account just got locked
+                    raise serializers.ValidationError(
+                        {
+                            "detail": lockout_info['message'],
+                            "locked": True,
+                            "locked_until": lockout_info['locked_until'].isoformat() if lockout_info['locked_until'] else None,
+                            "remaining_attempts": 0
+                        }
+                    )
+                else:
+                    # Still has attempts remaining
+                    raise serializers.ValidationError(
+                        {
+                            "detail": lockout_info['message'],
+                            "locked": False,
+                            "remaining_attempts": lockout_info['remaining_attempts']
+                        }
+                    )
+            else:
+                # User not found - generic error message (don't reveal if user exists)
+                raise serializers.ValidationError(
+                    {"detail": "Invalid credentials. Please check your username/email and password."}
+                )
+
+        # Get the authenticated user (set by parent's validate method)
+        user = self.user
 
         # Record successful login
         user.record_successful_login()

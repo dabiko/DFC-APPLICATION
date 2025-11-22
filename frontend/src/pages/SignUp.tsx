@@ -12,13 +12,13 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Input } from '../components/Input/Input'
-import { Button } from '../components/Button/Button'
-import { Select } from '../components/Select/Select'
-import { Checkbox } from '../components/Checkbox/Checkbox'
-import { PasswordStrengthIndicator } from '../components/Auth/PasswordStrengthIndicator'
-import { OTPVerificationModal } from '../components/Auth/OTPVerificationModal'
-import { AuthHeader } from '../components/Auth/AuthHeader'
+import { Input } from '@components/Input'
+import { Button } from '@components/Button'
+import { Select } from '@components/Select'
+import { Checkbox } from '@components/Checkbox'
+import { PasswordStrengthIndicator } from '@components/Auth'
+import { OTPVerificationModal } from '@components/Auth'
+import { AuthHeader } from '@components/Auth'
 import { validateBusinessEmail } from '../utils/emailValidation'
 import { validatePassword } from '../utils/passwordStrength'
 import { COUNTRIES } from '../data/countries'
@@ -416,8 +416,15 @@ export const SignUp: React.FC = () => {
     return isValid
   }
 
-  const handleNext = () => {
-    // Mark all fields in current step as touched to show validation errors
+  const handleNext = async () => {
+    // Clear any previous submit errors
+    setErrors((prev) => {
+      const newErrors = { ...prev }
+      delete newErrors.submit
+      return newErrors
+    })
+
+    // Determine which fields to validate based on current step
     let fieldsToValidate: (keyof FormData)[] = []
 
     if (currentStep === 1) {
@@ -435,35 +442,105 @@ export const SignUp: React.FC = () => {
         'state',
         'postalCode',
       ]
-    } else if (currentStep === 3) {
-      fieldsToValidate = ['password', 'confirmPassword', 'termsAccepted', 'privacyAccepted']
     }
 
-    // Mark all fields as touched
+    // Mark all fields in current step as touched to show validation errors
     const touchedUpdates: { [key: string]: boolean } = {}
     fieldsToValidate.forEach((field) => {
       touchedUpdates[field] = true
     })
     setTouched((prev) => ({ ...prev, ...touchedUpdates }))
 
-    // Validate step - use setTimeout to ensure touched state is updated before validation
-    // This ensures error messages are visible when validation fails
-    setTimeout(() => {
-      if (validateStep(currentStep)) {
-        if (currentStep === 2 && !emailVerified) {
-          // Blur the button before opening modal to prevent focus trap conflict
-          if (document.activeElement instanceof HTMLElement) {
-            document.activeElement.blur()
+    // Small delay to ensure touched state is updated before validation
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    // Validate current step (frontend validation)
+    const isValid = validateStep(currentStep)
+
+    if (!isValid) {
+      // Validation failed - errors are already set by validateStep
+      return
+    }
+
+    // Step 1: Company Information - just move to next step
+    if (currentStep === 1) {
+      setCurrentStep(2)
+      return
+    }
+
+    // Step 2: Personal Information - requires email verification
+    if (currentStep === 2) {
+      // If email already verified, move to step 3
+      if (emailVerified) {
+        setCurrentStep(3)
+        return
+      }
+
+      // Email not verified - send OTP
+      setLoading(true)
+
+      try {
+        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+        const response = await fetch(`${apiBaseUrl}/api/v1/auth/otp/email/send/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: formData.email,
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+          }),
+        })
+
+        const data = await response.json()
+
+        if (!response.ok) {
+          // Handle backend validation errors
+          if (data.errors?.email) {
+            // Personal email domain error from backend
+            setErrors((prev) => ({
+              ...prev,
+              email: data.errors.email[0],
+            }))
+          } else if (data.email_exists) {
+            // Email already registered
+            setErrors((prev) => ({
+              ...prev,
+              email: data.detail || 'An account with this email already exists.',
+            }))
+          } else {
+            // Other errors (rate limit, server error, etc.)
+            setErrors((prev) => ({
+              ...prev,
+              submit: data.detail || 'Failed to send verification code. Please try again.',
+            }))
           }
-          // Delay modal opening to allow focus to be released
-          setTimeout(() => {
-            setShowEmailOTP(true)
-          }, 0)
+          setLoading(false)
           return
         }
-        setCurrentStep((prev) => Math.min(prev + 1, 3))
+
+        // OTP sent successfully - show verification modal
+        setLoading(false)
+
+        // Blur the button before opening modal to prevent focus issues
+        if (document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur()
+        }
+
+        // Open OTP modal
+        setTimeout(() => {
+          setShowEmailOTP(true)
+        }, 50)
+      } catch (error) {
+        console.error('Error sending OTP:', error)
+        setErrors((prev) => ({
+          ...prev,
+          submit: 'Network error. Failed to send verification code. Please try again.',
+        }))
+        setLoading(false)
       }
-    }, 0)
+    }
   }
 
   const handleBack = () => {
@@ -471,16 +548,47 @@ export const SignUp: React.FC = () => {
   }
 
   const handleSendEmailOTP = async () => {
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    console.log('Sending email OTP to:', formData.email)
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+
+    const response = await fetch(`${apiBaseUrl}/api/v1/auth/otp/email/send/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: formData.email,
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+      }),
+    })
+
+    if (!response.ok) {
+      const data = await response.json()
+      throw new Error(data.detail || 'Failed to send verification code')
+    }
   }
 
   const handleVerifyEmailOTP = async (otp: string) => {
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-    if (otp === '123456') {
-      // Demo OTP
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+
+    const response = await fetch(`${apiBaseUrl}/api/v1/auth/otp/email/verify/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: formData.email,
+        code: otp,
+      }),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(data.detail || 'Invalid verification code')
+    }
+
+    if (data.verified) {
       setEmailVerified(true)
       setShowEmailOTP(false)
       if (phoneVerified || !formData.phone) {
@@ -492,13 +600,13 @@ export const SignUp: React.FC = () => {
         }, 100)
       }
     } else {
-      throw new Error('Invalid OTP code')
+      throw new Error(data.detail || 'Verification failed')
     }
   }
 
   const handleSendPhoneOTP = async () => {
     await new Promise((resolve) => setTimeout(resolve, 1000))
-    console.log('Sending phone OTP to:', selectedCountry?.phoneCode, formData.phone)
+    // Phone OTP sending logic here
   }
 
   const handleVerifyPhoneOTP = async (otp: string) => {
@@ -583,7 +691,6 @@ export const SignUp: React.FC = () => {
       }
 
       const data = await response.json()
-      console.log('Registration successful:', data)
 
       // Store tokens if returned
       if (data.tokens) {
@@ -739,6 +846,12 @@ export const SignUp: React.FC = () => {
                 }))}
                 fullWidth
               />
+
+              {errors.submit && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                  <p className="text-sm text-red-600 dark:text-red-400">{errors.submit}</p>
+                </div>
+              )}
             </div>
           )}
 
@@ -791,7 +904,11 @@ export const SignUp: React.FC = () => {
                   ) : undefined
                 }
                 placeholder="john.doe@company.com"
-                helperText="Personal email addresses (Gmail, Yahoo, etc.) are not allowed"
+                helperText={
+                  emailVerified
+                    ? 'Email verified successfully'
+                    : 'Personal email addresses (Gmail, Yahoo, etc.) are not allowed. You will receive a verification code when you click Next.'
+                }
                 required
                 fullWidth
               />
@@ -912,6 +1029,12 @@ export const SignUp: React.FC = () => {
                 required
                 fullWidth
               />
+
+              {errors.submit && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mt-4">
+                  <p className="text-sm text-red-600 dark:text-red-400">{errors.submit}</p>
+                </div>
+              )}
             </div>
           )}
 
@@ -1020,10 +1143,11 @@ export const SignUp: React.FC = () => {
               <Button
                 type="button"
                 onClick={handleNext}
+                loading={loading}
                 disabled={loading}
                 className="flex-1 cursor-pointer"
               >
-                Next
+                {loading ? 'Validating...' : 'Next'}
               </Button>
             ) : (
               <Button
@@ -1032,7 +1156,7 @@ export const SignUp: React.FC = () => {
                 disabled={loading}
                 className="flex-1 cursor-pointer"
               >
-                Create Account
+                {loading ? 'Creating Account...' : 'Create Account'}
               </Button>
             )}
           </div>

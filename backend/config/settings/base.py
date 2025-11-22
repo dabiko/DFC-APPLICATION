@@ -93,9 +93,9 @@ WSGI_APPLICATION = 'config.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME', 'dfc_dev'),
-        'USER': os.getenv('DB_USER', 'dfc_user'),
-        'PASSWORD': os.getenv('DB_PASSWORD', 'dev_password'),
+        'NAME': os.getenv('DB_NAME', 'dfc_database'),
+        'USER': os.getenv('DB_USER', 'postgres'),
+        'PASSWORD': os.getenv('DB_PASSWORD', 'dabiko'),
         'HOST': os.getenv('DB_HOST', '127.0.0.1'),  # Use IPv4 explicitly
         'PORT': os.getenv('DB_PORT', '5432'),
         'OPTIONS': {
@@ -184,7 +184,7 @@ SIMPLE_JWT = {
 # CORS Settings
 CORS_ALLOWED_ORIGINS = os.getenv(
     'CORS_ALLOWED_ORIGINS',
-    'http://localhost:3000,http://localhost:3002,http://localhost:5173'
+    'http://localhost:3000,http://localhost:3002,http://localhost:3003'
 ).split(',')
 
 CORS_ALLOW_CREDENTIALS = True
@@ -192,7 +192,7 @@ CORS_ALLOW_CREDENTIALS = True
 # CSRF Settings
 CSRF_TRUSTED_ORIGINS = os.getenv(
     'CSRF_TRUSTED_ORIGINS',
-    'http://localhost:3000,http://localhost:3002,http://localhost:5173'
+    'http://localhost:3000,http://localhost:3002,http://localhost:3003'
 ).split(',')
 
 # Spectacular Settings (API Documentation)
@@ -372,7 +372,7 @@ ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 # CSRF Trusted Origins
 CSRF_TRUSTED_ORIGINS = os.getenv(
     'CSRF_TRUSTED_ORIGINS',
-    'http://localhost:3000,http://localhost:5173'
+    'http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003',
 ).split(',')
 
 # ==============================================================================
@@ -421,3 +421,32 @@ UNAUTHORIZED_ACCESS_THRESHOLD = int(os.getenv('UNAUTHORIZED_ACCESS_THRESHOLD', '
 
 # Environment identifier for alerts
 ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
+
+# ==============================================================================
+# PASSWORD RESET & SECURITY CONFIGURATION
+# ==============================================================================
+
+# Frontend URL for password reset emails
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003')
+
+# Password History Settings
+PASSWORD_HISTORY_COUNT = int(os.getenv('PASSWORD_HISTORY_COUNT', '5'))  # Prevent reusing last 5 passwords
+
+# Password Reset Rate Limiting
+PASSWORD_RESET_RATE_LIMIT = int(os.getenv('PASSWORD_RESET_RATE_LIMIT', '3'))  # Max attempts per window
+PASSWORD_RESET_RATE_WINDOW = int(os.getenv('PASSWORD_RESET_RATE_WINDOW', '1'))  # Window in hours
+
+# ==============================================================================
+# EMAIL CONFIGURATION (Resend)
+# ==============================================================================
+
+# Resend API Configuration
+RESEND_API_KEY = os.getenv('RESEND_API_KEY', '')
+USE_RESEND_IN_DEV = os.getenv('USE_RESEND_IN_DEV', 'False') == 'True'
+
+# Email sender configuration
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'DFC <btamunang@quantum-soft.ai>')
+SUPPORT_EMAIL = os.getenv('SUPPORT_EMAIL', 'support@yourdomain.com')
+
+# Email backend (configured via EMAIL_BACKEND environment variable in .env)
+# Don't override here - let it use the value from line 278
