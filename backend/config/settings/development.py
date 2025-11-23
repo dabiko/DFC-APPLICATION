@@ -32,7 +32,7 @@ INTERNAL_IPS = [
 # Email settings
 import os  # noqa
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@digitalfilingcabinet.com')
-FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
 
 # Disable SSL redirect in development
 SECURE_SSL_REDIRECT = False
@@ -51,5 +51,5 @@ LOGGING['loggers']['apps'] = {  # noqa
 }
 
 # CORS Settings for Development (allow all origins for easier testing)
-CORS_ALLOW_ALL_ORIGINS = True
-CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOW_CREDENTIALS = False

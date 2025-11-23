@@ -6,6 +6,7 @@
 import { useState, useCallback } from 'react'
 import { PointerSensor, KeyboardSensor, useSensor, useSensors } from '@dnd-kit/core'
 import type { DragEndEvent, DragOverEvent, DragStartEvent } from '@dnd-kit/core'
+import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { Folder, FolderDragData, FolderDropResult } from '@/types/folder'
 import { canMoveFolder, findFolderById } from '@/utils/folderTree'

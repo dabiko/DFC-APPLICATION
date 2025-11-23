@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Bell, User, Settings, Users, LogOut, Sun, Moon, Monitor } from 'lucide-react'
+import { TopNavigationBar } from '@components/Navigation/TopNavigationBar'
 import { useTheme } from '@hooks/useTheme'
 import { cn } from '@utils/cn'
 
@@ -67,9 +68,9 @@ export function DashboardHeader({ user, notifications = [], onLogout }: Dashboar
   }
 
   return (
-    <header className="h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 flex items-center justify-between">
+    <header className="h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 flex items-center justify-between gap-6">
       {/* Logo and Company Name */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-shrink-0">
         <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
           <span className="text-white font-bold text-sm">DFC</span>
         </div>
@@ -79,6 +80,11 @@ export function DashboardHeader({ user, notifications = [], onLogout }: Dashboar
           </h1>
           <p className="text-xs text-gray-500 dark:text-gray-400">Enterprise Document Management</p>
         </div>
+      </div>
+
+      {/* Center - App Navigation */}
+      <div className="flex-1">
+        <TopNavigationBar />
       </div>
 
       {/* Right Section - Theme, Notifications, Profile */}

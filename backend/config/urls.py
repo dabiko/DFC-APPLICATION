@@ -58,8 +58,8 @@ urlpatterns = [
     # API v1 - Billing & Subscriptions
     path('api/billing/', include('apps.billing.urls', namespace='billing')),
 
-    # API Documentation
-    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    # API Documentation (publicly accessible for testing)
+    path('api/schema/', SpectacularAPIView.as_view(permission_classes=[]), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 ]

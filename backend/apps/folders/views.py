@@ -56,6 +56,7 @@ class FolderListCreateView(FolderPermissionMixin, generics.ListCreateAPIView):
     Returns only folders the user has access to based on RBAC permissions.
     """
     permission_classes = [permissions.IsAuthenticated]
+    queryset = Folder.objects.all()  # Base queryset - will be filtered in get_queryset()
 
     def get_serializer_class(self):
         if self.request.method == 'POST':
@@ -74,7 +75,11 @@ class FolderListCreateView(FolderPermissionMixin, generics.ListCreateAPIView):
         )
 
         # Apply RBAC filtering using FolderPermissionMixin
-        queryset = super().get_queryset()
+        try:
+            queryset = super().get_queryset()
+        except AssertionError:
+            queryset = base_queryset
+
         if queryset is None:
             queryset = base_queryset
 
@@ -95,9 +100,15 @@ class FolderListCreateView(FolderPermissionMixin, generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         """Create folder with ownership and department info"""
+        # Get department from request data or user's department
+        department = serializer.validated_data.get('department')
+        if not department:
+            department = self.request.user.department
+
         folder = serializer.save(
             owner=self.request.user,
-            created_by=self.request.user
+            created_by=self.request.user,
+            department=department
         )
 
         logger.info(

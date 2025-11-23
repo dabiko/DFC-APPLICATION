@@ -29,3 +29,8 @@ export type { FolderTemplateSelectorProps } from './FolderTemplateSelector'
 
 export { TemplatePreview } from './TemplatePreview'
 export type { TemplatePreviewProps } from './TemplatePreview'
+
+export { FolderSidebar } from './FolderSidebar'
+
+export { SmartFolderItem } from './SmartFolderItem'
+export type { SmartFolderItemProps } from './SmartFolderItem'

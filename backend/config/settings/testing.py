@@ -32,7 +32,7 @@ PASSWORD_HASHERS = [
 
 # Disable Celery for tests
 CELERY_TASK_ALWAYS_EAGER = True
-CELERY_TASK_EAGER_PROPAG ATES = True
+CELERY_TASK_EAGER_PROPAG_ATES = True
 
 # Test email backend
 EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'

@@ -69,7 +69,9 @@ export function ConfidentialityBadge({
   className,
   ...props
 }: ConfidentialityBadgeProps) {
-  const config = levelConfig[level]
+  // Normalize the level to handle both underscore and hyphen formats
+  const normalizedLevel = level?.replace(/_/g, '-') as ConfidentialityLevel
+  const config = levelConfig[normalizedLevel] || levelConfig['internal'] // Default to internal if level is invalid
 
   if (dotOnly) {
     return (

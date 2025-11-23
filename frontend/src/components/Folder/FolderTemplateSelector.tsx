@@ -3,7 +3,7 @@
  * Select and preview folder templates
  */
 
-import { FC, useState } from 'react'
+import { type FC, useState } from 'react'
 import { XMarkIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 import type { FolderTemplate } from '@/types/folderTemplate'
 import { FOLDER_TEMPLATES, searchTemplates } from '@/data/folderTemplates'
@@ -32,9 +32,11 @@ export const FolderTemplateSelector: FC<FolderTemplateSelectorProps> = ({
       ? FOLDER_TEMPLATES
       : FOLDER_TEMPLATES.filter((t) => t.category === categoryFilter)
 
-  const handleSelectTemplate = () => {
+  const handleSelectTemplate = (e?: React.MouseEvent) => {
+    e?.stopPropagation()
     if (selectedTemplate) {
       onSelectTemplate(selectedTemplate)
+      onClose()
     }
   }
 
@@ -42,7 +44,7 @@ export const FolderTemplateSelector: FC<FolderTemplateSelectorProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 backdrop-blur-sm"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -120,7 +122,11 @@ export const FolderTemplateSelector: FC<FolderTemplateSelectorProps> = ({
                 {filteredTemplates.map((template) => (
                   <button
                     key={template.id}
-                    onClick={() => setSelectedTemplate(template)}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setSelectedTemplate(template)
+                    }}
                     className={`
                       w-full p-4 rounded-lg text-left transition-colors mb-2
                       ${
@@ -197,12 +203,17 @@ export const FolderTemplateSelector: FC<FolderTemplateSelectorProps> = ({
         {/* Footer */}
         <div className="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
           <button
-            onClick={onClose}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onClose()
+            }}
             className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
           >
             Cancel
           </button>
           <button
+            type="button"
             onClick={handleSelectTemplate}
             disabled={!selectedTemplate}
             className="px-4 py-2 text-sm font-medium bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"

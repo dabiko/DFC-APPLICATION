@@ -87,6 +87,9 @@ def model_to_dict(instance, exclude_fields=None):
     Returns:
         Dict representation of the model
     """
+    from uuid import UUID
+    from decimal import Decimal
+
     if exclude_fields is None:
         exclude_fields = []
 
@@ -97,12 +100,18 @@ def model_to_dict(instance, exclude_fields=None):
 
         value = getattr(instance, field.name)
 
-        # Handle special field types
-        if hasattr(value, 'isoformat'):  # DateTime fields
+        # Handle special field types for JSON serialization
+        if value is None:
+            pass  # Keep None as is
+        elif isinstance(value, UUID):  # UUID fields
+            value = str(value)
+        elif hasattr(value, 'isoformat'):  # DateTime fields
             value = value.isoformat()
         elif hasattr(value, 'pk'):  # Foreign key fields
             value = str(value.pk)
-        elif isinstance(value, bytes):
+        elif isinstance(value, Decimal):  # Decimal fields
+            value = float(value)
+        elif isinstance(value, bytes):  # Byte fields
             value = value.decode('utf-8', errors='replace')
 
         data[field.name] = value

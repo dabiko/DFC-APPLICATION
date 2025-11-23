@@ -3,9 +3,11 @@
  * Modal for creating new folders
  */
 
-import { FC, useState, useEffect } from 'react'
-import { XMarkIcon, FolderPlusIcon } from '@heroicons/react/24/outline'
+import { type FC, useState, useEffect } from 'react'
+import { XMarkIcon, FolderPlusIcon, RectangleStackIcon } from '@heroicons/react/24/outline'
+import { FolderTemplateSelector } from './FolderTemplateSelector'
 import type { Folder, CreateFolderData, ConfidentialityLevel } from '@/types/folder'
+import type { FolderTemplate } from '@/types/folderTemplate'
 
 export interface CreateFolderModalProps {
   isOpen: boolean
@@ -26,6 +28,8 @@ export const CreateFolderModal: FC<CreateFolderModalProps> = ({
   const [confidentiality, setConfidentiality] = useState<ConfidentialityLevel>('internal')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showTemplateSelector, setShowTemplateSelector] = useState(false)
+  const [selectedTemplate, setSelectedTemplate] = useState<FolderTemplate | null>(null)
 
   // Reset form when modal opens
   useEffect(() => {
@@ -33,8 +37,16 @@ export const CreateFolderModal: FC<CreateFolderModalProps> = ({
       setFolderName('')
       setConfidentiality(parentFolder?.confidentiality || 'internal')
       setError(null)
+      setSelectedTemplate(null)
     }
   }, [isOpen, parentFolder])
+
+  // Handle template selection
+  const handleTemplateSelect = (template: FolderTemplate) => {
+    setSelectedTemplate(template)
+    setFolderName(template.name)
+    setShowTemplateSelector(false)
+  }
 
   // Validate folder name
   const validateFolderName = (name: string): string | null => {
@@ -77,6 +89,7 @@ export const CreateFolderModal: FC<CreateFolderModalProps> = ({
         name: folderName.trim(),
         parentId: parentFolder?.id || null,
         confidentiality,
+        templateId: selectedTemplate?.id,
       })
       onClose()
     } catch (err) {
@@ -86,7 +99,12 @@ export const CreateFolderModal: FC<CreateFolderModalProps> = ({
     }
   }
 
-  const handleClose = () => {
+  const handleClose = (_e?: React.MouseEvent) => {
+    // Don't close if template selector is open
+    if (showTemplateSelector) {
+      return
+    }
+
     if (!isLoading) {
       onClose()
     }
@@ -96,7 +114,7 @@ export const CreateFolderModal: FC<CreateFolderModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/10 backdrop-blur-sm"
       onClick={handleClose}
       role="dialog"
       aria-modal="true"
@@ -139,6 +157,36 @@ export const CreateFolderModal: FC<CreateFolderModalProps> = ({
                 </span>
               </div>
             )}
+
+            {/* Template Button */}
+            <div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setShowTemplateSelector(true)
+                }}
+                disabled={isLoading}
+                className="
+                  w-full px-4 py-2 border-2 border-dashed border-gray-300 dark:border-gray-600
+                  rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300
+                  hover:border-primary-500 hover:text-primary-600 dark:hover:text-primary-400
+                  transition-colors flex items-center justify-center gap-2
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                "
+              >
+                <RectangleStackIcon className="w-5 h-5" />
+                {selectedTemplate
+                  ? `Using Template: ${selectedTemplate.name}`
+                  : 'Use Template (Optional)'}
+              </button>
+              {selectedTemplate && (
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  {selectedTemplate.description}
+                </p>
+              )}
+            </div>
 
             {/* Folder name input */}
             <div>
@@ -268,6 +316,16 @@ export const CreateFolderModal: FC<CreateFolderModalProps> = ({
           </div>
         </form>
       </div>
+
+      {/* Template Selector Modal */}
+      {showTemplateSelector && (
+        <FolderTemplateSelector
+          isOpen={showTemplateSelector}
+          onClose={() => setShowTemplateSelector(false)}
+          onSelectTemplate={handleTemplateSelect}
+          parentFolderName={parentFolder?.name}
+        />
+      )}
     </div>
   )
 }

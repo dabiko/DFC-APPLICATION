@@ -12,7 +12,7 @@ import type {
   FolderSortOptions,
 } from '@/types/folder'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
 
 // Axios instance with auth interceptor
 const api = axios.create({
@@ -25,7 +25,8 @@ const api = axios.create({
 // Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('access_token')
+    // Check both localStorage and sessionStorage for token
+    const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -39,10 +40,15 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid - redirect to login
-      localStorage.removeItem('access_token')
-      localStorage.removeItem('refresh_token')
-      window.location.href = '/login'
+      // Only redirect if not already on login page
+      if (!window.location.pathname.includes('/login')) {
+        // Token expired or invalid - clear tokens and redirect to login
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('refresh_token')
+        sessionStorage.removeItem('access_token')
+        sessionStorage.removeItem('refresh_token')
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(error)
   }
@@ -74,16 +80,25 @@ export const folderService = {
       params.sort_order = sort.sortOrder
     }
 
-    const response = await api.get<Folder[]>('/folders/', { params })
-    return response.data
+    const response = await api.get<any[]>('/folders/', { params })
+
+    // Debug: Log the response to see what we're getting
+    console.log('Folders API Response:', response.data)
+
+    // Transform backend response to frontend format
+    const { transformFoldersFromBackend } = await import('@/utils/dataTransformers')
+    const transformed = transformFoldersFromBackend(response.data)
+    console.log('Transformed folders:', transformed)
+    return transformed
   },
 
   /**
    * Get folder by ID
    */
   getFolderById: async (folderId: string): Promise<Folder> => {
-    const response = await api.get<Folder>(`/folders/${folderId}/`)
-    return response.data
+    const response = await api.get<any>(`/folders/${folderId}/`)
+    const { transformFolderFromBackend } = await import('@/utils/dataTransformers')
+    return transformFolderFromBackend(response.data)
   },
 
   /**
@@ -98,25 +113,47 @@ export const folderService = {
    * Create new folder
    */
   createFolder: async (data: CreateFolderData): Promise<Folder> => {
-    const response = await api.post<Folder>('/folders/', {
+    const { transformFolderFromBackend } = await import('@/utils/dataTransformers')
+
+    // Transform confidentiality to backend format
+    const confidentialityMapping: Record<string, string> = {
+      public: 'PUBLIC',
+      internal: 'INTERNAL',
+      confidential: 'CONFIDENTIAL',
+      highly_confidential: 'HIGHLY_CONFIDENTIAL',
+    }
+
+    const response = await api.post<any>('/folders/', {
       name: data.name,
-      parent_id: data.parentId,
-      confidentiality: data.confidentiality,
+      parent: data.parentId, // Backend expects 'parent' not 'parent_id'
+      confidentiality_level: confidentialityMapping[data.confidentiality] || 'INTERNAL',
       template_id: data.templateId,
+      description: data.description || '',
     })
-    return response.data
+    return transformFolderFromBackend(response.data)
   },
 
   /**
    * Update folder
    */
   updateFolder: async (folderId: string, data: UpdateFolderData): Promise<Folder> => {
-    const response = await api.put<Folder>(`/folders/${folderId}/`, {
+    const { transformFolderFromBackend } = await import('@/utils/dataTransformers')
+
+    const confidentialityMapping: Record<string, string> = {
+      public: 'PUBLIC',
+      internal: 'INTERNAL',
+      confidential: 'CONFIDENTIAL',
+      highly_confidential: 'HIGHLY_CONFIDENTIAL',
+    }
+
+    const response = await api.put<any>(`/folders/${folderId}/update/`, {
       name: data.name,
-      confidentiality: data.confidentiality,
+      confidentiality: data.confidentiality
+        ? confidentialityMapping[data.confidentiality]
+        : undefined,
       is_locked: data.isLocked,
     })
-    return response.data
+    return transformFolderFromBackend(response.data)
   },
 
   /**
@@ -130,10 +167,11 @@ export const folderService = {
    * Move folder
    */
   moveFolder: async (folderId: string, newParentId: string | null): Promise<Folder> => {
-    const response = await api.post<Folder>(`/folders/${folderId}/move/`, {
+    const { transformFolderFromBackend } = await import('@/utils/dataTransformers')
+    const response = await api.post<any>(`/folders/${folderId}/move/`, {
       new_parent_id: newParentId,
     })
-    return response.data
+    return transformFolderFromBackend(response.data)
   },
 
   /**

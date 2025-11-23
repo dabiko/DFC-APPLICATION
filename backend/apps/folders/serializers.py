@@ -81,6 +81,12 @@ class FolderCreateSerializer(serializers.ModelSerializer):
     """
     Serializer for creating new folders.
     """
+    department = serializers.PrimaryKeyRelatedField(
+        queryset=Department.objects.all(),
+        required=False,
+        allow_null=True
+    )
+
     class Meta:
         model = Folder
         fields = [
