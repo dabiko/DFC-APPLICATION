@@ -84,11 +84,11 @@ export function ThreePanelLayout({
           <aside
             className={cn(
               'hidden lg:flex flex-col bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 transition-all duration-300',
-              'overflow-hidden'
+              'overflow-hidden flex-shrink-0'
             )}
-            style={{ width: leftPanelWidth }}
+            style={leftPanelWidth !== 'auto' ? { width: leftPanelWidth } : undefined}
           >
-            <div className="flex-1 overflow-y-auto">{leftPanel}</div>
+            <div className="flex-1 overflow-y-auto overflow-x-hidden">{leftPanel}</div>
 
             {collapsibleLeft && (
               <button
@@ -156,7 +156,7 @@ export function ThreePanelLayout({
             </div>
           )}
 
-          <div className="flex-1 overflow-y-auto">{centerPanel}</div>
+          <div className="flex-1 overflow-y-auto overflow-x-hidden">{centerPanel}</div>
         </main>
 
         {/* Right Panel - Desktop */}

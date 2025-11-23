@@ -158,6 +158,8 @@ export function Dashboard() {
           <DashboardHeader user={user} notifications={notifications} onLogout={handleLogout} />
         }
         leftPanel={<DashboardSidebar />}
+        leftPanelWidth="auto"
+        collapsibleLeft={false}
         centerPanel={
           <div className="p-6 space-y-6">
             {/* Welcome Section */}
@@ -343,7 +345,6 @@ export function Dashboard() {
             </div>
           </div>
         }
-        leftPanelWidth="280px"
         collapsibleRight={false}
       />
     </>
