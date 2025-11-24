@@ -19,6 +19,19 @@ import { getFileIcon } from '@/utils/fileValidation'
 import { formatFileSize } from '@/utils/versionUtils'
 import { formatDistanceToNow } from 'date-fns'
 
+// Helper function to safely format dates
+const formatModifiedDate = (dateString: string): string => {
+  try {
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) {
+      return '-'
+    }
+    return formatDistanceToNow(date, { addSuffix: true })
+  } catch (error) {
+    return '-'
+  }
+}
+
 export const FileCard: FC<FileCardProps> = ({
   item,
   viewMode,
@@ -27,6 +40,7 @@ export const FileCard: FC<FileCardProps> = ({
   onDoubleClick,
   onSelect,
   onFavoriteToggle,
+  onContextMenu,
   showCheckbox = false,
   showActions = true,
   className,
@@ -94,6 +108,7 @@ export const FileCard: FC<FileCardProps> = ({
         )}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
+        onContextMenu={onContextMenu}
       >
         {/* Checkbox */}
         {showCheckbox && (
@@ -146,24 +161,25 @@ export const FileCard: FC<FileCardProps> = ({
             {item.name}
           </p>
 
-          {/* Metadata */}
-          <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-            <span>
+          {/* Size and Date */}
+          <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
+            <span className="font-medium">
               {isFolder ? `${item.itemCount || 0} items` : formatFileSize(item.fileSize || 0)}
             </span>
-            <span>{formatDistanceToNow(new Date(item.modifiedAt), { addSuffix: true })}</span>
+            <span>{formatModifiedDate(item.modifiedAt)}</span>
           </div>
 
-          {/* Badges */}
+          {/* Confidentiality and Status Indicators */}
           <div className="flex items-center gap-1.5 flex-wrap">
-            {/* Confidentiality */}
+            {/* Confidentiality Badge */}
             <span className={getConfidentialityBadgeClass()}>
-              {confidentialityIcon} {item.confidentialityLevel}
+              <span className="mr-1">{confidentialityIcon}</span>
+              {item.confidentialityLevel}
             </span>
 
             {/* Status indicators */}
-            {item.isLocked && <LockClosedIcon className="w-4 h-4 text-gray-500" title="Locked" />}
             {item.isShared && <ShareIcon className="w-4 h-4 text-blue-500" title="Shared" />}
+            {item.isLocked && <LockClosedIcon className="w-4 h-4 text-gray-500" title="Locked" />}
             {item.hasVersions && (
               <ClockIcon
                 className="w-4 h-4 text-gray-500"
@@ -188,6 +204,7 @@ export const FileCard: FC<FileCardProps> = ({
       )}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
+      onContextMenu={onContextMenu}
     >
       {/* Checkbox */}
       {showCheckbox && (
@@ -239,7 +256,7 @@ export const FileCard: FC<FileCardProps> = ({
 
       {/* Modified */}
       <div className="hidden lg:flex flex-shrink-0 w-32 text-sm text-gray-600 dark:text-gray-400">
-        {formatDistanceToNow(new Date(item.modifiedAt), { addSuffix: true })}
+        {formatModifiedDate(item.modifiedAt)}
       </div>
 
       {/* Favorite */}

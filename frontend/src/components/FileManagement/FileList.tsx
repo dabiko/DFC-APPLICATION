@@ -19,6 +19,7 @@ export const FileList: FC<FileListProps> = ({
   onSelectionChange,
   onSortChange: _onSortChange,
   onViewModeChange: _onViewModeChange,
+  onContextMenu,
   isLoading = false,
   emptyState,
   className,
@@ -166,6 +167,7 @@ export const FileList: FC<FileListProps> = ({
             onDoubleClick={() => handleItemDoubleClick(item)}
             onSelect={(selected) => handleItemSelect(item.id, selected)}
             onFavoriteToggle={() => handleFavoriteToggle(item.id)}
+            onContextMenu={onContextMenu ? (e) => onContextMenu(e, item) : undefined}
             showCheckbox={localSelectedIds.size > 0 || onSelectionChange !== undefined}
             showActions={true}
           />
@@ -197,6 +199,7 @@ export const FileList: FC<FileListProps> = ({
           isSelected={localSelectedIds.has(item.id)}
           onClick={() => handleItemClick(item)}
           onDoubleClick={() => handleItemDoubleClick(item)}
+          onContextMenu={onContextMenu ? (e) => onContextMenu(e, item) : undefined}
           onSelect={(selected) => handleItemSelect(item.id, selected)}
           onFavoriteToggle={() => handleFavoriteToggle(item.id)}
           showCheckbox={localSelectedIds.size > 0 || onSelectionChange !== undefined}

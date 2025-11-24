@@ -20,7 +20,7 @@ interface FolderState {
   folderTree: Folder[]
   selectedFolderId: string | null
   selectedFolder: Folder | null
-  expandedFolderIds: Set<string>
+  expandedFolderIds: string[]
   loading: boolean
   error: string | null
   filters: FolderFilterOptions
@@ -32,7 +32,7 @@ const initialState: FolderState = {
   folderTree: [],
   selectedFolderId: null,
   selectedFolder: null,
-  expandedFolderIds: new Set<string>(),
+  expandedFolderIds: [],
   loading: false,
   error: null,
   filters: {},
@@ -166,38 +166,34 @@ const folderSlice = createSlice({
     // Toggle folder expansion
     toggleFolderExpansion: (state, action: PayloadAction<string>) => {
       const folderId = action.payload
-      const newExpandedIds = new Set(state.expandedFolderIds)
-      if (newExpandedIds.has(folderId)) {
-        newExpandedIds.delete(folderId)
+      const index = state.expandedFolderIds.indexOf(folderId)
+      if (index > -1) {
+        state.expandedFolderIds.splice(index, 1)
       } else {
-        newExpandedIds.add(folderId)
+        state.expandedFolderIds.push(folderId)
       }
-      state.expandedFolderIds = newExpandedIds
     },
 
     // Expand folder
     expandFolder: (state, action: PayloadAction<string>) => {
-      const newExpandedIds = new Set(state.expandedFolderIds)
-      newExpandedIds.add(action.payload)
-      state.expandedFolderIds = newExpandedIds
+      if (!state.expandedFolderIds.includes(action.payload)) {
+        state.expandedFolderIds.push(action.payload)
+      }
     },
 
     // Collapse folder
     collapseFolder: (state, action: PayloadAction<string>) => {
-      const newExpandedIds = new Set(state.expandedFolderIds)
-      newExpandedIds.delete(action.payload)
-      state.expandedFolderIds = newExpandedIds
+      state.expandedFolderIds = state.expandedFolderIds.filter((id) => id !== action.payload)
     },
 
     // Expand all folders
     expandAllFolders: (state) => {
-      const allIds = state.folders.map((f) => f.id)
-      state.expandedFolderIds = new Set(allIds)
+      state.expandedFolderIds = state.folders.map((f) => f.id)
     },
 
     // Collapse all folders
     collapseAllFolders: (state) => {
-      state.expandedFolderIds = new Set()
+      state.expandedFolderIds = []
     },
 
     // Set filters
@@ -271,10 +267,8 @@ const folderSlice = createSlice({
       state.folderTree = buildFolderTree(state.folders)
 
       // Auto-expand parent folder
-      if (action.payload.parentId) {
-        const newExpandedIds = new Set(state.expandedFolderIds)
-        newExpandedIds.add(action.payload.parentId)
-        state.expandedFolderIds = newExpandedIds
+      if (action.payload.parentId && !state.expandedFolderIds.includes(action.payload.parentId)) {
+        state.expandedFolderIds.push(action.payload.parentId)
       }
     })
     builder.addCase(createFolder.rejected, (state, action) => {
@@ -317,10 +311,8 @@ const folderSlice = createSlice({
       }
 
       // Auto-expand new parent folder
-      if (action.payload.parentId) {
-        const newExpandedIds = new Set(state.expandedFolderIds)
-        newExpandedIds.add(action.payload.parentId)
-        state.expandedFolderIds = newExpandedIds
+      if (action.payload.parentId && !state.expandedFolderIds.includes(action.payload.parentId)) {
+        state.expandedFolderIds.push(action.payload.parentId)
       }
     })
     builder.addCase(moveFolder.rejected, (state, action) => {

@@ -248,6 +248,7 @@ export interface FileListProps {
   onSelectionChange?: (selectedIds: Set<string>) => void
   onSortChange?: (sortBy: SortField, sortOrder: SortOrder) => void
   onViewModeChange?: (viewMode: ViewMode) => void
+  onContextMenu?: (event: React.MouseEvent, item: FileListItem) => void
   isLoading?: boolean
   emptyState?: React.ReactNode
   className?: string
@@ -261,6 +262,7 @@ export interface FileCardProps {
   onDoubleClick?: () => void
   onSelect?: (selected: boolean) => void
   onFavoriteToggle?: () => void
+  onContextMenu?: (event: React.MouseEvent) => void
   showCheckbox?: boolean
   showActions?: boolean
   className?: string

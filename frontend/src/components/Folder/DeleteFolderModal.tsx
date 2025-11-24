@@ -82,7 +82,7 @@ export const DeleteFolderModal: FC<DeleteFolderModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
       onClick={handleClose}
       role="dialog"
       aria-modal="true"

@@ -144,6 +144,7 @@ export interface FolderTreeProps {
   showIcons?: boolean
   showLockIndicator?: boolean
   showDocumentCount?: boolean
+  showConfidentiality?: boolean
 }
 
 /**

@@ -11,7 +11,8 @@
       "Bash(curl:*)",
       "Bash(../.venv/Scripts/python.exe:*)",
       "Bash(npm run lint:*)",
-      "Bash(.env.example)"
+      "Bash(.env.example)",
+      "Bash(npx prettier:*)"
     ],
     "deny": [],
     "ask": []

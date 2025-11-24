@@ -1,5 +1,5 @@
 import { HTMLAttributes } from 'react'
-import { LockClosedIcon } from '@heroicons/react/24/outline'
+import { LockClosedIcon, GlobeAltIcon, BuildingOfficeIcon } from '@heroicons/react/24/outline'
 import { cn } from '@utils/cn'
 
 export type ConfidentialityLevel = 'public' | 'internal' | 'confidential' | 'highly-confidential'
@@ -11,6 +11,8 @@ export interface ConfidentialityBadgeProps extends HTMLAttributes<HTMLSpanElemen
   showIcon?: boolean
   /** Show as dot indicator instead of full badge */
   dotOnly?: boolean
+  /** Show only icon without text (for compact spaces like sidebar) */
+  iconOnly?: boolean
 }
 
 const levelConfig: Record<
@@ -19,27 +21,32 @@ const levelConfig: Record<
     label: string
     color: string
     dotColor: string
+    icon: typeof GlobeAltIcon
   }
 > = {
   public: {
     label: 'Public',
     color: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
     dotColor: 'bg-gray-600',
+    icon: GlobeAltIcon,
   },
   internal: {
     label: 'Internal',
     color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300',
     dotColor: 'bg-blue-600',
+    icon: BuildingOfficeIcon,
   },
   confidential: {
     label: 'Confidential',
     color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300',
     dotColor: 'bg-orange-600',
+    icon: LockClosedIcon,
   },
   'highly-confidential': {
     label: 'Highly Confidential',
     color: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300',
     dotColor: 'bg-red-600',
+    icon: LockClosedIcon,
   },
 }
 
@@ -66,12 +73,14 @@ export function ConfidentialityBadge({
   level,
   showIcon = false,
   dotOnly = false,
+  iconOnly = false,
   className,
   ...props
 }: ConfidentialityBadgeProps) {
   // Normalize the level to handle both underscore and hyphen formats
   const normalizedLevel = level?.replace(/_/g, '-') as ConfidentialityLevel
   const config = levelConfig[normalizedLevel] || levelConfig['internal'] // Default to internal if level is invalid
+  const IconComponent = config.icon
 
   if (dotOnly) {
     return (
@@ -81,6 +90,23 @@ export function ConfidentialityBadge({
         aria-label={`Confidentiality: ${config.label}`}
         {...props}
       />
+    )
+  }
+
+  if (iconOnly) {
+    return (
+      <span
+        className={cn(
+          'inline-flex items-center justify-center w-6 h-6 rounded-full',
+          config.color,
+          className
+        )}
+        title={config.label}
+        aria-label={`Confidentiality: ${config.label}`}
+        {...props}
+      >
+        <IconComponent className="h-3.5 w-3.5" />
+      </span>
     )
   }
 

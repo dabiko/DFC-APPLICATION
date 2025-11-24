@@ -9,6 +9,11 @@ import type { Folder, FolderTreeNode } from '@/types/folder'
  * Build tree structure from flat folder list
  */
 export const buildFolderTree = (folders: Folder[]): Folder[] => {
+  // Handle undefined or null folders array
+  if (!folders || !Array.isArray(folders)) {
+    return []
+  }
+
   const folderMap = new Map<string, Folder>()
   const rootFolders: Folder[] = []
 
@@ -51,6 +56,10 @@ export const flattenFolderTree = (
   depth: number = 0,
   parentPath: string[] = []
 ): FolderTreeNode[] => {
+  if (!folders || !Array.isArray(folders)) {
+    return []
+  }
+
   const result: FolderTreeNode[] = []
 
   folders.forEach((folder) => {
@@ -83,6 +92,10 @@ export const flattenFolderTree = (
  * Find folder by ID in tree
  */
 export const findFolderById = (folders: Folder[], folderId: string): Folder | null => {
+  if (!folders || !Array.isArray(folders)) {
+    return null
+  }
+
   for (const folder of folders) {
     if (folder.id === folderId) {
       return folder
@@ -170,6 +183,10 @@ export const canMoveFolder = (
  * Filter folders by search query
  */
 export const filterFoldersBySearch = (folders: Folder[], searchQuery: string): Folder[] => {
+  if (!folders || !Array.isArray(folders)) {
+    return []
+  }
+
   if (!searchQuery.trim()) return folders
 
   const query = searchQuery.toLowerCase()
@@ -211,6 +228,10 @@ export const sortFolders = (
   sortBy: 'name' | 'createdAt' | 'modifiedAt' | 'documentCount' = 'name',
   sortOrder: 'asc' | 'desc' = 'asc'
 ): Folder[] => {
+  if (!folders || !Array.isArray(folders)) {
+    return []
+  }
+
   const sorted = [...folders].sort((a, b) => {
     let comparison = 0
 

@@ -147,12 +147,8 @@ class FolderCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         """Create folder with ownership tracking"""
-        request = self.context.get('request')
-        folder = Folder.objects.create(
-            **validated_data,
-            owner=request.user,
-            created_by=request.user
-        )
+        # owner and created_by are already in validated_data from the view's perform_create
+        folder = Folder.objects.create(**validated_data)
         return folder
 
 

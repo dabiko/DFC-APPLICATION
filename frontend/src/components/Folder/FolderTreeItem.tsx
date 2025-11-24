@@ -186,7 +186,7 @@ export const FolderTreeItem: FC<FolderTreeItemProps> = memo(
         {/* Confidentiality Badge */}
         {showConfidentiality && (
           <div className="flex-shrink-0">
-            <ConfidentialityBadge level={folder.confidentiality} size="sm" />
+            <ConfidentialityBadge level={folder.confidentiality} iconOnly />
           </div>
         )}
 

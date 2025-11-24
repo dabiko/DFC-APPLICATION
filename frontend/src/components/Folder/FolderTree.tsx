@@ -37,6 +37,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
   showIcons = true,
   showLockIndicator = true,
   showDocumentCount = false,
+  showConfidentiality = false,
 }) => {
   // State
   const [state, setState] = useState<FolderTreeState>({
@@ -171,6 +172,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
     showIcons: boolean
     showLockIndicator: boolean
     showDocumentCount: boolean
+    showConfidentiality: boolean
   }
 
   const RowComponent = useCallback(
@@ -185,6 +187,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
       showIcons,
       showLockIndicator,
       showDocumentCount,
+      showConfidentiality,
     }: RowComponentProps) => {
       const node = flattenedTree[index]
 
@@ -202,6 +205,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
             showIcons={showIcons}
             showLockIndicator={showLockIndicator}
             showDocumentCount={showDocumentCount}
+            showConfidentiality={showConfidentiality}
           />
         </div>
       )
@@ -220,6 +224,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
       showIcons,
       showLockIndicator,
       showDocumentCount,
+      showConfidentiality,
     }),
     [
       flattenedTree,
@@ -230,6 +235,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
       showIcons,
       showLockIndicator,
       showDocumentCount,
+      showConfidentiality,
     ]
   )
 
@@ -373,9 +379,9 @@ export const FolderTree: FC<FolderTreeProps> = ({
       tabIndex={0}
       style={{ maxHeight: `${maxHeight}px`, overflowY: 'auto' }}
     >
-      {flattenedTree.map((node, _index) => (
+      {flattenedTree.map((node, index) => (
         <FolderTreeItem
-          key={node.folder.id}
+          key={`${node.folder.id}-${index}`}
           folder={node.folder}
           depth={node.depth}
           isExpanded={node.isExpanded}
@@ -387,6 +393,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
           showIcons={showIcons}
           showLockIndicator={showLockIndicator}
           showDocumentCount={showDocumentCount}
+          showConfidentiality={showConfidentiality}
         />
       ))}
 

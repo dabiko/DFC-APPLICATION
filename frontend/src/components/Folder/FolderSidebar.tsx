@@ -13,6 +13,7 @@ import { CreateFolderModal } from './CreateFolderModal'
 import { RenameFolderModal } from './RenameFolderModal'
 import { MoveFolderModal } from './MoveFolderModal'
 import { DeleteFolderModal } from './DeleteFolderModal'
+import { FolderPropertiesModal } from './FolderPropertiesModal'
 import { useAppDispatch, useAppSelector } from '@/store'
 import {
   fetchFolders,
@@ -71,8 +72,8 @@ export function FolderSidebar({ isCollapsed = false, className }: FolderSidebarP
   const handleFolderSelect = useCallback(
     (folder: Folder) => {
       dispatch(selectFolder(folder.id))
-      // Navigate to documents view for this folder
-      navigate(`/documents?folder=${folder.id}`)
+      // Update URL with folder parameter
+      navigate(`/dashboard?folder=${folder.id}`)
     },
     [dispatch, navigate]
   )
@@ -286,6 +287,7 @@ export function FolderSidebar({ isCollapsed = false, className }: FolderSidebarP
             enableVirtualization={folders.length > 50}
             showDocumentCount={true}
             showLockIndicator={true}
+            showConfidentiality={true}
           />
         </div>
       </div>
@@ -330,6 +332,15 @@ export function FolderSidebar({ isCollapsed = false, className }: FolderSidebarP
           setOperationFolder(null)
         }}
         onDelete={handleDeleteFolder}
+      />
+
+      <FolderPropertiesModal
+        isOpen={activeOperation === 'properties'}
+        folder={operationFolder}
+        onClose={() => {
+          setActiveOperation(null)
+          setOperationFolder(null)
+        }}
       />
     </div>
   )

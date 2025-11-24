@@ -123,8 +123,8 @@ function BreadcrumbLink({ item, isFirst, isLast, showHomeIcon }: BreadcrumbLinkP
   const baseClasses = cn(
     'flex items-center text-sm font-medium transition-colors',
     isLast
-      ? 'text-gray-900 dark:text-gray-100 cursor-default'
-      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+      ? 'text-blue-600 dark:text-blue-400 font-semibold cursor-default'
+      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 cursor-pointer'
   )
 
   if (isLast) {

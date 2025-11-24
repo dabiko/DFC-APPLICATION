@@ -24,6 +24,9 @@ export type { MoveFolderModalProps } from './MoveFolderModal'
 export { DeleteFolderModal } from './DeleteFolderModal'
 export type { DeleteFolderModalProps } from './DeleteFolderModal'
 
+export { FolderPropertiesModal } from './FolderPropertiesModal'
+export type { FolderPropertiesModalProps } from './FolderPropertiesModal'
+
 export { FolderTemplateSelector } from './FolderTemplateSelector'
 export type { FolderTemplateSelectorProps } from './FolderTemplateSelector'
 
