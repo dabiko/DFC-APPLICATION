@@ -126,9 +126,3 @@ export function ConfidentialityBadge({
   )
 }
 
-/**
- * Helper function to get confidentiality color for custom styling
- */
-export function getConfidentialityColor(level: ConfidentialityLevel): string {
-  return levelConfig[level].dotColor.replace('bg-', '')
-}
