@@ -29,7 +29,9 @@ export interface Folder {
   path: string // Full path: /Documents/Financial/Reports
   level: number // Depth level (0 = root)
   isLocked: boolean
+  isFavorite?: boolean // Whether folder is in user's favorites
   confidentiality: ConfidentialityLevel
+  description?: string // Optional folder description
   createdBy: string
   createdAt: string
   modifiedBy: string
@@ -41,6 +43,12 @@ export interface Folder {
   isExpanded?: boolean // UI state (for tree expansion)
   isLoading?: boolean // UI state (for lazy loading)
   permissions: FolderPermission
+  // Trash-specific fields (only present for trashed folders)
+  deletedAt?: string | null
+  deletedBy?: string | null
+  deletedByName?: string | null
+  deletedByEmail?: string | null
+  totalSize?: number
 }
 
 /**
@@ -66,7 +74,7 @@ export interface FolderTreeNode {
 /**
  * Folder operation types
  */
-export type FolderOperation = 'create' | 'rename' | 'move' | 'delete' | 'properties'
+export type FolderOperation = 'create' | 'rename' | 'move' | 'delete' | 'properties' | 'share' | 'lock' | 'unlock' | 'favorite'
 
 /**
  * Context menu item
@@ -97,6 +105,18 @@ export interface UpdateFolderData {
   name?: string
   confidentiality?: ConfidentialityLevel
   isLocked?: boolean
+  description?: string
+}
+
+/**
+ * Trash item extended info
+ */
+export interface TrashItemInfo {
+  deletedAt: string | null
+  deletedBy: string | null
+  deletedByName: string | null
+  deletedByEmail: string | null
+  totalSize: number
 }
 
 /**

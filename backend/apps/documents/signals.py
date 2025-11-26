@@ -10,7 +10,7 @@ from django.dispatch import receiver
 from django.db import transaction
 import logging
 
-from apps.documents.models import Document, DocumentTag
+from apps.documents.models import Document, DocumentTag, DocumentShortcut, RecentActivity
 from apps.audit.models import AuditLog
 
 logger = logging.getLogger(__name__)
@@ -37,6 +37,12 @@ def update_document_index(sender, instance, created, **kwargs):
     # Skip indexing if document is deleted (soft delete)
     if instance.is_deleted:
         delete_document_from_index(instance)
+        return
+
+    # Skip indexing for newly created documents that haven't been fully saved yet
+    # (they will be indexed after MinIO upload completes)
+    if created and not instance.minio_object_key:
+        logger.debug(f"Skipping ES indexing for new document {instance.id} - waiting for file upload")
         return
 
     try:
@@ -67,6 +73,13 @@ def update_document_index(sender, instance, created, **kwargs):
             # Update without triggering signals again
             Document.objects.filter(pk=instance.pk).update(is_indexed=True)
 
+    except TypeError as te:
+        # Handle serialization errors (like FieldFile not JSON serializable)
+        # This can happen if the document has a file field that's not fully saved
+        logger.warning(
+            f"TypeError during ES indexing for document {instance.id}: {te}. "
+            f"Document will be indexed later."
+        )
     except Exception as e:
         # Log error but don't fail the save operation
         logger.error(
@@ -241,3 +254,291 @@ def log_document_delete(sender, instance, **kwargs):
 
     except Exception as e:
         logger.error(f"Failed to create audit log for document deletion: {e}", exc_info=True)
+
+
+# ========================================
+# Document Shortcut Audit Logging Signals
+# ========================================
+
+@receiver(post_save, sender=DocumentShortcut)
+def log_shortcut_created(sender, instance, created, **kwargs):
+    """
+    Create audit log entry when a document shortcut is created.
+
+    Args:
+        sender: The DocumentShortcut model class
+        instance: The DocumentShortcut instance
+        created: Boolean indicating if this is a new shortcut
+        **kwargs: Additional signal arguments
+    """
+    # Only log creations (shortcuts cannot be updated)
+    if not created:
+        return
+
+    # Skip audit logging if we're in a migration or fixture loading
+    if kwargs.get('raw', False):
+        return
+
+    try:
+        # Get the user who created the shortcut
+        user = instance.created_by
+
+        # Create audit log entry
+        AuditLog.objects.create(
+            user=user,
+            action='SHORTCUT_CREATED',
+            resource_type='DOCUMENT_SHORTCUT',
+            resource_id=str(instance.id),
+            message=f"Document shortcut created: {instance.original_document.title} -> {instance.folder.name}",
+            metadata={
+                'shortcut_id': str(instance.id),
+                'original_document_id': str(instance.original_document_id),
+                'original_document_title': instance.original_document.title,
+                'original_folder_id': str(instance.original_document.folder_id) if instance.original_document.folder else None,
+                'target_folder_id': str(instance.folder_id),
+                'target_folder_name': instance.folder.name,
+                'target_folder_path': instance.folder.path,
+            }
+        )
+
+        logger.debug(f"Created audit log for shortcut creation: {instance.id}")
+
+    except Exception as e:
+        # Don't fail the save if audit logging fails
+        logger.error(f"Failed to create audit log for shortcut creation: {e}", exc_info=True)
+
+
+@receiver(pre_delete, sender=DocumentShortcut)
+def log_shortcut_deleted(sender, instance, **kwargs):
+    """
+    Create audit log entry before a document shortcut is deleted.
+
+    Args:
+        sender: The DocumentShortcut model class
+        instance: The DocumentShortcut instance being deleted
+        **kwargs: Additional signal arguments
+    """
+    try:
+        # Get the user who is deleting (if available)
+        user = getattr(instance, '_current_user', instance.created_by)
+
+        # Create audit log entry
+        AuditLog.objects.create(
+            user=user,
+            action='SHORTCUT_DELETED',
+            resource_type='DOCUMENT_SHORTCUT',
+            resource_id=str(instance.id),
+            message=f"Document shortcut deleted: {instance.original_document.title} from {instance.folder.name}",
+            metadata={
+                'shortcut_id': str(instance.id),
+                'original_document_id': str(instance.original_document_id),
+                'original_document_title': instance.original_document.title,
+                'folder_id': str(instance.folder_id),
+                'folder_name': instance.folder.name,
+                'folder_path': instance.folder.path,
+            }
+        )
+
+        logger.debug(f"Created audit log for shortcut deletion: {instance.id}")
+
+    except Exception as e:
+        logger.error(f"Failed to create audit log for shortcut deletion: {e}", exc_info=True)
+
+
+# ========================================
+# Recent Activity Logging Signals
+# ========================================
+
+@receiver(post_save, sender=Document)
+def log_document_activity(sender, instance, created, **kwargs):
+    """
+    Log recent activity when a document is created (uploaded) or updated (edited).
+
+    This enables the "Recent Files" feature by tracking user activities
+    on documents.
+
+    Args:
+        sender: The Document model class
+        instance: The Document instance
+        created: Boolean indicating if this is a new document
+        **kwargs: Additional signal arguments
+    """
+    # Skip during migrations or fixture loading
+    if kwargs.get('raw', False):
+        return
+
+    # Skip if deleted
+    if instance.is_deleted:
+        return
+
+    try:
+        # Get the user who performed the action
+        user = getattr(instance, '_current_user', None)
+        if not user:
+            user = instance.created_by if created else instance.owner
+
+        if not user:
+            logger.debug(f"Skipping recent activity for document {instance.id} - no user")
+            return
+
+        # Determine activity type
+        if created:
+            activity_type = RecentActivity.ActivityType.UPLOADED
+        else:
+            activity_type = RecentActivity.ActivityType.EDITED
+
+        # Get folder information
+        folder_id = None
+        folder_name = ''
+        folder_path = ''
+        if instance.folder:
+            folder_id = instance.folder.id
+            folder_name = instance.folder.name
+            folder_path = instance.folder.path
+
+        # Log the activity
+        RecentActivity.log_activity(
+            user=user,
+            resource_type=RecentActivity.ResourceType.DOCUMENT,
+            resource_id=str(instance.id),
+            activity_type=activity_type,
+            resource_name=instance.title,
+            file_type=instance.file_type or '',
+            file_size=instance.file_size or 0,
+            folder_id=folder_id,
+            folder_name=folder_name,
+            folder_path=folder_path,
+            confidentiality_level=instance.confidentiality_level or ''
+        )
+
+        logger.debug(
+            f"Logged recent activity: {user.username} {activity_type} document {instance.id}"
+        )
+
+    except Exception as e:
+        # Don't fail the save if activity logging fails
+        logger.error(f"Failed to log recent activity for document: {e}", exc_info=True)
+
+
+def log_document_download_activity(user, document):
+    """
+    Helper function to log a document download activity.
+
+    This should be called from the DocumentDownloadView when a document is downloaded.
+
+    Args:
+        user: The user who downloaded the document
+        document: The Document instance that was downloaded
+    """
+    try:
+        # Get folder information
+        folder_id = None
+        folder_name = ''
+        folder_path = ''
+        if document.folder:
+            folder_id = document.folder.id
+            folder_name = document.folder.name
+            folder_path = document.folder.path
+
+        # Log the activity
+        RecentActivity.log_activity(
+            user=user,
+            resource_type=RecentActivity.ResourceType.DOCUMENT,
+            resource_id=str(document.id),
+            activity_type=RecentActivity.ActivityType.DOWNLOADED,
+            resource_name=document.title,
+            file_type=document.file_type or '',
+            file_size=document.file_size or 0,
+            folder_id=folder_id,
+            folder_name=folder_name,
+            folder_path=folder_path,
+            confidentiality_level=document.confidentiality_level or ''
+        )
+
+        logger.debug(f"Logged recent activity: {user.username} DOWNLOADED document {document.id}")
+
+    except Exception as e:
+        logger.error(f"Failed to log download activity: {e}", exc_info=True)
+
+
+def log_document_view_activity(user, document):
+    """
+    Helper function to log a document view activity.
+
+    This should be called from views that display document details.
+
+    Args:
+        user: The user who viewed the document
+        document: The Document instance that was viewed
+    """
+    try:
+        # Get folder information
+        folder_id = None
+        folder_name = ''
+        folder_path = ''
+        if document.folder:
+            folder_id = document.folder.id
+            folder_name = document.folder.name
+            folder_path = document.folder.path
+
+        # Log the activity
+        RecentActivity.log_activity(
+            user=user,
+            resource_type=RecentActivity.ResourceType.DOCUMENT,
+            resource_id=str(document.id),
+            activity_type=RecentActivity.ActivityType.VIEWED,
+            resource_name=document.title,
+            file_type=document.file_type or '',
+            file_size=document.file_size or 0,
+            folder_id=folder_id,
+            folder_name=folder_name,
+            folder_path=folder_path,
+            confidentiality_level=document.confidentiality_level or ''
+        )
+
+        logger.debug(f"Logged recent activity: {user.username} VIEWED document {document.id}")
+
+    except Exception as e:
+        logger.error(f"Failed to log view activity: {e}", exc_info=True)
+
+
+def log_folder_activity(user, folder, activity_type):
+    """
+    Helper function to log a folder activity.
+
+    This can be called from folder views to track folder access.
+
+    Args:
+        user: The user who performed the action
+        folder: The Folder instance
+        activity_type: One of RecentActivity.ActivityType choices
+    """
+    try:
+        # Get parent folder information
+        parent_folder_id = None
+        parent_folder_name = ''
+        folder_path = folder.path if hasattr(folder, 'path') else ''
+
+        if hasattr(folder, 'parent') and folder.parent:
+            parent_folder_id = folder.parent.id
+            parent_folder_name = folder.parent.name
+
+        # Log the activity
+        RecentActivity.log_activity(
+            user=user,
+            resource_type=RecentActivity.ResourceType.FOLDER,
+            resource_id=str(folder.id),
+            activity_type=activity_type,
+            resource_name=folder.name,
+            file_type='',  # Folders don't have file type
+            file_size=0,
+            folder_id=parent_folder_id,
+            folder_name=parent_folder_name,
+            folder_path=folder_path,
+            confidentiality_level=getattr(folder, 'confidentiality_level', '') or ''
+        )
+
+        logger.debug(f"Logged recent activity: {user.username} {activity_type} folder {folder.id}")
+
+    except Exception as e:
+        logger.error(f"Failed to log folder activity: {e}", exc_info=True)

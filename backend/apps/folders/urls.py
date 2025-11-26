@@ -10,6 +10,9 @@ from apps.folders.views import (
     FolderMoveView,
     FolderBreadcrumbView,
     FolderTreeView,
+    FolderRestoreView,
+    FolderTrashListView,
+    FolderEmptyTrashView,
     FolderTemplateListCreateView,
     FolderTemplateDetailView,
     FolderTemplateInstantiateView,
@@ -28,7 +31,12 @@ urlpatterns = [
     path('<uuid:id>/update/', FolderUpdateView.as_view(), name='folder_update'),
     path('<uuid:id>/delete/', FolderDeleteView.as_view(), name='folder_delete'),
     path('<uuid:id>/move/', FolderMoveView.as_view(), name='folder_move'),
+    path('<uuid:id>/restore/', FolderRestoreView.as_view(), name='folder_restore'),
     path('<uuid:id>/breadcrumb/', FolderBreadcrumbView.as_view(), name='folder_breadcrumb'),
+
+    # Trash endpoints
+    path('trash/', FolderTrashListView.as_view(), name='folder_trash_list'),
+    path('trash/empty/', FolderEmptyTrashView.as_view(), name='folder_empty_trash'),
 
     # Folder tree view
     path('tree/', FolderTreeView.as_view(), name='folder_tree'),

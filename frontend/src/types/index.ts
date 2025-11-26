@@ -136,3 +136,101 @@ export interface ApiError {
   code?: string
   field?: string
 }
+
+// Document Shortcut types
+export interface DocumentShortcut {
+  id: string
+  folder: string
+  createdAt: string
+  createdBy: string
+  createdByName: string
+  // Original document metadata (proxied)
+  originalDocumentId: string
+  title: string
+  fileName: string
+  fileSize: number
+  fileType: string
+  documentType: string
+  confidentialityLevel: ConfidentialityLevel
+  versionNumber: number
+  documentDate?: string
+  checksum?: string
+  // Owner and department
+  ownerId: string
+  ownerName: string
+  departmentId: string
+  departmentName: string
+  // Original location
+  originalFolderId: string
+  originalFolderName: string
+  originalFolderPath: string
+  // Shortcut flag and tags
+  isShortcut: true
+  tags: string[]
+}
+
+export interface DocumentShortcutListItem {
+  id: string
+  folder: string
+  originalDocumentId: string
+  title: string
+  fileName: string
+  fileSize: number
+  fileType: string
+  documentType: string
+  confidentialityLevel: ConfidentialityLevel
+  originalFolderId: string | null
+  originalFolderName: string | null
+  createdAt: string
+  isShortcut: true
+}
+
+export interface DocumentShortcutLocation {
+  id: string
+  folder: string
+  folderName: string
+  folderPath: string
+  createdAt: string
+  createdByName: string
+}
+
+export interface CreateShortcutRequest {
+  documentId: string
+  targetFolderId: string
+}
+
+export interface BulkCreateShortcutRequest {
+  documentIds: string[]
+  targetFolderId: string
+}
+
+export interface BulkCreateShortcutResponse {
+  message: string
+  createdCount: number
+  created: DocumentShortcutListItem[]
+  skipped: {
+    sameFolder: string[]
+    alreadyExists: string[]
+    total: number
+  }
+}
+
+export interface CanDeleteResponse {
+  documentId: string
+  documentTitle: string
+  canDelete: boolean
+  message: string | null
+  shortcutCount?: number
+  shortcutLocations?: {
+    id: string
+    folderName: string
+    folderPath: string
+  }[]
+}
+
+export interface ShortcutLocationsResponse {
+  documentId: string
+  documentTitle: string
+  shortcutCount: number
+  shortcuts: DocumentShortcutLocation[]
+}

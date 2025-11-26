@@ -5,6 +5,8 @@ Implements best practices for web application security headers
 to protect against common vulnerabilities.
 """
 
+from django.conf import settings
+
 
 class SecurityHeadersMiddleware:
     """
@@ -106,8 +108,10 @@ class SecurityHeadersMiddleware:
         )
 
         # Additional security header for cross-origin policies
-        response['Cross-Origin-Opener-Policy'] = 'same-origin'
-        response['Cross-Origin-Resource-Policy'] = 'same-origin'
-        response['Cross-Origin-Embedder-Policy'] = 'require-corp'
+        # Skip these in DEBUG mode to allow CORS for frontend development
+        if not settings.DEBUG:
+            response['Cross-Origin-Opener-Policy'] = 'same-origin'
+            response['Cross-Origin-Resource-Policy'] = 'same-origin'
+            response['Cross-Origin-Embedder-Policy'] = 'require-corp'
 
         return response

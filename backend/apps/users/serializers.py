@@ -289,6 +289,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'last_name': user.last_name,
             'employee_id': user.employee_id,
             'department': user.department.name if user.department else None,
+            'department_id': str(user.department.id) if user.department else None,
             'is_staff': user.is_staff,
             'is_superuser': user.is_superuser,
             'mfa_enabled': user.mfa_enabled,

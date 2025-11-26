@@ -36,6 +36,21 @@ from apps.documents.views import (
     DocumentExtractTextView,
     DocumentOCRView,
     DocumentExtractedTextView,
+    # Shortcut views
+    DocumentShortcutCreateView,
+    DocumentShortcutListView,
+    DocumentShortcutDetailView,
+    DocumentShortcutDeleteView,
+    DocumentShortcutLocationsView,
+    DocumentCanDeleteView,
+    BulkCreateShortcutsView,
+    # Recent Activity views
+    RecentActivityListView,
+    RecentActivityDetailView,
+    RecentActivityPinView,
+    RecentActivityClearView,
+    RecentActivityStatsView,
+    AdminRecentActivityListView,
 )
 from apps.classification.views import ApplyClassificationManuallyView
 
@@ -95,4 +110,23 @@ urlpatterns = [
 
     # Classification endpoint
     path('<uuid:pk>/classify/', ApplyClassificationManuallyView.as_view(), name='classify_document'),
+
+    # Document shortcut endpoints
+    path('shortcuts/', DocumentShortcutCreateView.as_view(), name='shortcut_create'),
+    path('shortcuts/list/', DocumentShortcutListView.as_view(), name='shortcut_list'),
+    path('shortcuts/bulk/', BulkCreateShortcutsView.as_view(), name='shortcut_bulk_create'),
+    path('shortcuts/<uuid:id>/', DocumentShortcutDetailView.as_view(), name='shortcut_detail'),
+    path('shortcuts/<uuid:id>/delete/', DocumentShortcutDeleteView.as_view(), name='shortcut_delete'),
+    path('<uuid:id>/shortcut-locations/', DocumentShortcutLocationsView.as_view(), name='shortcut_locations'),
+    path('<uuid:id>/can-delete/', DocumentCanDeleteView.as_view(), name='can_delete'),
+
+    # Recent Activity endpoints
+    path('recent/', RecentActivityListView.as_view(), name='recent_list'),
+    path('recent/stats/', RecentActivityStatsView.as_view(), name='recent_stats'),
+    path('recent/clear/', RecentActivityClearView.as_view(), name='recent_clear'),
+    path('recent/<uuid:id>/', RecentActivityDetailView.as_view(), name='recent_detail'),
+    path('recent/<uuid:id>/pin/', RecentActivityPinView.as_view(), name='recent_pin'),
+
+    # Admin Recent Activity endpoint
+    path('admin/recent/', AdminRecentActivityListView.as_view(), name='admin_recent_list'),
 ]

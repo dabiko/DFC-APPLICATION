@@ -28,18 +28,33 @@ class Document(models.Model):
     ]
 
     # Document Type Choices (controlled list)
+    # Synced with frontend constants - frontend/src/constants/metadata.ts
     DOCUMENT_TYPE_CHOICES = [
         ('INVOICE', 'Invoice'),
         ('CONTRACT', 'Contract'),
         ('REPORT', 'Report'),
         ('KYC_RECORD', 'KYC Record'),
-        ('FINANCIAL_STATEMENT', 'Financial Statement'),
+        ('STATEMENT', 'Statement'),
+        ('FINANCIAL_STATEMENT', 'Financial Statement'),  # Legacy, kept for backwards compatibility
+        ('CORRESPONDENCE', 'Correspondence'),
+        ('POLICY_DOCUMENT', 'Policy'),
+        ('POLICY', 'Policy'),  # Legacy, kept for backwards compatibility
+        ('PROCEDURE_DOCUMENT', 'Procedure'),
+        ('PROCEDURE', 'Procedure'),  # Legacy, kept for backwards compatibility
+        ('MEMO', 'Memo'),
+        ('PRESENTATION', 'Presentation'),
+        ('SPREADSHEET', 'Spreadsheet'),
+        ('FORM', 'Form'),
+        ('CERTIFICATE', 'Certificate'),
+        ('AGREEMENT', 'Agreement'),
+        ('AUDIT_REPORT', 'Audit Report'),
+        ('BANK_STATEMENT', 'Bank Statement'),
+        ('TAX_DOCUMENT', 'Tax Document'),
+        ('LEGAL_DOCUMENT', 'Legal Document'),
+        ('PASSPORT', 'Passport'),
+        ('ID_CARD', 'ID Card'),
         ('LOAN_APPLICATION', 'Loan Application'),
         ('IDENTITY_DOCUMENT', 'Identity Document'),
-        ('CORRESPONDENCE', 'Correspondence'),
-        ('POLICY', 'Policy'),
-        ('PROCEDURE', 'Procedure'),
-        ('AUDIT_REPORT', 'Audit Report'),
         ('COMPLIANCE_DOC', 'Compliance Document'),
         ('OTHER', 'Other'),
     ]
@@ -58,7 +73,12 @@ class Document(models.Model):
 
     # File information
     title = models.CharField(max_length=500)
-    file = models.FileField(upload_to='documents/%Y/%m/%d/')
+    file = models.FileField(
+        upload_to='documents/%Y/%m/%d/',
+        blank=True,
+        null=True,
+        help_text='Legacy file field - files are stored in MinIO, not here'
+    )
     file_name = models.CharField(max_length=255)
     file_size = models.BigIntegerField(help_text='File size in bytes')
     file_type = models.CharField(max_length=50, help_text='MIME type')
@@ -251,6 +271,34 @@ class Document(models.Model):
     def is_current_version(self):
         """Check if this is the latest version"""
         return not self.versions.exists()
+
+    def can_delete(self):
+        """
+        Check if document can be deleted (no shortcuts exist).
+
+        Returns:
+            tuple: (can_delete: bool, message: str or None)
+        """
+        shortcut_count = self.shortcuts.count()
+        if shortcut_count > 0:
+            return False, f"Cannot delete: {shortcut_count} shortcut(s) reference this document"
+        return True, None
+
+    def get_shortcut_locations(self):
+        """
+        Return list of folders where this document has shortcuts.
+
+        Returns:
+            QuerySet of tuples: (folder_name, folder_path)
+        """
+        return self.shortcuts.select_related('folder').values_list(
+            'folder__name', 'folder__path'
+        )
+
+    @property
+    def shortcut_count(self):
+        """Return the number of shortcuts pointing to this document"""
+        return self.shortcuts.count()
 
 
 class Tag(models.Model):
@@ -549,3 +597,408 @@ class DocumentVersion(models.Model):
         file_obj.seek(0)
 
         return sha256.hexdigest()
+
+
+class DocumentShortcut(models.Model):
+    """
+    A shortcut/reference to a document in another folder.
+
+    This model enables documents to appear in multiple folders without
+    duplicating the actual file in storage. The shortcut inherits all
+    metadata from the original document (single source of truth).
+
+    Features:
+    - Points to original document via ForeignKey with PROTECT
+    - Cannot delete original while shortcuts exist
+    - Unique constraint prevents duplicate shortcuts in same folder
+    - Full audit trail with created_by and created_at
+    - Proxy properties provide read-only access to original metadata
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    original_document = models.ForeignKey(
+        Document,
+        on_delete=models.PROTECT,  # Prevents deletion of original while shortcuts exist
+        related_name='shortcuts',
+        help_text='The original document this shortcut points to'
+    )
+
+    folder = models.ForeignKey(
+        'folders.Folder',
+        on_delete=models.CASCADE,
+        related_name='document_shortcuts',
+        help_text='The folder where this shortcut appears'
+    )
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='created_shortcuts',
+        help_text='User who created this shortcut'
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'document_shortcuts'
+        verbose_name = 'Document Shortcut'
+        verbose_name_plural = 'Document Shortcuts'
+        unique_together = ['original_document', 'folder']  # One shortcut per document per folder
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['folder']),
+            models.Index(fields=['original_document']),
+            models.Index(fields=['created_at']),
+        ]
+
+    def __str__(self):
+        return f"Shortcut to '{self.original_document.title}' in {self.folder.name}"
+
+    # Proxy properties for read-only metadata access from original document
+    @property
+    def title(self):
+        return self.original_document.title
+
+    @property
+    def file_name(self):
+        return self.original_document.file_name
+
+    @property
+    def file_size(self):
+        return self.original_document.file_size
+
+    @property
+    def file_type(self):
+        return self.original_document.file_type
+
+    @property
+    def document_type(self):
+        return self.original_document.document_type
+
+    @property
+    def confidentiality_level(self):
+        return self.original_document.confidentiality_level
+
+    @property
+    def owner(self):
+        return self.original_document.owner
+
+    @property
+    def department(self):
+        return self.original_document.department
+
+    @property
+    def document_date(self):
+        return self.original_document.document_date
+
+    @property
+    def version_number(self):
+        return self.original_document.version_number
+
+    @property
+    def checksum(self):
+        return self.original_document.checksum
+
+    @property
+    def minio_bucket(self):
+        return self.original_document.minio_bucket
+
+    @property
+    def minio_object_key(self):
+        return self.original_document.minio_object_key
+
+    @property
+    def original_folder(self):
+        """Return the folder where the original document is stored"""
+        return self.original_document.folder
+
+    @property
+    def original_folder_path(self):
+        """Return the full path of the original document's folder"""
+        return self.original_document.folder.path
+
+    @property
+    def is_shortcut(self):
+        """Always returns True - identifies this as a shortcut"""
+        return True
+
+
+class RecentActivity(models.Model):
+    """
+    Optimized table for tracking recent document/folder activities.
+
+    This model is separate from AuditLog for performance reasons:
+    - Smaller table with specific indexes for fast queries
+    - Auto-cleanup of entries older than retention period (30 days)
+    - Denormalized fields to avoid JOINs for common queries
+
+    Features:
+    - Track VIEW, EDIT, UPLOAD, DOWNLOAD, SHARED activities
+    - Support for both documents and folders
+    - Pin frequently accessed items (max 10 per user)
+    - Time-based grouping (Today, Yesterday, This Week, etc.)
+    - Admin access to view other users' recent activities
+
+    Configuration:
+    - Retention Period: 30 days
+    - Max Pinned Items: 10 per user
+    - Admin Access: Enabled
+    """
+
+    class ActivityType(models.TextChoices):
+        VIEWED = 'VIEWED', 'Viewed'
+        EDITED = 'EDITED', 'Edited'
+        UPLOADED = 'UPLOADED', 'Uploaded'
+        DOWNLOADED = 'DOWNLOADED', 'Downloaded'
+        SHARED = 'SHARED', 'Shared'
+
+    class ResourceType(models.TextChoices):
+        DOCUMENT = 'DOCUMENT', 'Document'
+        FOLDER = 'FOLDER', 'Folder'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    # User who performed the activity
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='recent_activities'
+    )
+
+    # Resource reference (document or folder)
+    resource_type = models.CharField(
+        max_length=20,
+        choices=ResourceType.choices
+    )
+    resource_id = models.UUIDField(
+        help_text='UUID of the document or folder'
+    )
+
+    # Activity details
+    activity_type = models.CharField(
+        max_length=20,
+        choices=ActivityType.choices
+    )
+    timestamp = models.DateTimeField(
+        auto_now_add=True,
+        db_index=True
+    )
+
+    # Denormalized fields for faster queries (avoid JOINs)
+    resource_name = models.CharField(
+        max_length=500,
+        help_text='Name of the document or folder'
+    )
+    file_type = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text='MIME type (for documents only)'
+    )
+    file_size = models.BigIntegerField(
+        default=0,
+        help_text='File size in bytes (for documents only)'
+    )
+
+    # Parent folder information
+    folder_id = models.UUIDField(
+        null=True,
+        blank=True,
+        help_text='Parent folder UUID'
+    )
+    folder_name = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text='Parent folder name'
+    )
+    folder_path = models.CharField(
+        max_length=1000,
+        blank=True,
+        help_text='Full path to the resource'
+    )
+
+    # Security classification
+    confidentiality_level = models.CharField(
+        max_length=20,
+        blank=True,
+        help_text='Confidentiality level (PUBLIC, INTERNAL, etc.)'
+    )
+
+    # Pinning feature
+    is_pinned = models.BooleanField(
+        default=False,
+        help_text='Whether this item is pinned by the user'
+    )
+    pinned_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='When the item was pinned'
+    )
+
+    class Meta:
+        db_table = 'recent_activities'
+        verbose_name = 'Recent Activity'
+        verbose_name_plural = 'Recent Activities'
+        ordering = ['-timestamp']
+        indexes = [
+            # Primary query: user's recent activities sorted by time
+            models.Index(fields=['user', '-timestamp']),
+            # Filter by resource type
+            models.Index(fields=['user', 'resource_type', '-timestamp']),
+            # Filter by activity type
+            models.Index(fields=['user', 'activity_type', '-timestamp']),
+            # Pinned items query
+            models.Index(fields=['user', 'is_pinned', '-timestamp']),
+            # Resource lookup (for updating/deleting when resource is modified)
+            models.Index(fields=['resource_type', 'resource_id']),
+        ]
+        constraints = [
+            # Ensure unique activity per user/resource/activity_type combination
+            # This allows updating timestamp instead of creating duplicates
+            models.UniqueConstraint(
+                fields=['user', 'resource_type', 'resource_id', 'activity_type'],
+                name='unique_user_resource_activity'
+            )
+        ]
+
+    # Configuration constants
+    RETENTION_DAYS = 30
+    MAX_PINNED_ITEMS = 10
+
+    def __str__(self):
+        return f"{self.user.username} {self.activity_type} {self.resource_name}"
+
+    @classmethod
+    def log_activity(
+        cls,
+        user,
+        resource_type: str,
+        resource_id: str,
+        activity_type: str,
+        resource_name: str,
+        file_type: str = '',
+        file_size: int = 0,
+        folder_id: str = None,
+        folder_name: str = '',
+        folder_path: str = '',
+        confidentiality_level: str = ''
+    ):
+        """
+        Log or update a recent activity entry.
+
+        Uses update_or_create to update timestamp if activity already exists,
+        preventing duplicate entries for repeated actions on the same resource.
+
+        Args:
+            user: The user performing the activity
+            resource_type: 'DOCUMENT' or 'FOLDER'
+            resource_id: UUID of the resource
+            activity_type: One of ActivityType choices
+            resource_name: Display name of the resource
+            file_type: MIME type (for documents)
+            file_size: File size in bytes (for documents)
+            folder_id: Parent folder UUID
+            folder_name: Parent folder name
+            folder_path: Full path to resource
+            confidentiality_level: Security classification
+
+        Returns:
+            tuple: (RecentActivity instance, created boolean)
+        """
+        from django.utils import timezone
+
+        return cls.objects.update_or_create(
+            user=user,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            activity_type=activity_type,
+            defaults={
+                'resource_name': resource_name,
+                'file_type': file_type,
+                'file_size': file_size,
+                'folder_id': folder_id,
+                'folder_name': folder_name,
+                'folder_path': folder_path,
+                'confidentiality_level': confidentiality_level,
+                'timestamp': timezone.now(),
+            }
+        )
+
+    @classmethod
+    def cleanup_old_entries(cls, days: int = None):
+        """
+        Remove entries older than retention period.
+
+        Should be run periodically via Celery beat or management command.
+
+        Args:
+            days: Number of days to retain (defaults to RETENTION_DAYS)
+
+        Returns:
+            int: Number of deleted entries
+        """
+        from django.utils import timezone
+        from datetime import timedelta
+
+        if days is None:
+            days = cls.RETENTION_DAYS
+
+        cutoff_date = timezone.now() - timedelta(days=days)
+        deleted_count, _ = cls.objects.filter(
+            timestamp__lt=cutoff_date,
+            is_pinned=False  # Don't delete pinned items
+        ).delete()
+
+        return deleted_count
+
+    @classmethod
+    def get_user_pinned_count(cls, user) -> int:
+        """Get the count of pinned items for a user."""
+        return cls.objects.filter(user=user, is_pinned=True).count()
+
+    def can_pin(self) -> tuple:
+        """
+        Check if this activity can be pinned.
+
+        Returns:
+            tuple: (can_pin: bool, reason: str or None)
+        """
+        if self.is_pinned:
+            return False, "Item is already pinned"
+
+        pinned_count = self.get_user_pinned_count(self.user)
+        if pinned_count >= self.MAX_PINNED_ITEMS:
+            return False, f"Maximum of {self.MAX_PINNED_ITEMS} pinned items reached"
+
+        return True, None
+
+    def pin(self) -> bool:
+        """
+        Pin this activity item.
+
+        Returns:
+            bool: True if successfully pinned, False otherwise
+        """
+        from django.utils import timezone
+
+        can_pin, reason = self.can_pin()
+        if not can_pin:
+            return False
+
+        self.is_pinned = True
+        self.pinned_at = timezone.now()
+        self.save(update_fields=['is_pinned', 'pinned_at'])
+        return True
+
+    def unpin(self) -> bool:
+        """
+        Unpin this activity item.
+
+        Returns:
+            bool: True if successfully unpinned
+        """
+        self.is_pinned = False
+        self.pinned_at = None
+        self.save(update_fields=['is_pinned', 'pinned_at'])
+        return True

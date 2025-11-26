@@ -5,11 +5,13 @@ from rest_framework import generics, status, permissions, parsers, serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.http import FileResponse, Http404
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from django.db import models
 from django.db.models import Q
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse, inline_serializer
 
-from apps.documents.models import Document, Tag, DocumentTag
+from apps.documents.models import Document, Tag, DocumentTag, DocumentShortcut, RecentActivity
 from apps.documents.serializers import (
     DocumentListSerializer,
     DocumentDetailSerializer,
@@ -23,6 +25,16 @@ from apps.documents.serializers import (
     DocumentVersionDetailSerializer,
     DocumentVersionUploadSerializer,
     VersionRestoreSerializer,
+    DocumentShortcutSerializer,
+    DocumentShortcutListSerializer,
+    CreateShortcutSerializer,
+    DocumentShortcutLocationSerializer,
+    BulkCreateShortcutSerializer,
+    RecentActivitySerializer,
+    RecentActivityListSerializer,
+    RecentActivityPinSerializer,
+    RecentActivityClearSerializer,
+    RecentActivityStatsSerializer,
 )
 from apps.documents.storage import generate_presigned_url
 import logging
@@ -58,9 +70,17 @@ class DocumentUploadView(generics.CreateAPIView):
         """
         Handle document upload with comprehensive validation.
         """
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        document = serializer.save()
+        import traceback
+
+        try:
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            document = serializer.save()
+        except Exception as e:
+            print(f"Error in DocumentUploadView.create: {e}")
+            print(f"Error type: {type(e)}")
+            print(f"Full traceback:\n{traceback.format_exc()}")
+            raise
 
         # Log the upload
         logger.info(
@@ -136,18 +156,29 @@ class DocumentListView(generics.ListAPIView):
         Get documents filtered by permissions and query parameters.
         """
         user = self.request.user
+
+        # Debug logging
+        logger.info(f"DocumentListView - User: {user.username} (ID: {user.id})")
+        logger.info(f"DocumentListView - User Department: {user.department_id}")
+        logger.info(f"DocumentListView - Is Staff: {user.is_staff}")
+        logger.info(f"DocumentListView - Query Params: {dict(self.request.query_params)}")
+
         queryset = Document.objects.select_related(
             'owner', 'department', 'folder', 'created_by'
         ).prefetch_related('document_tags__tag').filter(is_deleted=False)
 
+        logger.info(f"DocumentListView - After is_deleted filter: {queryset.count()}")
+
         # Filter by user's department unless staff
         if not user.is_staff:
             queryset = queryset.filter(department=user.department)
+            logger.info(f"DocumentListView - After department filter: {queryset.count()}")
 
         # Apply filters from query parameters
         folder_id = self.request.query_params.get('folder')
         if folder_id:
             queryset = queryset.filter(folder_id=folder_id)
+            logger.info(f"DocumentListView - After folder filter (folder={folder_id}): {queryset.count()}")
 
         document_type = self.request.query_params.get('document_type')
         if document_type:
@@ -164,6 +195,9 @@ class DocumentListView(generics.ListAPIView):
                 Q(identifier__icontains=search) |
                 Q(file_name__icontains=search)
             )
+
+        final_count = queryset.count()
+        logger.info(f"DocumentListView - Final count: {final_count}")
 
         return queryset.order_by('-created_at')
 
@@ -200,6 +234,17 @@ class DocumentDetailView(generics.RetrieveAPIView):
             queryset = queryset.filter(department=user.department)
 
         return queryset
+
+    def retrieve(self, request, *args, **kwargs):
+        """Override retrieve to log view activity"""
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+
+        # Log recent activity for viewing document
+        from apps.documents.signals import log_document_view_activity
+        log_document_view_activity(request.user, instance)
+
+        return Response(serializer.data)
 
 
 @extend_schema(
@@ -382,7 +427,9 @@ class DocumentDownloadView(APIView):
                         f"Document {document.id} streamed to user {user.id} (mode=stream, inline={inline})"
                     )
 
-                    # TODO: Create audit log entry for download
+                    # Log recent activity for download
+                    from apps.documents.signals import log_document_download_activity
+                    log_document_download_activity(user, document)
 
                     return response
 
@@ -406,7 +453,9 @@ class DocumentDownloadView(APIView):
                     f"Download URL generated for document {document.id} by user {user.id} (expires={expiration}s)"
                 )
 
-                # TODO: Create audit log entry for download URL generation
+                # Log recent activity for download
+                from apps.documents.signals import log_document_download_activity
+                log_document_download_activity(user, document)
 
                 return Response({
                     'download_url': download_url,
@@ -427,8 +476,18 @@ class DocumentDownloadView(APIView):
             )
         except Exception as e:
             logger.error(f"Error in document download: {e}", exc_info=True)
+            # Provide more specific error messages based on exception type
+            error_message = 'Failed to process download request'
+            if 'NoCredentialsError' in str(type(e).__name__) or 'credentials' in str(e).lower():
+                error_message = 'Storage service credentials not configured'
+            elif 'EndpointConnectionError' in str(type(e).__name__) or 'connection' in str(e).lower():
+                error_message = 'Cannot connect to storage service (MinIO may not be running)'
+            elif 'NoSuchKey' in str(type(e).__name__) or 'NoSuchBucket' in str(type(e).__name__):
+                error_message = 'File not found in storage'
+            elif 'ClientError' in str(type(e).__name__):
+                error_message = f'Storage service error: {str(e)}'
             return Response(
-                {'error': 'Failed to process download request'},
+                {'error': error_message, 'detail': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -2317,3 +2376,768 @@ class DocumentExtractedTextView(APIView):
                 {'error': 'Failed to retrieve extracted text'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+# ============================================================================
+# DOCUMENT SHORTCUT VIEWS
+# ============================================================================
+
+@extend_schema(
+    tags=['Document Shortcuts'],
+    request=CreateShortcutSerializer,
+    responses={
+        201: DocumentShortcutSerializer,
+        400: OpenApiResponse(description='Validation error'),
+        403: OpenApiResponse(description='Permission denied'),
+        404: OpenApiResponse(description='Document or folder not found'),
+    }
+)
+class DocumentShortcutCreateView(APIView):
+    """
+    Create a shortcut to a document in another folder.
+
+    A shortcut is a reference to the original document that appears
+    in a different folder. The shortcut inherits all metadata from
+    the original document and cannot be modified independently.
+
+    POST /api/v1/documents/shortcuts/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        """Create a new document shortcut"""
+        serializer = CreateShortcutSerializer(
+            data=request.data,
+            context={'request': request}
+        )
+        serializer.is_valid(raise_exception=True)
+        shortcut = serializer.save()
+
+        logger.info(
+            f"Document shortcut created: document {shortcut.original_document_id} "
+            f"-> folder {shortcut.folder_id} by user {request.user.username}"
+        )
+
+        response_serializer = DocumentShortcutSerializer(shortcut)
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+
+@extend_schema(
+    tags=['Document Shortcuts'],
+    parameters=[
+        OpenApiParameter(
+            name='folder',
+            type=str,
+            location=OpenApiParameter.QUERY,
+            description='Filter shortcuts by folder ID'
+        ),
+    ],
+    responses={
+        200: DocumentShortcutListSerializer(many=True),
+    }
+)
+class DocumentShortcutListView(generics.ListAPIView):
+    """
+    List document shortcuts.
+
+    Can filter by folder to get all shortcuts in a specific folder.
+
+    GET /api/v1/documents/shortcuts/
+    GET /api/v1/documents/shortcuts/?folder={folder_id}
+    """
+    serializer_class = DocumentShortcutListSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        """Get shortcuts filtered by user permissions"""
+        user = self.request.user
+
+        queryset = DocumentShortcut.objects.select_related(
+            'original_document',
+            'original_document__folder',
+            'original_document__owner',
+            'original_document__department',
+            'folder',
+            'created_by'
+        )
+
+        # Filter by user's department unless staff
+        if not user.is_staff:
+            queryset = queryset.filter(
+                original_document__department=user.department
+            )
+
+        # Filter by folder if specified
+        folder_id = self.request.query_params.get('folder')
+        if folder_id:
+            queryset = queryset.filter(folder_id=folder_id)
+
+        return queryset.order_by('-created_at')
+
+
+@extend_schema(
+    tags=['Document Shortcuts'],
+    responses={
+        200: DocumentShortcutSerializer,
+        404: OpenApiResponse(description='Shortcut not found'),
+    }
+)
+class DocumentShortcutDetailView(generics.RetrieveAPIView):
+    """
+    Get details of a specific shortcut.
+
+    GET /api/v1/documents/shortcuts/{id}/
+    """
+    serializer_class = DocumentShortcutSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'id'
+
+    def get_queryset(self):
+        """Filter shortcuts by user permissions"""
+        user = self.request.user
+
+        queryset = DocumentShortcut.objects.select_related(
+            'original_document',
+            'original_document__folder',
+            'original_document__owner',
+            'original_document__department',
+            'folder',
+            'created_by'
+        ).prefetch_related('original_document__document_tags__tag')
+
+        if not user.is_staff:
+            queryset = queryset.filter(
+                original_document__department=user.department
+            )
+
+        return queryset
+
+
+@extend_schema(
+    tags=['Document Shortcuts'],
+    responses={
+        204: OpenApiResponse(description='Shortcut deleted successfully'),
+        403: OpenApiResponse(description='Permission denied'),
+        404: OpenApiResponse(description='Shortcut not found'),
+    }
+)
+class DocumentShortcutDeleteView(generics.DestroyAPIView):
+    """
+    Delete a document shortcut.
+
+    This only removes the shortcut reference, not the original document.
+
+    DELETE /api/v1/documents/shortcuts/{id}/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'id'
+
+    def get_queryset(self):
+        """Filter shortcuts by user permissions"""
+        user = self.request.user
+
+        queryset = DocumentShortcut.objects.select_related(
+            'original_document',
+            'original_document__department',
+            'folder',
+            'created_by'
+        )
+
+        # Only creator or staff can delete shortcuts
+        if not user.is_staff:
+            queryset = queryset.filter(created_by=user)
+
+        return queryset
+
+    def perform_destroy(self, instance):
+        """Delete the shortcut"""
+        logger.info(
+            f"Document shortcut deleted: {instance.id} (document {instance.original_document_id} "
+            f"-> folder {instance.folder_id}) by user {self.request.user.username}"
+        )
+        instance.delete()
+
+
+@extend_schema(
+    tags=['Document Shortcuts'],
+    responses={
+        200: DocumentShortcutLocationSerializer(many=True),
+        404: OpenApiResponse(description='Document not found'),
+    }
+)
+class DocumentShortcutLocationsView(APIView):
+    """
+    Get all shortcut locations for a document.
+
+    Shows where shortcuts to this document exist.
+
+    GET /api/v1/documents/{id}/shortcut-locations/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, id):
+        """Get all shortcut locations for a document"""
+        try:
+            document = Document.objects.select_related('department').get(
+                pk=id, is_deleted=False
+            )
+        except Document.DoesNotExist:
+            raise Http404('Document not found')
+
+        # Check permissions
+        if not request.user.is_staff:
+            if document.department != request.user.department:
+                return Response(
+                    {'error': 'You do not have permission to view this document'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+        # Get all shortcuts for this document
+        shortcuts = DocumentShortcut.objects.filter(
+            original_document=document
+        ).select_related('folder', 'created_by')
+
+        serializer = DocumentShortcutLocationSerializer(shortcuts, many=True)
+
+        return Response({
+            'document_id': str(document.id),
+            'document_title': document.title,
+            'shortcut_count': shortcuts.count(),
+            'shortcuts': serializer.data
+        })
+
+
+@extend_schema(
+    tags=['Document Shortcuts'],
+    responses={
+        200: OpenApiResponse(description='Deletion allowed status'),
+        404: OpenApiResponse(description='Document not found'),
+    }
+)
+class DocumentCanDeleteView(APIView):
+    """
+    Check if a document can be deleted.
+
+    Returns whether the document can be deleted and any blocking reasons.
+    Documents with shortcuts cannot be deleted until shortcuts are removed.
+
+    GET /api/v1/documents/{id}/can-delete/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, id):
+        """Check if document can be deleted"""
+        try:
+            document = Document.objects.select_related('department').get(
+                pk=id, is_deleted=False
+            )
+        except Document.DoesNotExist:
+            raise Http404('Document not found')
+
+        # Check permissions
+        if not request.user.is_staff:
+            if document.owner != request.user:
+                return Response(
+                    {'error': 'You do not have permission to delete this document'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+        can_delete, message = document.can_delete()
+
+        response_data = {
+            'document_id': str(document.id),
+            'document_title': document.title,
+            'can_delete': can_delete,
+            'message': message
+        }
+
+        # If can't delete, include shortcut information
+        if not can_delete:
+            shortcuts = DocumentShortcut.objects.filter(
+                original_document=document
+            ).select_related('folder')
+
+            response_data['shortcut_count'] = shortcuts.count()
+            response_data['shortcut_locations'] = [
+                {
+                    'id': str(s.id),
+                    'folder_name': s.folder.name,
+                    'folder_path': s.folder.path
+                }
+                for s in shortcuts
+            ]
+
+        return Response(response_data)
+
+
+@extend_schema(
+    tags=['Document Shortcuts'],
+    request=BulkCreateShortcutSerializer,
+    responses={
+        201: OpenApiResponse(description='Shortcuts created successfully'),
+        400: OpenApiResponse(description='Validation error'),
+        403: OpenApiResponse(description='Permission denied'),
+    }
+)
+class BulkCreateShortcutsView(APIView):
+    """
+    Create shortcuts for multiple documents at once.
+
+    POST /api/v1/documents/shortcuts/bulk/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        """Create shortcuts for multiple documents"""
+        serializer = BulkCreateShortcutSerializer(
+            data=request.data,
+            context={'request': request}
+        )
+        serializer.is_valid(raise_exception=True)
+        result = serializer.save()
+
+        created_shortcuts = result['created']
+        skipped = result['skipped']
+
+        logger.info(
+            f"Bulk shortcut creation: {len(created_shortcuts)} created, "
+            f"{len(skipped['same_folder']) + len(skipped['already_exists'])} skipped "
+            f"by user {request.user.username}"
+        )
+
+        response_serializer = DocumentShortcutListSerializer(created_shortcuts, many=True)
+
+        return Response({
+            'message': f'Created {len(created_shortcuts)} shortcut(s)',
+            'created_count': len(created_shortcuts),
+            'created': response_serializer.data,
+            'skipped': {
+                'same_folder': skipped['same_folder'],
+                'already_exists': skipped['already_exists'],
+                'total': len(skipped['same_folder']) + len(skipped['already_exists'])
+            }
+        }, status=status.HTTP_201_CREATED)
+
+
+# ============================================================================
+# RECENT ACTIVITY VIEWS
+# ============================================================================
+
+@extend_schema(
+    tags=['Recent Activities'],
+    parameters=[
+        OpenApiParameter(
+            name='activity_type',
+            type=str,
+            location=OpenApiParameter.QUERY,
+            description='Filter by activity type (VIEWED, EDITED, UPLOADED, DOWNLOADED, SHARED)',
+            enum=['VIEWED', 'EDITED', 'UPLOADED', 'DOWNLOADED', 'SHARED']
+        ),
+        OpenApiParameter(
+            name='resource_type',
+            type=str,
+            location=OpenApiParameter.QUERY,
+            description='Filter by resource type (DOCUMENT, FOLDER)',
+            enum=['DOCUMENT', 'FOLDER']
+        ),
+        OpenApiParameter(
+            name='days',
+            type=int,
+            location=OpenApiParameter.QUERY,
+            description='Number of days to look back (default: 30, max: 30)'
+        ),
+        OpenApiParameter(
+            name='pinned_only',
+            type=bool,
+            location=OpenApiParameter.QUERY,
+            description='Only show pinned items'
+        ),
+        OpenApiParameter(
+            name='limit',
+            type=int,
+            location=OpenApiParameter.QUERY,
+            description='Maximum number of results (default: 50, max: 200)'
+        ),
+    ],
+    responses={
+        200: RecentActivitySerializer(many=True),
+    }
+)
+class RecentActivityListView(generics.ListAPIView):
+    """
+    List user's recent activities.
+
+    Returns activities grouped by time (Today, Yesterday, This Week, etc.)
+    with support for filtering by activity type, resource type, and date range.
+
+    Features:
+    - Pinned items appear first
+    - Time-based grouping for UI display
+    - Configurable retention period (default: 30 days)
+    - Activity type filtering (VIEWED, EDITED, UPLOADED, DOWNLOADED, SHARED)
+    - Resource type filtering (DOCUMENT, FOLDER)
+
+    GET /api/v1/recent/
+    """
+    serializer_class = RecentActivityListSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        """Get recent activities for the authenticated user"""
+        from datetime import timedelta
+
+        user = self.request.user
+
+        # Base queryset - user's activities
+        queryset = RecentActivity.objects.filter(user=user)
+
+        # Filter by days (default 30, max 30)
+        days = min(int(self.request.query_params.get('days', 30)), 30)
+        cutoff_date = timezone.now() - timedelta(days=days)
+        queryset = queryset.filter(timestamp__gte=cutoff_date)
+
+        # Filter by activity type
+        activity_type = self.request.query_params.get('activity_type')
+        if activity_type:
+            queryset = queryset.filter(activity_type=activity_type.upper())
+
+        # Filter by resource type
+        resource_type = self.request.query_params.get('resource_type')
+        if resource_type:
+            queryset = queryset.filter(resource_type=resource_type.upper())
+
+        # Filter pinned only
+        pinned_only = self.request.query_params.get('pinned_only', '').lower() == 'true'
+        if pinned_only:
+            queryset = queryset.filter(is_pinned=True)
+
+        # Order: pinned first, then by timestamp
+        queryset = queryset.order_by('-is_pinned', '-timestamp')
+
+        # Apply limit (default 50, max 200)
+        limit = min(int(self.request.query_params.get('limit', 50)), 200)
+
+        return queryset[:limit]
+
+    def list(self, request, *args, **kwargs):
+        """Override list to add grouping information"""
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+
+        # Group activities by time
+        grouped = {
+            'today': [],
+            'yesterday': [],
+            'this_week': [],
+            'last_week': [],
+            'this_month': [],
+            'older': []
+        }
+
+        for item in serializer.data:
+            time_group = item.get('time_group', 'older')
+            grouped[time_group].append(item)
+
+        # Get pinned items separately
+        pinned = [item for item in serializer.data if item.get('is_pinned')]
+
+        return Response({
+            'count': len(serializer.data),
+            'pinned_count': len(pinned),
+            'pinned': pinned,
+            'grouped': grouped,
+            'results': serializer.data
+        })
+
+
+@extend_schema(
+    tags=['Recent Activities'],
+    responses={
+        200: RecentActivitySerializer,
+        404: OpenApiResponse(description='Activity not found'),
+    }
+)
+class RecentActivityDetailView(generics.RetrieveAPIView):
+    """
+    Get details of a specific recent activity.
+
+    GET /api/v1/recent/{id}/
+    """
+    serializer_class = RecentActivitySerializer
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'id'
+
+    def get_queryset(self):
+        """Only allow user to see their own activities"""
+        return RecentActivity.objects.filter(user=self.request.user)
+
+
+@extend_schema(
+    tags=['Recent Activities'],
+    request=RecentActivityPinSerializer,
+    responses={
+        200: RecentActivitySerializer,
+        400: OpenApiResponse(description='Pin limit reached or validation error'),
+        404: OpenApiResponse(description='Activity not found'),
+    }
+)
+class RecentActivityPinView(APIView):
+    """
+    Pin or unpin a recent activity item.
+
+    Users can pin up to 10 items (configurable via MAX_PINNED_ITEMS).
+    Pinned items appear at the top of the recent activities list.
+
+    POST /api/v1/recent/{id}/pin/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, id):
+        """Pin or unpin an activity"""
+        try:
+            activity = RecentActivity.objects.get(id=id, user=request.user)
+        except RecentActivity.DoesNotExist:
+            return Response(
+                {'error': 'Activity not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = RecentActivityPinSerializer(
+            data=request.data,
+            context={'activity': activity}
+        )
+        serializer.is_valid(raise_exception=True)
+
+        is_pinned = serializer.validated_data['is_pinned']
+
+        if is_pinned:
+            success = activity.pin()
+            action = 'pinned'
+        else:
+            success = activity.unpin()
+            action = 'unpinned'
+
+        if not success:
+            return Response(
+                {'error': f'Failed to {action} item'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        logger.info(
+            f"Recent activity {id} {action} by user {request.user.username}"
+        )
+
+        response_serializer = RecentActivitySerializer(activity)
+        return Response(response_serializer.data)
+
+
+@extend_schema(
+    tags=['Recent Activities'],
+    request=RecentActivityClearSerializer,
+    responses={
+        200: OpenApiResponse(description='Activities cleared'),
+        400: OpenApiResponse(description='Validation error'),
+    }
+)
+class RecentActivityClearView(APIView):
+    """
+    Clear recent activity history by date range.
+
+    Allows users to clear their history while optionally preserving pinned items.
+
+    DELETE /api/v1/recent/clear/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request):
+        """Clear activities before a specific date"""
+        serializer = RecentActivityClearSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        before_date = serializer.validated_data['before_date']
+        activity_type = serializer.validated_data.get('activity_type')
+        resource_type = serializer.validated_data.get('resource_type')
+        exclude_pinned = serializer.validated_data.get('exclude_pinned', True)
+
+        # Build query
+        queryset = RecentActivity.objects.filter(
+            user=request.user,
+            timestamp__lt=before_date
+        )
+
+        if activity_type:
+            queryset = queryset.filter(activity_type=activity_type)
+
+        if resource_type:
+            queryset = queryset.filter(resource_type=resource_type)
+
+        if exclude_pinned:
+            queryset = queryset.filter(is_pinned=False)
+
+        # Count and delete
+        count = queryset.count()
+        queryset.delete()
+
+        logger.info(
+            f"Cleared {count} recent activities for user {request.user.username} "
+            f"(before {before_date}, exclude_pinned={exclude_pinned})"
+        )
+
+        return Response({
+            'message': f'Cleared {count} activity entries',
+            'cleared_count': count,
+            'before_date': before_date.isoformat(),
+            'excluded_pinned': exclude_pinned
+        })
+
+
+@extend_schema(
+    tags=['Recent Activities'],
+    responses={
+        200: RecentActivityStatsSerializer,
+    }
+)
+class RecentActivityStatsView(APIView):
+    """
+    Get statistics about recent activities.
+
+    Returns counts by activity type, resource type, and daily breakdown
+    for the last 30 days.
+
+    GET /api/v1/recent/stats/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        """Get activity statistics"""
+        from django.db.models import Count
+        from django.db.models.functions import TruncDate
+        from datetime import timedelta
+
+        user = request.user
+        cutoff_date = timezone.now() - timedelta(days=30)
+
+        # Base queryset
+        queryset = RecentActivity.objects.filter(
+            user=user,
+            timestamp__gte=cutoff_date
+        )
+
+        # Total count
+        total = queryset.count()
+
+        # Count by activity type
+        by_type = dict(
+            queryset.values('activity_type')
+            .annotate(count=Count('id'))
+            .values_list('activity_type', 'count')
+        )
+
+        # Count by resource type
+        by_resource_type = dict(
+            queryset.values('resource_type')
+            .annotate(count=Count('id'))
+            .values_list('resource_type', 'count')
+        )
+
+        # Count by day (last 30 days)
+        by_day = list(
+            queryset.annotate(date=TruncDate('timestamp'))
+            .values('date')
+            .annotate(count=Count('id'))
+            .order_by('-date')
+            .values('date', 'count')
+        )
+
+        # Convert dates to strings for JSON serialization
+        by_day = [
+            {'date': item['date'].isoformat(), 'count': item['count']}
+            for item in by_day
+        ]
+
+        # Pinned count
+        pinned_count = RecentActivity.get_user_pinned_count(user)
+
+        return Response({
+            'total': total,
+            'by_type': by_type,
+            'by_resource_type': by_resource_type,
+            'by_day': by_day,
+            'pinned_count': pinned_count,
+            'pinned_limit': RecentActivity.MAX_PINNED_ITEMS,
+            'retention_days': RecentActivity.RETENTION_DAYS
+        })
+
+
+@extend_schema(
+    tags=['Recent Activities - Admin'],
+    parameters=[
+        OpenApiParameter(
+            name='user_id',
+            type=str,
+            location=OpenApiParameter.QUERY,
+            description='Filter by user ID (admin only)'
+        ),
+        OpenApiParameter(
+            name='activity_type',
+            type=str,
+            location=OpenApiParameter.QUERY,
+            description='Filter by activity type'
+        ),
+        OpenApiParameter(
+            name='days',
+            type=int,
+            location=OpenApiParameter.QUERY,
+            description='Number of days to look back'
+        ),
+        OpenApiParameter(
+            name='limit',
+            type=int,
+            location=OpenApiParameter.QUERY,
+            description='Maximum results'
+        ),
+    ],
+    responses={
+        200: RecentActivitySerializer(many=True),
+        403: OpenApiResponse(description='Admin access required'),
+    }
+)
+class AdminRecentActivityListView(generics.ListAPIView):
+    """
+    Admin view to see all users' recent activities.
+
+    Only accessible by staff/admin users.
+
+    GET /api/v1/admin/recent/
+    """
+    serializer_class = RecentActivitySerializer
+    permission_classes = [permissions.IsAdminUser]
+
+    def get_queryset(self):
+        """Get all recent activities with optional filtering"""
+        from datetime import timedelta
+
+        queryset = RecentActivity.objects.select_related('user').all()
+
+        # Filter by user ID
+        user_id = self.request.query_params.get('user_id')
+        if user_id:
+            queryset = queryset.filter(user_id=user_id)
+
+        # Filter by days (default 7 for admin view)
+        days = min(int(self.request.query_params.get('days', 7)), 90)
+        cutoff_date = timezone.now() - timedelta(days=days)
+        queryset = queryset.filter(timestamp__gte=cutoff_date)
+
+        # Filter by activity type
+        activity_type = self.request.query_params.get('activity_type')
+        if activity_type:
+            queryset = queryset.filter(activity_type=activity_type.upper())
+
+        # Order by timestamp
+        queryset = queryset.order_by('-timestamp')
+
+        # Apply limit (default 100, max 500)
+        limit = min(int(self.request.query_params.get('limit', 100)), 500)
+
+        return queryset[:limit]

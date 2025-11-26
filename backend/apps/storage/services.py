@@ -13,8 +13,14 @@ from typing import BinaryIO, Dict, Optional, Tuple
 from urllib.parse import quote
 
 import boto3
-import magic
 from botocore.exceptions import ClientError
+
+# python-magic is optional - requires libmagic which is not always available on Windows
+try:
+    import magic
+    MAGIC_AVAILABLE = True
+except ImportError:
+    MAGIC_AVAILABLE = False
 from django.conf import settings
 from django.core.files.base import File
 from django.core.files.storage import default_storage
@@ -130,9 +136,24 @@ class StorageService:
         bucket = self.get_organization_bucket(organization_id)
         object_key = self.get_object_key(organization_id, document_id, filename, version)
 
-        # Read file content
-        file_content = file_obj.read()
-        file_obj.seek(0)  # Reset position
+        # Read file content - ensure we get bytes
+        try:
+            file_content = file_obj.read()
+            if hasattr(file_obj, 'seek'):
+                file_obj.seek(0)  # Reset position
+        except Exception as read_error:
+            return {
+                'success': False,
+                'error': f'Failed to read file: {str(read_error)}',
+                'error_code': 'READ_ERROR'
+            }
+
+        # Ensure file_content is bytes
+        if not isinstance(file_content, bytes):
+            try:
+                file_content = file_content.encode('utf-8')
+            except (AttributeError, UnicodeDecodeError):
+                file_content = bytes(file_content)
 
         # Calculate SHA-256 checksum
         checksum = hashlib.sha256(file_content).hexdigest()
@@ -140,29 +161,38 @@ class StorageService:
         # Detect MIME type
         mime_type = self._detect_mime_type(file_obj, filename)
 
-        # Prepare metadata
+        # Prepare metadata - ensure all values are strings
         upload_metadata = {
-            'original-filename': filename,
+            'original-filename': str(filename),
             'document-id': str(document_id),
             'organization-id': str(organization_id),
             'version': str(version),
-            'sha256-checksum': checksum,
+            'sha256-checksum': str(checksum),
             'upload-timestamp': datetime.utcnow().isoformat()
         }
 
         if metadata:
-            upload_metadata.update(metadata)
+            # Ensure all custom metadata values are strings
+            for key, value in metadata.items():
+                upload_metadata[str(key)] = str(value) if value is not None else ''
 
         # Upload to MinIO
         try:
-            response = self.s3_client.put_object(
-                Bucket=bucket,
-                Key=object_key,
-                Body=file_content,
-                Metadata=upload_metadata,
-                ContentType=mime_type,
-                ServerSideEncryption='AES256'  # Enable server-side encryption
-            )
+            # Build upload parameters
+            upload_params = {
+                'Bucket': bucket,
+                'Key': object_key,
+                'Body': file_content,
+                'Metadata': upload_metadata,
+                'ContentType': mime_type,
+            }
+
+            # Only enable server-side encryption if configured
+            # MinIO requires KMS configuration for SSE, which may not be available in dev
+            if getattr(settings, 'AWS_S3_ENCRYPTION', False):
+                upload_params['ServerSideEncryption'] = 'AES256'
+
+            response = self.s3_client.put_object(**upload_params)
 
             return {
                 'success': True,
@@ -180,6 +210,26 @@ class StorageService:
                 'success': False,
                 'error': str(e),
                 'error_code': e.response['Error']['Code']
+            }
+        except TypeError as te:
+            # Handle serialization errors - log full traceback
+            import traceback
+            print(f"TypeError during MinIO upload: {te}")
+            print(f"Traceback: {traceback.format_exc()}")
+            return {
+                'success': False,
+                'error': f'Type error during upload: {str(te)}',
+                'error_code': 'TYPE_ERROR'
+            }
+        except Exception as e:
+            # Catch-all for any other errors - log full traceback
+            import traceback
+            print(f"Exception during MinIO upload: {e}")
+            print(f"Traceback: {traceback.format_exc()}")
+            return {
+                'success': False,
+                'error': f'Unexpected error: {str(e)}',
+                'error_code': 'UNKNOWN_ERROR'
             }
 
     def download_file(self, bucket: str, object_key: str) -> Optional[bytes]:
@@ -282,12 +332,17 @@ class StorageService:
         """
         try:
             copy_source = {'Bucket': source_bucket, 'Key': source_key}
-            self.s3_client.copy_object(
-                CopySource=copy_source,
-                Bucket=dest_bucket,
-                Key=dest_key,
-                ServerSideEncryption='AES256'
-            )
+            copy_params = {
+                'CopySource': copy_source,
+                'Bucket': dest_bucket,
+                'Key': dest_key,
+            }
+
+            # Only enable server-side encryption if configured
+            if getattr(settings, 'AWS_S3_ENCRYPTION', False):
+                copy_params['ServerSideEncryption'] = 'AES256'
+
+            self.s3_client.copy_object(**copy_params)
             return True
         except ClientError as e:
             print(f"Error copying file: {e}")
@@ -428,14 +483,15 @@ class StorageService:
         Returns:
             MIME type string
         """
-        # Try python-magic first (more accurate)
-        try:
-            file_obj.seek(0)
-            mime = magic.from_buffer(file_obj.read(2048), mime=True)
-            file_obj.seek(0)
-            return mime
-        except Exception:
-            pass
+        # Try python-magic first (more accurate, but requires libmagic)
+        if MAGIC_AVAILABLE:
+            try:
+                file_obj.seek(0)
+                mime = magic.from_buffer(file_obj.read(2048), mime=True)
+                file_obj.seek(0)
+                return mime
+            except Exception:
+                pass
 
         # Fallback to mimetypes based on extension
         mime_type, _ = mimetypes.guess_type(filename)

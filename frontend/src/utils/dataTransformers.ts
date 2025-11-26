@@ -14,7 +14,7 @@ export function transformFolderFromBackend(backendFolder: any): Folder {
     name: backendFolder.name,
     parentId: backendFolder.parent || null,
     path: backendFolder.path,
-    depth: backendFolder.depth || 0,
+    level: backendFolder.depth || 0,
 
     // Transform confidentiality level
     confidentiality: transformConfidentialityFromBackend(backendFolder.confidentiality_level),
@@ -22,16 +22,16 @@ export function transformFolderFromBackend(backendFolder: any): Folder {
     // Metadata
     description: backendFolder.description || '',
     isLocked: backendFolder.is_locked || false,
-    documentCount: backendFolder.document_count || backendFolder.children_count || 0,
+    documentCount: backendFolder.documents_count || backendFolder.document_count || 0,
+    childrenCount: backendFolder.children_count || 0,
 
     // Timestamps
     createdAt: backendFolder.created_at,
     modifiedAt: backendFolder.updated_at || backendFolder.created_at,
 
     // User and department info
-    owner: backendFolder.owner?.username || backendFolder.owner?.id?.toString() || '',
-    createdBy: backendFolder.created_by?.username || backendFolder.created_by?.id?.toString() || '',
-    department: backendFolder.department?.name || backendFolder.department?.id?.toString() || '',
+    createdBy: backendFolder.created_by?.username || backendFolder.owner_name || '',
+    modifiedBy: backendFolder.owner_name || '',
 
     // Children
     hasChildren:
@@ -44,8 +44,16 @@ export function transformFolderFromBackend(backendFolder: any): Folder {
       canView: backendFolder.permissions?.can_view ?? true,
       canEdit: backendFolder.permissions?.can_edit ?? true,
       canDelete: backendFolder.permissions?.can_delete ?? true,
+      canShare: backendFolder.permissions?.can_share ?? true,
       canManage: backendFolder.permissions?.can_manage ?? true,
     },
+
+    // Trash-specific fields (only present for trashed folders)
+    deletedAt: backendFolder.deleted_at || null,
+    deletedBy: backendFolder.deleted_by || null,
+    deletedByName: backendFolder.deleted_by_name || null,
+    deletedByEmail: backendFolder.deleted_by_email || null,
+    totalSize: backendFolder.total_size || 0,
   }
 }
 

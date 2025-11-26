@@ -83,7 +83,6 @@ export const DeleteFolderModal: FC<DeleteFolderModalProps> = ({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
-      onClick={handleClose}
       role="dialog"
       aria-modal="true"
       aria-labelledby="delete-folder-title"
@@ -119,17 +118,16 @@ export const DeleteFolderModal: FC<DeleteFolderModalProps> = ({
         <form onSubmit={handleSubmit}>
           <div className="px-6 py-4 space-y-4">
             {/* Warning */}
-            <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
               <div className="flex gap-3">
-                <ExclamationTriangleIcon className="w-6 h-6 text-red-600 dark:text-red-400 flex-shrink-0" />
+                <ExclamationTriangleIcon className="w-6 h-6 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
                 <div className="flex-1">
-                  <h3 className="font-semibold text-red-800 dark:text-red-200 mb-1">
-                    This action cannot be undone
+                  <h3 className="font-semibold text-yellow-800 dark:text-yellow-200 mb-1">
+                    Move to Trash
                   </h3>
-                  <p className="text-sm text-red-700 dark:text-red-300">
-                    You are about to permanently delete this folder
-                    {hasContents ? ' and all its contents' : ''}. This will remove all data and
-                    cannot be recovered.
+                  <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                    This folder{hasContents ? ' and all its contents' : ''} will be moved to trash.
+                    You can restore it later from the trash.
                   </p>
                 </div>
               </div>
@@ -165,7 +163,7 @@ export const DeleteFolderModal: FC<DeleteFolderModalProps> = ({
                     )}
                   </ul>
                   <p className="mt-2 text-xs text-yellow-700 dark:text-yellow-300">
-                    All contents will be permanently deleted.
+                    All contents will also be moved to trash.
                   </p>
                 </div>
               )}
@@ -189,10 +187,10 @@ export const DeleteFolderModal: FC<DeleteFolderModalProps> = ({
                   checked={forceDelete}
                   onChange={(e) => setForceDelete(e.target.checked)}
                   disabled={isLoading}
-                  className="mt-1 w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                  className="mt-1 w-4 h-4 text-yellow-600 border-gray-300 rounded focus:ring-yellow-500"
                 />
                 <label htmlFor="force-delete" className="text-sm text-gray-700 dark:text-gray-300">
-                  I understand this will permanently delete the folder and all its contents
+                  I understand this will move the folder and all its contents to trash
                 </label>
               </div>
             )}
@@ -270,7 +268,7 @@ export const DeleteFolderModal: FC<DeleteFolderModalProps> = ({
               }
               className="
                 px-4 py-2 text-sm font-medium
-                bg-red-600 hover:bg-red-700
+                bg-yellow-600 hover:bg-yellow-700
                 text-white rounded-lg transition-colors
                 disabled:opacity-50 disabled:cursor-not-allowed
                 flex items-center gap-2
@@ -294,12 +292,12 @@ export const DeleteFolderModal: FC<DeleteFolderModalProps> = ({
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     />
                   </svg>
-                  Deleting...
+                  Moving to Trash...
                 </>
               ) : (
                 <>
                   <TrashIcon className="w-4 h-4" />
-                  Delete Folder
+                  Move to Trash
                 </>
               )}
             </button>

@@ -42,10 +42,15 @@ export const FolderTemplateSelector: FC<FolderTemplateSelectorProps> = ({
 
   if (!isOpen) return null
 
+  // Handle backdrop click - don't close modal
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+  }
+
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 backdrop-blur-sm"
-      onClick={onClose}
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      onClick={handleBackdropClick}
       role="dialog"
       aria-modal="true"
       aria-labelledby="template-selector-title"

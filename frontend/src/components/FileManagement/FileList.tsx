@@ -20,6 +20,7 @@ export const FileList: FC<FileListProps> = ({
   onSortChange: _onSortChange,
   onViewModeChange: _onViewModeChange,
   onContextMenu,
+  onFavoriteToggle,
   isLoading = false,
   emptyState,
   className,
@@ -60,9 +61,10 @@ export const FileList: FC<FileListProps> = ({
   }
 
   // Handle favorite toggle
-  const handleFavoriteToggle = (_itemId: string) => {
-    // This would typically call an API to toggle favorite status
-    // TODO: Implement favorite toggle API call
+  const handleFavoriteToggle = (item: FileListItem) => {
+    if (onFavoriteToggle) {
+      onFavoriteToggle(item)
+    }
   }
 
   // Sort items
@@ -166,7 +168,7 @@ export const FileList: FC<FileListProps> = ({
             onClick={() => handleItemClick(item)}
             onDoubleClick={() => handleItemDoubleClick(item)}
             onSelect={(selected) => handleItemSelect(item.id, selected)}
-            onFavoriteToggle={() => handleFavoriteToggle(item.id)}
+            onFavoriteToggle={() => handleFavoriteToggle(item)}
             onContextMenu={onContextMenu ? (e) => onContextMenu(e, item) : undefined}
             showCheckbox={localSelectedIds.size > 0 || onSelectionChange !== undefined}
             showActions={true}
@@ -201,7 +203,7 @@ export const FileList: FC<FileListProps> = ({
           onDoubleClick={() => handleItemDoubleClick(item)}
           onContextMenu={onContextMenu ? (e) => onContextMenu(e, item) : undefined}
           onSelect={(selected) => handleItemSelect(item.id, selected)}
-          onFavoriteToggle={() => handleFavoriteToggle(item.id)}
+          onFavoriteToggle={() => handleFavoriteToggle(item)}
           showCheckbox={localSelectedIds.size > 0 || onSelectionChange !== undefined}
           showActions={true}
         />

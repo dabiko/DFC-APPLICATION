@@ -4,14 +4,21 @@
  */
 
 import { FC, useState, useEffect } from 'react'
-import { XMarkIcon, PencilIcon } from '@heroicons/react/24/outline'
-import type { Folder } from '@/types/folder'
+import { XMarkIcon, PencilIcon, ShieldCheckIcon } from '@heroicons/react/24/outline'
+import type { Folder, ConfidentialityLevel } from '@/types/folder'
+
+const CONFIDENTIALITY_OPTIONS: { value: ConfidentialityLevel; label: string; color: string }[] = [
+  { value: 'public', label: 'Public', color: 'text-gray-600 bg-gray-100 dark:bg-gray-700' },
+  { value: 'internal', label: 'Internal', color: 'text-blue-600 bg-blue-100 dark:bg-blue-900/30' },
+  { value: 'confidential', label: 'Confidential', color: 'text-orange-600 bg-orange-100 dark:bg-orange-900/30' },
+  { value: 'highly_confidential', label: 'Highly Confidential', color: 'text-red-600 bg-red-100 dark:bg-red-900/30' },
+]
 
 export interface RenameFolderModalProps {
   isOpen: boolean
   folder: Folder | null
   onClose: () => void
-  onRename: (folderId: string, newName: string) => Promise<void>
+  onRename: (folderId: string, newName: string, confidentiality?: ConfidentialityLevel) => Promise<void>
   existingFolderNames?: string[]
 }
 
@@ -23,6 +30,7 @@ export const RenameFolderModal: FC<RenameFolderModalProps> = ({
   existingFolderNames = [],
 }) => {
   const [folderName, setFolderName] = useState('')
+  const [confidentiality, setConfidentiality] = useState<ConfidentialityLevel>('internal')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -30,6 +38,7 @@ export const RenameFolderModal: FC<RenameFolderModalProps> = ({
   useEffect(() => {
     if (isOpen && folder) {
       setFolderName(folder.name)
+      setConfidentiality(folder.confidentiality)
       setError(null)
     }
   }, [isOpen, folder])
@@ -50,9 +59,9 @@ export const RenameFolderModal: FC<RenameFolderModalProps> = ({
       return 'Folder name contains invalid characters (< > : " / \\ | ? *)'
     }
 
-    // Check if name unchanged
-    if (folder && name.trim() === folder.name) {
-      return 'Please enter a different name'
+    // Check if nothing changed
+    if (folder && name.trim() === folder.name && confidentiality === folder.confidentiality) {
+      return 'Please make a change to save'
     }
 
     // Check for duplicate names in same parent
@@ -78,10 +87,12 @@ export const RenameFolderModal: FC<RenameFolderModalProps> = ({
     setError(null)
 
     try {
-      await onRename(folder.id, folderName.trim())
+      // Pass confidentiality only if it changed
+      const newConfidentiality = confidentiality !== folder.confidentiality ? confidentiality : undefined
+      await onRename(folder.id, folderName.trim(), newConfidentiality)
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to rename folder')
+      setError(err instanceof Error ? err.message : 'Failed to update folder')
     } finally {
       setIsLoading(false)
     }
@@ -98,7 +109,6 @@ export const RenameFolderModal: FC<RenameFolderModalProps> = ({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
-      onClick={handleClose}
       role="dialog"
       aria-modal="true"
       aria-labelledby="rename-folder-title"
@@ -115,7 +125,7 @@ export const RenameFolderModal: FC<RenameFolderModalProps> = ({
               id="rename-folder-title"
               className="text-lg font-semibold text-gray-900 dark:text-gray-100"
             >
-              Rename Folder
+              Edit Folder
             </h2>
           </div>
           <button
@@ -170,11 +180,47 @@ export const RenameFolderModal: FC<RenameFolderModalProps> = ({
               {error && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{error}</p>}
             </div>
 
+            {/* Confidentiality level */}
+            <div>
+              <label
+                htmlFor="confidentiality"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              >
+                <div className="flex items-center gap-2">
+                  <ShieldCheckIcon className="w-4 h-4" />
+                  Confidentiality Level
+                </div>
+              </label>
+              <select
+                id="confidentiality"
+                value={confidentiality}
+                onChange={(e) => setConfidentiality(e.target.value as ConfidentialityLevel)}
+                disabled={isLoading || folder?.isLocked}
+                className={`
+                  w-full px-3 py-2 border rounded-lg
+                  bg-white dark:bg-gray-900
+                  text-gray-900 dark:text-gray-100
+                  focus:outline-none focus:ring-2 focus:ring-primary-500
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                  border-gray-300 dark:border-gray-600
+                `}
+              >
+                {CONFIDENTIALITY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                This affects who can access the folder and its contents
+              </p>
+            </div>
+
             {/* Locked folder warning */}
             {folder.isLocked && (
               <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
                 <p className="text-sm text-red-800 dark:text-red-200">
-                  This folder is locked and cannot be renamed.
+                  This folder is locked and cannot be modified.
                 </p>
               </div>
             )}
@@ -236,10 +282,10 @@ export const RenameFolderModal: FC<RenameFolderModalProps> = ({
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     />
                   </svg>
-                  Renaming...
+                  Saving...
                 </>
               ) : (
-                'Rename'
+                'Save Changes'
               )}
             </button>
           </div>

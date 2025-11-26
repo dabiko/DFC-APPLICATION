@@ -145,29 +145,32 @@ class LegalHoldAdmin(admin.ModelAdmin):
 
     list_display = [
         'case_number',
-        'case_name',
+        'title',
         'is_active_display',
         'document_count',
-        'placed_by',
-        'placed_at',
+        'start_date',
+        'end_date',
+        'created_by',
         'released_status',
     ]
 
     list_filter = [
         'is_active',
-        'placed_at',
+        'start_date',
+        'created_at',
     ]
 
     search_fields = [
         'case_number',
-        'case_name',
-        'description',
+        'title',
+        'reason',
     ]
 
     readonly_fields = [
         'id',
-        'placed_by',
-        'placed_at',
+        'created_by',
+        'created_at',
+        'updated_at',
         'released_by',
         'released_at',
         'document_count',
@@ -178,8 +181,14 @@ class LegalHoldAdmin(admin.ModelAdmin):
             'fields': [
                 'id',
                 'case_number',
-                'case_name',
-                'description',
+                'title',
+                'reason',
+            ]
+        }),
+        ('Hold Period', {
+            'fields': [
+                'start_date',
+                'end_date',
             ]
         }),
         ('Status', {
@@ -187,10 +196,11 @@ class LegalHoldAdmin(admin.ModelAdmin):
                 'is_active',
             ]
         }),
-        ('Placement Details', {
+        ('Creation Details', {
             'fields': [
-                'placed_by',
-                'placed_at',
+                'created_by',
+                'created_at',
+                'updated_at',
             ],
             'classes': ['collapse'],
         }),
@@ -198,7 +208,6 @@ class LegalHoldAdmin(admin.ModelAdmin):
             'fields': [
                 'released_by',
                 'released_at',
-                'notes',
             ],
             'classes': ['collapse'],
         }),
@@ -242,9 +251,9 @@ class LegalHoldAdmin(admin.ModelAdmin):
     released_status.short_description = 'Released'
 
     def save_model(self, request, obj, form, change):
-        """Set placed_by on creation"""
+        """Set created_by on creation"""
         if not change:  # Creating new
-            obj.placed_by = request.user
+            obj.created_by = request.user
         super().save_model(request, obj, form, change)
 
 

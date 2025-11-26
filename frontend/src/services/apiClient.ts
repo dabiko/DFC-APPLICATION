@@ -14,13 +14,14 @@ const apiClient: AxiosInstance = axios.create({
 // Request interceptor - attach access token to all requests
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const tokens = localStorage.getItem('auth_tokens')
-    if (tokens) {
-      const { accessToken } = JSON.parse(tokens)
-      if (accessToken && config.headers) {
-        config.headers.Authorization = `Bearer ${accessToken}`
-      }
+    // Check both localStorage and sessionStorage for tokens
+    // (auth.service.ts stores them based on "Remember Me" checkbox)
+    const accessToken = localStorage.getItem('access_token') || sessionStorage.getItem('access_token')
+
+    if (accessToken && config.headers) {
+      config.headers.Authorization = `Bearer ${accessToken}`
     }
+
     return config
   },
   (error) => {
@@ -39,24 +40,29 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true
 
       try {
-        const tokens = localStorage.getItem('auth_tokens')
-        if (!tokens) {
+        // Get refresh token from storage (check both localStorage and sessionStorage)
+        const refreshToken = localStorage.getItem('refresh_token') || sessionStorage.getItem('refresh_token')
+
+        if (!refreshToken) {
           throw new Error('No refresh token available')
         }
 
-        const { refreshToken } = JSON.parse(tokens)
+        // Check which storage is being used
+        const isLocalStorage = !!localStorage.getItem('refresh_token')
+        const storage = isLocalStorage ? localStorage : sessionStorage
 
         // Call refresh endpoint
-        const response = await axios.post(`${API_BASE_URL}/auth/refresh/`, {
+        const response = await axios.post(`${API_BASE_URL}/auth/token/refresh/`, {
           refresh: refreshToken,
         })
 
-        const { access } = response.data
+        const { access, refresh } = response.data
 
-        // Update stored tokens
-        const updatedTokens = JSON.parse(tokens)
-        updatedTokens.accessToken = access
-        localStorage.setItem('auth_tokens', JSON.stringify(updatedTokens))
+        // Update stored tokens in the same storage location
+        storage.setItem('access_token', access)
+        if (refresh) {
+          storage.setItem('refresh_token', refresh)
+        }
 
         // Retry original request with new token
         if (originalRequest.headers) {
@@ -65,8 +71,13 @@ apiClient.interceptors.response.use(
         return apiClient(originalRequest)
       } catch (refreshError) {
         // Refresh failed - clear tokens and redirect to login
-        localStorage.removeItem('auth_tokens')
-        localStorage.removeItem('auth_user')
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('refresh_token')
+        localStorage.removeItem('user')
+        localStorage.removeItem('remember_me')
+        sessionStorage.removeItem('access_token')
+        sessionStorage.removeItem('refresh_token')
+        sessionStorage.removeItem('user')
         window.location.href = '/login'
         return Promise.reject(refreshError)
       }

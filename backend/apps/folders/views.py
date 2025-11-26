@@ -16,6 +16,7 @@ from apps.folders.serializers import (
     FolderUpdateSerializer,
     FolderMoveSerializer,
     FolderTemplateSerializer,
+    TrashFolderSerializer,
     SmartFolderListSerializer,
     SmartFolderDetailSerializer,
     SmartFolderCreateSerializer,
@@ -67,16 +68,18 @@ class FolderListCreateView(FolderPermissionMixin, generics.ListCreateAPIView):
         """Get folders filtered by RBAC permissions and query parameters"""
         user = self.request.user
 
-        # Get base queryset with select_related
-        base_queryset = Folder.objects.select_related(
+        # Get base queryset with select_related (exclude deleted folders)
+        base_queryset = Folder.objects.filter(is_deleted=False).select_related(
             'owner', 'department', 'parent', 'created_by'
         ).annotate(
-            children_count=Count('children')
+            children_count=Count('children', filter=Q(children__is_deleted=False))
         )
 
         # Apply RBAC filtering using FolderPermissionMixin
         try:
             queryset = super().get_queryset()
+            if queryset is not None:
+                queryset = queryset.filter(is_deleted=False)
         except AssertionError:
             queryset = base_queryset
 
@@ -203,18 +206,27 @@ class FolderUpdateView(generics.UpdateAPIView):
 
 @extend_schema(
     tags=['Folders'],
+    parameters=[
+        OpenApiParameter(
+            name='permanent',
+            type=bool,
+            location=OpenApiParameter.QUERY,
+            description='If true, permanently delete the folder. Otherwise, move to trash.'
+        ),
+    ],
     responses={
         204: OpenApiResponse(description='Folder deleted successfully'),
-        400: OpenApiResponse(description='Folder not empty'),
+        400: OpenApiResponse(description='Folder is locked'),
         403: OpenApiResponse(description='Permission denied'),
         404: OpenApiResponse(description='Folder not found'),
     }
 )
 class FolderDeleteView(generics.DestroyAPIView):
     """
-    Delete a folder.
+    Delete a folder (move to trash).
 
-    Only empty folders (no documents, no subfolders) can be deleted.
+    By default, folders are moved to trash (soft delete).
+    Use ?permanent=true to permanently delete (only for folders already in trash).
     Requires 'can_delete' permission on the folder.
     """
     permission_classes = [permissions.IsAuthenticated, HasFolderPermission]
@@ -233,22 +245,185 @@ class FolderDeleteView(generics.DestroyAPIView):
         return accessible_folders
 
     def perform_destroy(self, instance):
-        """Check if folder is empty before deleting"""
-        # Check for documents
-        if instance.documents.filter(is_deleted=False).exists():
-            from rest_framework.exceptions import ValidationError
-            raise ValidationError({'error': 'Cannot delete folder with documents'})
+        """Soft delete folder (move to trash) or permanent delete"""
+        from rest_framework.exceptions import ValidationError
 
-        # Check for subfolders
-        if instance.children.exists():
-            from rest_framework.exceptions import ValidationError
-            raise ValidationError({'error': 'Cannot delete folder with subfolders'})
+        # Check if folder is locked
+        if instance.is_locked:
+            raise ValidationError({'error': 'Cannot delete a locked folder'})
 
-        logger.info(
-            f"Folder deleted: {instance.id} ({instance.path}) by user {self.request.user.username}"
+        # Check if permanent delete is requested
+        permanent = self.request.query_params.get('permanent', '').lower() == 'true'
+
+        if permanent:
+            # Only allow permanent delete for folders already in trash
+            if not instance.is_deleted:
+                raise ValidationError({
+                    'error': 'Folder must be in trash before permanent deletion. '
+                             'Delete without ?permanent=true first.'
+                })
+
+            logger.info(
+                f"Folder permanently deleted: {instance.id} ({instance.path}) "
+                f"by user {self.request.user.username}"
+            )
+            instance.permanent_delete()
+        else:
+            # Soft delete (move to trash)
+            logger.info(
+                f"Folder moved to trash: {instance.id} ({instance.path}) "
+                f"by user {self.request.user.username}"
+            )
+            instance.soft_delete(self.request.user)
+
+    def destroy(self, request, *args, **kwargs):
+        """Override to return 200 with message instead of 204"""
+        instance = self.get_object()
+        permanent = request.query_params.get('permanent', '').lower() == 'true'
+        self.perform_destroy(instance)
+
+        if permanent:
+            return Response(
+                {'message': 'Folder permanently deleted'},
+                status=status.HTTP_200_OK
+            )
+        return Response(
+            {'message': 'Folder moved to trash'},
+            status=status.HTTP_200_OK
         )
 
-        instance.delete()
+
+@extend_schema(
+    tags=['Folders'],
+    responses={
+        200: FolderDetailSerializer,
+        400: OpenApiResponse(description='Cannot restore - parent folder is in trash'),
+        403: OpenApiResponse(description='Permission denied'),
+        404: OpenApiResponse(description='Folder not found'),
+    }
+)
+class FolderRestoreView(APIView):
+    """
+    Restore a folder from trash.
+
+    Restores the folder and all its contents (subfolders and documents).
+    The parent folder must not be in trash.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, id):
+        """Restore folder from trash"""
+        try:
+            user = request.user
+            folder = Folder.objects.get(id=id, is_deleted=True)
+
+            # Check RBAC permissions
+            if not check_permission(user, 'can_delete', folder):
+                return Response(
+                    {'error': 'You do not have permission to restore this folder'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            try:
+                folder.restore(user)
+                logger.info(
+                    f"Folder restored from trash: {folder.id} ({folder.path}) "
+                    f"by user {user.username}"
+                )
+
+                response_serializer = FolderDetailSerializer(folder)
+                return Response(response_serializer.data)
+
+            except ValueError as e:
+                return Response(
+                    {'error': str(e)},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        except Folder.DoesNotExist:
+            raise Http404('Folder not found in trash')
+
+
+@extend_schema(
+    tags=['Folders'],
+    responses={
+        200: TrashFolderSerializer(many=True),
+    }
+)
+class FolderTrashListView(generics.ListAPIView):
+    """
+    List all folders in trash for the current user.
+
+    Returns folders that have been soft-deleted.
+    Only shows top-level deleted folders (not nested deleted folders).
+    Includes deleted_by information for audit purposes.
+    """
+    serializer_class = TrashFolderSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        """Get deleted folders accessible to user"""
+        user = self.request.user
+        queryset = Folder.objects.filter(is_deleted=True).select_related(
+            'owner', 'department', 'parent', 'created_by', 'deleted_by'
+        )
+
+        # Use PermissionChecker to filter by permissions
+        checker = PermissionChecker(user)
+        accessible_folders = checker.get_accessible_folders(queryset)
+
+        # Only show top-level deleted folders
+        # (folders whose parent is not deleted, or root folders)
+        return accessible_folders.filter(
+            Q(parent__isnull=True) | Q(parent__is_deleted=False)
+        ).order_by('-deleted_at')
+
+
+@extend_schema(
+    tags=['Folders'],
+    responses={
+        200: OpenApiResponse(description='Trash emptied successfully'),
+    }
+)
+class FolderEmptyTrashView(APIView):
+    """
+    Permanently delete all folders in trash.
+
+    WARNING: This action is irreversible!
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        """Empty trash - permanently delete all trashed folders"""
+        user = request.user
+
+        # Get all trashed folders accessible to user
+        queryset = Folder.objects.filter(is_deleted=True)
+        checker = PermissionChecker(user)
+        accessible_folders = checker.get_accessible_folders(queryset)
+
+        # Get top-level deleted folders only
+        top_level_deleted = accessible_folders.filter(
+            Q(parent__isnull=True) | Q(parent__is_deleted=False)
+        )
+
+        deleted_count = 0
+        for folder in top_level_deleted:
+            try:
+                folder.permanent_delete()
+                deleted_count += 1
+            except Exception as e:
+                logger.error(f"Failed to permanently delete folder {folder.id}: {e}")
+
+        logger.info(
+            f"Trash emptied: {deleted_count} folders permanently deleted "
+            f"by user {user.username}"
+        )
+
+        return Response({
+            'message': f'{deleted_count} folders permanently deleted',
+            'deleted_count': deleted_count
+        })
 
 
 @extend_schema(

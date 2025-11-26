@@ -343,3 +343,6 @@ from apps.users.models_password_history import (
 
 # Import OTP models
 from apps.users.models_otp import EmailOTP, PhoneOTP
+
+# Import Favorites models
+from apps.users.models_favorites import FavoriteFolder, FavoriteDocument

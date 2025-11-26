@@ -134,7 +134,7 @@ export const folderService = {
   },
 
   /**
-   * Update folder
+   * Update folder (partial update)
    */
   updateFolder: async (folderId: string, data: UpdateFolderData): Promise<Folder> => {
     const { transformFolderFromBackend } = await import('@/utils/dataTransformers')
@@ -146,13 +146,23 @@ export const folderService = {
       highly_confidential: 'HIGHLY_CONFIDENTIAL',
     }
 
-    const response = await api.put<any>(`/folders/${folderId}/update/`, {
-      name: data.name,
-      confidentiality: data.confidentiality
-        ? confidentialityMapping[data.confidentiality]
-        : undefined,
-      is_locked: data.isLocked,
-    })
+    // Build payload with only provided fields
+    const payload: Record<string, any> = {}
+    if (data.name !== undefined) {
+      payload.name = data.name
+    }
+    if (data.confidentiality !== undefined) {
+      payload.confidentiality_level = confidentialityMapping[data.confidentiality]
+    }
+    if (data.isLocked !== undefined) {
+      payload.is_locked = data.isLocked
+    }
+    if (data.description !== undefined) {
+      payload.description = data.description
+    }
+
+    // Use PATCH for partial updates
+    const response = await api.patch<any>(`/folders/${folderId}/update/`, payload)
     return transformFolderFromBackend(response.data)
   },
 
@@ -178,7 +188,7 @@ export const folderService = {
    * Delete folder
    */
   deleteFolder: async (folderId: string, force: boolean = false): Promise<void> => {
-    await api.delete(`/folders/${folderId}/`, {
+    await api.delete(`/folders/${folderId}/delete/`, {
       params: { force },
     })
   },
@@ -295,6 +305,43 @@ export const folderService = {
         'Content-Type': 'multipart/form-data',
       },
     })
+    return response.data
+  },
+
+  /**
+   * Get folders in trash
+   */
+  getTrashFolders: async (): Promise<Folder[]> => {
+    const response = await api.get<any[]>('/folders/trash/')
+    // Handle paginated response
+    const data = Array.isArray(response.data) ? response.data : response.data.results || []
+    const { transformFoldersFromBackend } = await import('@/utils/dataTransformers')
+    return transformFoldersFromBackend(data)
+  },
+
+  /**
+   * Restore folder from trash
+   */
+  restoreFolder: async (folderId: string): Promise<Folder> => {
+    const { transformFolderFromBackend } = await import('@/utils/dataTransformers')
+    const response = await api.post<any>(`/folders/${folderId}/restore/`)
+    return transformFolderFromBackend(response.data)
+  },
+
+  /**
+   * Permanently delete folder (must be in trash first)
+   */
+  permanentlyDeleteFolder: async (folderId: string): Promise<void> => {
+    await api.delete(`/folders/${folderId}/delete/`, {
+      params: { permanent: true },
+    })
+  },
+
+  /**
+   * Empty trash (permanently delete all trashed folders)
+   */
+  emptyTrash: async (): Promise<{ message: string; deleted_count: number }> => {
+    const response = await api.post('/folders/trash/empty/')
     return response.data
   },
 }

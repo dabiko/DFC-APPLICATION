@@ -20,7 +20,7 @@ class FolderListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'parent', 'path', 'depth',
             'owner', 'owner_name', 'department', 'department_name',
-            'confidentiality_level', 'created_at', 'updated_at',
+            'confidentiality_level', 'is_locked', 'created_at', 'updated_at',
             'children_count', 'documents_count'
         ]
 
@@ -50,7 +50,7 @@ class FolderDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'parent', 'parent_name', 'path', 'depth',
             'owner', 'owner_name', 'department', 'department_name',
-            'confidentiality_level', 'description',
+            'confidentiality_level', 'is_locked', 'description',
             'created_at', 'updated_at', 'created_by', 'created_by_name',
             'breadcrumb', 'children', 'documents_count'
         ]
@@ -158,7 +158,7 @@ class FolderUpdateSerializer(serializers.ModelSerializer):
     """
     class Meta:
         model = Folder
-        fields = ['name', 'description', 'confidentiality_level']
+        fields = ['name', 'description', 'confidentiality_level', 'is_locked']
 
     def validate_name(self, value):
         """Validate folder name"""
@@ -310,6 +310,56 @@ class FolderTreeSerializer(serializers.Serializer):
         """Recursively get children folders"""
         children = obj.get('children', [])
         return FolderTreeSerializer(children, many=True).data
+
+
+class TrashFolderSerializer(serializers.ModelSerializer):
+    """
+    Serializer for folders in trash with deleted_by information.
+    """
+    owner_name = serializers.CharField(source='owner.get_full_name', read_only=True)
+    department_name = serializers.CharField(source='department.name', read_only=True)
+    children_count = serializers.SerializerMethodField()
+    documents_count = serializers.SerializerMethodField()
+    deleted_by_name = serializers.SerializerMethodField()
+    deleted_by_email = serializers.SerializerMethodField()
+    total_size = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Folder
+        fields = [
+            'id', 'name', 'parent', 'path', 'depth',
+            'owner', 'owner_name', 'department', 'department_name',
+            'confidentiality_level', 'is_locked', 'created_at', 'updated_at',
+            'children_count', 'documents_count',
+            'deleted_at', 'deleted_by', 'deleted_by_name', 'deleted_by_email',
+            'total_size'
+        ]
+
+    def get_children_count(self, obj):
+        """Get number of direct children (including deleted)"""
+        return obj.children.filter(is_deleted=True).count()
+
+    def get_documents_count(self, obj):
+        """Get number of documents in this folder"""
+        return obj.documents.count()
+
+    def get_deleted_by_name(self, obj):
+        """Get the name of the user who deleted the folder"""
+        if obj.deleted_by:
+            return obj.deleted_by.get_full_name() or obj.deleted_by.username
+        return None
+
+    def get_deleted_by_email(self, obj):
+        """Get the email of the user who deleted the folder"""
+        if obj.deleted_by:
+            return obj.deleted_by.email
+        return None
+
+    def get_total_size(self, obj):
+        """Get total size of documents in this folder"""
+        from django.db.models import Sum
+        total = obj.documents.aggregate(total=Sum('file_size'))['total']
+        return total or 0
 
 
 # ============================================================================

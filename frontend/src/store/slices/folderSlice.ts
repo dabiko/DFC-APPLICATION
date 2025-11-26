@@ -88,12 +88,24 @@ export const createFolder = createAsyncThunk(
   }
 )
 
-// Rename folder
+// Rename folder (and optionally update confidentiality)
 export const renameFolder = createAsyncThunk(
   'folder/renameFolder',
-  async ({ folderId, newName }: { folderId: string; newName: string }, { rejectWithValue }) => {
+  async (
+    {
+      folderId,
+      newName,
+      confidentiality,
+    }: { folderId: string; newName: string; confidentiality?: string },
+    { rejectWithValue }
+  ) => {
     try {
-      const folder = await folderService.renameFolder(folderId, newName)
+      // Use updateFolder to handle both name and confidentiality
+      const updateData: { name?: string; confidentiality?: string } = {}
+      if (newName) updateData.name = newName
+      if (confidentiality) updateData.confidentiality = confidentiality
+
+      const folder = await folderService.updateFolder(folderId, updateData)
       return folder
     } catch (error) {
       return rejectWithValue(handleFolderError(error))

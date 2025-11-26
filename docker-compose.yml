@@ -144,10 +144,6 @@ services:
   # =========================================================================
 
 volumes:
-  postgres_data:
-    driver: local
-  pgadmin_data:
-    driver: local
   minio_data:
     driver: local
   redis_data:

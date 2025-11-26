@@ -2,7 +2,7 @@
 Serializers for document management.
 """
 from rest_framework import serializers
-from apps.documents.models import Document, Tag, DocumentTag, DocumentVersion
+from apps.documents.models import Document, Tag, DocumentTag, DocumentVersion, DocumentShortcut, RecentActivity
 from apps.folders.models import Folder
 from apps.users.models import Department
 from apps.documents.constants import (
@@ -91,6 +91,8 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
     tags = DocumentTagSerializer(source='document_tags', many=True, read_only=True)
     versions = serializers.SerializerMethodField()
+    # Override file field to return URL string or null (not FieldFile object)
+    file = serializers.SerializerMethodField()
 
     class Meta:
         model = Document
@@ -110,6 +112,20 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at', 'created_by', 'extracted_text',
             'ocr_confidence', 'is_indexed', 'version_number'
         ]
+
+    def get_file(self, obj):
+        """Return file URL or None - files are stored in MinIO, not Django FileField"""
+        # If file is stored in MinIO, return None here
+        # The actual download URL should be fetched via the download endpoint
+        if obj.minio_object_key:
+            return None  # File is in MinIO, use download endpoint
+        # Fallback for legacy Django FileField storage
+        if obj.file and hasattr(obj.file, 'url'):
+            try:
+                return obj.file.url
+            except ValueError:
+                return None
+        return None
 
     def get_versions(self, obj):
         """Get all versions of this document"""
@@ -153,6 +169,12 @@ class DocumentUploadSerializer(serializers.ModelSerializer):
         required=False,
         write_only=True,
         help_text='List of tag IDs to apply to the document'
+    )
+    department = serializers.PrimaryKeyRelatedField(
+        queryset=Department.objects.all(),
+        required=False,
+        allow_null=True,
+        help_text='Department ID (UUID). If not provided, uses the uploading user\'s department.'
     )
 
     class Meta:
@@ -213,6 +235,19 @@ class DocumentUploadSerializer(serializers.ModelSerializer):
         folder = attrs.get('folder')
         department = attrs.get('department')
 
+        # If department not specified, default to user's department
+        if not department:
+            if folder and folder.department:
+                # Use folder's department
+                attrs['department'] = folder.department
+            elif request.user.department:
+                # Use user's department
+                attrs['department'] = request.user.department
+            else:
+                raise serializers.ValidationError({
+                    'department': 'Department is required. User has no assigned department.'
+                })
+
         # Ensure user has access to the specified folder
         if folder and folder.department != request.user.department:
             if not request.user.is_staff:
@@ -221,14 +256,10 @@ class DocumentUploadSerializer(serializers.ModelSerializer):
                 })
 
         # Ensure department matches folder's department
-        if folder and department and folder.department != department:
+        if folder and attrs.get('department') and folder.department != attrs.get('department'):
             raise serializers.ValidationError({
                 'department': 'Department must match the folder\'s department'
             })
-
-        # If department not specified, use folder's department
-        if folder and not department:
-            attrs['department'] = folder.department
 
         return attrs
 
@@ -238,20 +269,54 @@ class DocumentUploadSerializer(serializers.ModelSerializer):
         Uploads file to MinIO for secure storage.
         """
         from apps.storage.services import storage_service
+        import logging
+        logger = logging.getLogger(__name__)
 
         request = self.context.get('request')
+
+        # Debug: Print what's in validated_data BEFORE popping
+        print(f"DEBUG - validated_data keys BEFORE pop: {list(validated_data.keys())}")
+        for key, value in validated_data.items():
+            print(f"DEBUG - {key}: {type(value).__name__}")
+
         tags_data = validated_data.pop('tags', [])
-        uploaded_file = validated_data.pop('file')
+        uploaded_file = validated_data.pop('file', None)
+
+        if uploaded_file is None:
+            raise serializers.ValidationError({'file': 'No file provided'})
+
+        # Debug: Print what's in validated_data AFTER popping
+        print(f"DEBUG - validated_data keys AFTER pop: {list(validated_data.keys())}")
 
         # Calculate checksum
         checksum = Document.calculate_checksum(uploaded_file)
         uploaded_file.seek(0)  # Reset file pointer after checksum calculation
 
         # Check for duplicate files (same checksum)
-        existing_doc = Document.objects.filter(checksum=checksum).first()
+        existing_doc = Document.objects.select_related('folder', 'department').filter(
+            checksum=checksum, is_deleted=False
+        ).first()
         if existing_doc:
+            # Provide detailed information about the existing document
+            # so frontend can offer to create a shortcut
+            error_data = {
+                'code': 'DUPLICATE_FILE',
+                'message': f'This file already exists: {existing_doc.title}',
+                'existing_document': {
+                    'id': str(existing_doc.id),
+                    'title': existing_doc.title,
+                    'file_name': existing_doc.file_name,
+                    'folder_id': str(existing_doc.folder_id) if existing_doc.folder_id else None,
+                    'folder_name': existing_doc.folder.name if existing_doc.folder else None,
+                    'folder_path': existing_doc.folder.path if existing_doc.folder else None,
+                    'confidentiality_level': existing_doc.confidentiality_level,
+                    'document_type': existing_doc.document_type,
+                },
+                'suggestion': 'You can create a shortcut to reference this document in the target folder instead of uploading a duplicate.',
+                'can_create_shortcut': True,
+            }
             raise serializers.ValidationError({
-                'file': f'This file already exists: {existing_doc.title} (ID: {existing_doc.id})'
+                'file': error_data
             })
 
         # Extract file metadata
@@ -259,20 +324,37 @@ class DocumentUploadSerializer(serializers.ModelSerializer):
         file_size = uploaded_file.size
         file_type = mimetypes.guess_type(file_name)[0] or 'application/octet-stream'
 
-        # Create document instance (without file for now)
-        document = Document.objects.create(
-            **validated_data,
-            file_name=file_name,
-            file_size=file_size,
-            file_type=file_type,
-            checksum=checksum,
-            owner=request.user,
-            created_by=request.user,
-            version_number=1
-        )
+        # Debug: Print validated_data right before create
+        print(f"DEBUG - About to create Document with keys: {list(validated_data.keys())}")
+        for k, v in validated_data.items():
+            print(f"DEBUG - Field '{k}': type={type(v).__name__}, value={repr(v)[:50]}")
 
-        # Upload file to MinIO
+        document = None
         try:
+            # Temporarily disconnect signals to avoid serialization issues during initial create
+            from django.db.models.signals import post_save
+            from apps.documents.signals import update_document_index, log_document_save
+
+            post_save.disconnect(update_document_index, sender=Document)
+            post_save.disconnect(log_document_save, sender=Document)
+
+            try:
+                # Create document instance (without file - file goes to MinIO)
+                document = Document.objects.create(
+                    **validated_data,
+                    file_name=file_name,
+                    file_size=file_size,
+                    file_type=file_type,
+                    checksum=checksum,
+                    owner=request.user,
+                    created_by=request.user,
+                    version_number=1
+                )
+                print(f"DEBUG - Document created with id: {document.id}")
+            finally:
+                # Reconnect signals
+                post_save.connect(update_document_index, sender=Document)
+                post_save.connect(log_document_save, sender=Document)
             result = storage_service.upload_file(
                 file_obj=uploaded_file,
                 organization_id=str(request.user.organization.id),
@@ -296,16 +378,59 @@ class DocumentUploadSerializer(serializers.ModelSerializer):
                 document.save(update_fields=['minio_bucket', 'minio_object_key', 'minio_etag', 'file_type'])
             else:
                 # If MinIO upload fails, delete the document and raise error
-                document.delete()
+                if document.id:
+                    document.delete()
                 raise serializers.ValidationError({
                     'file': f'Failed to upload file to storage: {result.get("error", "Unknown error")}'
                 })
 
-        except Exception as e:
-            # Clean up on error
-            document.delete()
+        except serializers.ValidationError as ve:
+            # Re-raise validation errors - extract message to avoid serialization issues
+            if document and document.id:
+                document.delete()
+            # Extract the actual error message from ValidationError
+            if hasattr(ve, 'detail'):
+                error_detail = ve.detail
+                if isinstance(error_detail, dict):
+                    # Flatten nested error messages
+                    messages = []
+                    for key, value in error_detail.items():
+                        if isinstance(value, list):
+                            messages.extend([str(v) for v in value])
+                        else:
+                            messages.append(str(value))
+                    error_message = '; '.join(messages)
+                else:
+                    error_message = str(error_detail)
+            else:
+                error_message = str(ve)
             raise serializers.ValidationError({
-                'file': f'Storage error: {str(e)}'
+                'file': error_message
+            })
+        except TypeError as te:
+            # Handle serialization errors (like FieldFile not JSON serializable)
+            import traceback
+            print(f"TypeError during upload: {te}")
+            print(f"Full traceback:\n{traceback.format_exc()}")
+            if document and document.id:
+                document.delete()
+            raise serializers.ValidationError({
+                'file': f'Upload error: {te.__class__.__name__} - {str(te)}'
+            })
+        except Exception as e:
+            # Clean up on error - only delete if document was saved
+            import traceback
+            print(f"Exception during upload: {e}")
+            print(f"Full traceback:\n{traceback.format_exc()}")
+            if document and document.id:
+                document.delete()
+            # Extract error message safely - avoid serialization issues
+            try:
+                error_message = str(e)
+            except Exception:
+                error_message = e.__class__.__name__
+            raise serializers.ValidationError({
+                'file': f'Storage error: {error_message}'
             })
 
         # Apply tags
@@ -817,10 +942,10 @@ class BulkMoveSerializer(serializers.Serializer):
 
         # Check target folder exists
         try:
-            target_folder = Folder.objects.get(pk=target_folder_id, is_deleted=False)
+            target_folder = Folder.objects.get(pk=target_folder_id)
         except Folder.DoesNotExist:
             raise serializers.ValidationError({
-                'target_folder_id': 'Target folder does not exist or is deleted'
+                'target_folder_id': 'Target folder does not exist'
             })
 
         # Check user has permission to target folder
@@ -893,10 +1018,10 @@ class BulkCopySerializer(serializers.Serializer):
 
         # Check target folder exists
         try:
-            target_folder = Folder.objects.get(pk=target_folder_id, is_deleted=False)
+            target_folder = Folder.objects.get(pk=target_folder_id)
         except Folder.DoesNotExist:
             raise serializers.ValidationError({
-                'target_folder_id': 'Target folder does not exist or is deleted'
+                'target_folder_id': 'Target folder does not exist'
             })
 
         # Check user has permission to target folder
@@ -1075,3 +1200,635 @@ class BulkExportSerializer(serializers.Serializer):
         attrs['total_size'] = total_size
 
         return attrs
+
+
+# ============================================================================
+# DOCUMENT SHORTCUT SERIALIZERS
+# ============================================================================
+
+class DocumentShortcutSerializer(serializers.ModelSerializer):
+    """
+    Serializer for DocumentShortcut model.
+
+    Provides read-only access to original document's metadata through proxy fields.
+    Includes is_shortcut flag for frontend identification.
+    """
+    # Original document metadata (read-only proxied fields)
+    title = serializers.CharField(source='original_document.title', read_only=True)
+    file_name = serializers.CharField(source='original_document.file_name', read_only=True)
+    file_size = serializers.IntegerField(source='original_document.file_size', read_only=True)
+    file_type = serializers.CharField(source='original_document.file_type', read_only=True)
+    document_type = serializers.CharField(source='original_document.document_type', read_only=True)
+    confidentiality_level = serializers.CharField(source='original_document.confidentiality_level', read_only=True)
+    version_number = serializers.IntegerField(source='original_document.version_number', read_only=True)
+    document_date = serializers.DateField(source='original_document.document_date', read_only=True)
+    checksum = serializers.CharField(source='original_document.checksum', read_only=True)
+
+    # Owner and department info - use SerializerMethodField for null safety
+    owner_id = serializers.SerializerMethodField()
+    owner_name = serializers.SerializerMethodField()
+    department_id = serializers.SerializerMethodField()
+    department_name = serializers.SerializerMethodField()
+
+    # Original location info - use SerializerMethodField for null safety
+    original_document_id = serializers.UUIDField(source='original_document.id', read_only=True)
+    original_folder_id = serializers.SerializerMethodField()
+    original_folder_name = serializers.SerializerMethodField()
+    original_folder_path = serializers.SerializerMethodField()
+
+    # Shortcut-specific fields
+    created_by_name = serializers.SerializerMethodField()
+    is_shortcut = serializers.SerializerMethodField()
+
+    # Tags from original document
+    tags = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DocumentShortcut
+        fields = [
+            # Shortcut identifiers
+            'id', 'folder', 'created_at', 'created_by', 'created_by_name',
+            # Original document metadata
+            'original_document_id', 'title', 'file_name', 'file_size', 'file_type',
+            'document_type', 'confidentiality_level', 'version_number',
+            'document_date', 'checksum',
+            # Owner and department
+            'owner_id', 'owner_name', 'department_id', 'department_name',
+            # Original location
+            'original_folder_id', 'original_folder_name', 'original_folder_path',
+            # Shortcut flag and tags
+            'is_shortcut', 'tags'
+        ]
+        read_only_fields = fields
+
+    def get_is_shortcut(self, obj):
+        """Always returns True - identifies this as a shortcut"""
+        return True
+
+    def get_tags(self, obj):
+        """Get tag names from original document"""
+        if obj.original_document:
+            return [dt.tag.name for dt in obj.original_document.document_tags.select_related('tag')]
+        return []
+
+    def get_owner_id(self, obj):
+        """Safely get owner ID"""
+        if obj.original_document and obj.original_document.owner:
+            return str(obj.original_document.owner.id)
+        return None
+
+    def get_owner_name(self, obj):
+        """Safely get owner name"""
+        if obj.original_document and obj.original_document.owner:
+            return obj.original_document.owner.get_full_name()
+        return None
+
+    def get_department_id(self, obj):
+        """Safely get department ID"""
+        if obj.original_document and obj.original_document.department:
+            return obj.original_document.department.id
+        return None
+
+    def get_department_name(self, obj):
+        """Safely get department name"""
+        if obj.original_document and obj.original_document.department:
+            return obj.original_document.department.name
+        return None
+
+    def get_original_folder_id(self, obj):
+        """Safely get original folder ID"""
+        if obj.original_document and obj.original_document.folder:
+            return str(obj.original_document.folder.id)
+        return None
+
+    def get_original_folder_name(self, obj):
+        """Safely get original folder name"""
+        if obj.original_document and obj.original_document.folder:
+            return obj.original_document.folder.name
+        return None
+
+    def get_original_folder_path(self, obj):
+        """Safely get original folder path"""
+        if obj.original_document and obj.original_document.folder:
+            return obj.original_document.folder.path
+        return None
+
+    def get_created_by_name(self, obj):
+        """Safely get created by name"""
+        if obj.created_by:
+            return obj.created_by.get_full_name()
+        return None
+
+
+class DocumentShortcutListSerializer(serializers.ModelSerializer):
+    """
+    Minimal serializer for listing shortcuts (optimized for performance).
+    """
+    title = serializers.CharField(source='original_document.title', read_only=True)
+    file_name = serializers.CharField(source='original_document.file_name', read_only=True)
+    file_size = serializers.IntegerField(source='original_document.file_size', read_only=True)
+    file_type = serializers.CharField(source='original_document.file_type', read_only=True)
+    document_type = serializers.CharField(source='original_document.document_type', read_only=True)
+    confidentiality_level = serializers.CharField(source='original_document.confidentiality_level', read_only=True)
+    original_document_id = serializers.UUIDField(source='original_document.id', read_only=True)
+    original_folder_id = serializers.SerializerMethodField()
+    original_folder_name = serializers.SerializerMethodField()
+    is_shortcut = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DocumentShortcut
+        fields = [
+            'id', 'folder', 'original_document_id', 'title', 'file_name',
+            'file_size', 'file_type', 'document_type', 'confidentiality_level',
+            'original_folder_id', 'original_folder_name', 'created_at', 'is_shortcut'
+        ]
+        read_only_fields = fields
+
+    def get_is_shortcut(self, obj):
+        return True
+
+    def get_original_folder_id(self, obj):
+        """Safely get original folder ID"""
+        if obj.original_document and obj.original_document.folder:
+            return str(obj.original_document.folder_id)
+        return None
+
+    def get_original_folder_name(self, obj):
+        """Safely get original folder name"""
+        if obj.original_document and obj.original_document.folder:
+            return obj.original_document.folder.name
+        return None
+
+
+class CreateShortcutSerializer(serializers.Serializer):
+    """
+    Serializer for creating a document shortcut.
+
+    Validates:
+    - Document exists and user has access
+    - Target folder exists and user has access
+    - Shortcut doesn't already exist in target folder
+    - Cannot create shortcut in same folder as original
+    """
+    document_id = serializers.UUIDField(
+        help_text='UUID of the document to create a shortcut for'
+    )
+    target_folder_id = serializers.UUIDField(
+        help_text='UUID of the folder where the shortcut will be created'
+    )
+
+    def validate(self, attrs):
+        """Validate document and folder access permissions"""
+        request = self.context['request']
+        user = request.user
+
+        document_id = attrs['document_id']
+        target_folder_id = attrs['target_folder_id']
+
+        # Check document exists
+        try:
+            document = Document.objects.select_related(
+                'folder', 'owner', 'department'
+            ).get(pk=document_id, is_deleted=False)
+        except Document.DoesNotExist:
+            raise serializers.ValidationError({
+                'document_id': 'Document does not exist or has been deleted'
+            })
+
+        # Check user has access to document
+        if not user.is_staff:
+            if document.department != user.department:
+                raise serializers.ValidationError({
+                    'document_id': 'You do not have permission to access this document'
+                })
+
+        # Check target folder exists
+        try:
+            target_folder = Folder.objects.get(pk=target_folder_id)
+        except Folder.DoesNotExist:
+            raise serializers.ValidationError({
+                'target_folder_id': 'Target folder does not exist'
+            })
+
+        # Check user has access to target folder
+        if not user.is_staff:
+            if target_folder.department != user.department:
+                raise serializers.ValidationError({
+                    'target_folder_id': 'You do not have permission to create shortcuts in this folder'
+                })
+
+        # Cannot create shortcut in same folder as original
+        if document.folder_id == target_folder_id:
+            raise serializers.ValidationError({
+                'target_folder_id': 'Cannot create a shortcut in the same folder as the original document'
+            })
+
+        # Check if shortcut already exists in target folder
+        if DocumentShortcut.objects.filter(
+            original_document=document,
+            folder=target_folder
+        ).exists():
+            raise serializers.ValidationError({
+                'target_folder_id': 'A shortcut to this document already exists in this folder'
+            })
+
+        attrs['document'] = document
+        attrs['target_folder'] = target_folder
+
+        return attrs
+
+    def create(self, validated_data):
+        """Create the document shortcut"""
+        request = self.context['request']
+
+        shortcut = DocumentShortcut.objects.create(
+            original_document=validated_data['document'],
+            folder=validated_data['target_folder'],
+            created_by=request.user
+        )
+
+        return shortcut
+
+
+class DocumentShortcutLocationSerializer(serializers.ModelSerializer):
+    """
+    Serializer for showing where shortcuts to a document exist.
+    Used when displaying shortcut locations in the UI.
+    """
+    folder_name = serializers.CharField(source='folder.name', read_only=True)
+    folder_path = serializers.CharField(source='folder.path', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+
+    class Meta:
+        model = DocumentShortcut
+        fields = ['id', 'folder', 'folder_name', 'folder_path', 'created_at', 'created_by_name']
+        read_only_fields = fields
+
+
+class BulkCreateShortcutSerializer(serializers.Serializer):
+    """
+    Serializer for creating shortcuts for multiple documents at once.
+    """
+    document_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        min_length=1,
+        max_length=50,
+        help_text='List of document UUIDs to create shortcuts for (max 50)'
+    )
+    target_folder_id = serializers.UUIDField(
+        help_text='UUID of the folder where shortcuts will be created'
+    )
+
+    def validate_document_ids(self, value):
+        """Validate all document IDs are unique"""
+        if len(value) != len(set(value)):
+            raise serializers.ValidationError('Duplicate document IDs found')
+        return value
+
+    def validate(self, attrs):
+        """Validate documents and folder access"""
+        request = self.context['request']
+        user = request.user
+
+        document_ids = attrs['document_ids']
+        target_folder_id = attrs['target_folder_id']
+
+        # Check target folder exists
+        try:
+            target_folder = Folder.objects.get(pk=target_folder_id)
+        except Folder.DoesNotExist:
+            raise serializers.ValidationError({
+                'target_folder_id': 'Target folder does not exist'
+            })
+
+        # Check user has access to target folder
+        if not user.is_staff:
+            if target_folder.department != user.department:
+                raise serializers.ValidationError({
+                    'target_folder_id': 'You do not have permission to create shortcuts in this folder'
+                })
+
+        # Check all documents exist
+        documents = Document.objects.filter(
+            pk__in=document_ids,
+            is_deleted=False
+        ).select_related('folder', 'department')
+
+        if documents.count() != len(document_ids):
+            raise serializers.ValidationError({
+                'document_ids': 'Some documents do not exist or have been deleted'
+            })
+
+        # Check permissions for each document
+        if not user.is_staff:
+            for doc in documents:
+                if doc.department != user.department:
+                    raise serializers.ValidationError({
+                        'document_ids': f'You do not have permission to access document {doc.id}'
+                    })
+
+        # Filter out documents already in target folder or with existing shortcuts
+        valid_documents = []
+        skipped = {
+            'same_folder': [],
+            'already_exists': []
+        }
+
+        existing_shortcuts = set(
+            DocumentShortcut.objects.filter(
+                original_document__in=documents,
+                folder=target_folder
+            ).values_list('original_document_id', flat=True)
+        )
+
+        for doc in documents:
+            if str(doc.folder_id) == str(target_folder_id):
+                skipped['same_folder'].append(str(doc.id))
+            elif doc.id in existing_shortcuts:
+                skipped['already_exists'].append(str(doc.id))
+            else:
+                valid_documents.append(doc)
+
+        attrs['documents'] = valid_documents
+        attrs['target_folder'] = target_folder
+        attrs['skipped'] = skipped
+
+        return attrs
+
+    def create(self, validated_data):
+        """Create shortcuts for all valid documents"""
+        request = self.context['request']
+        shortcuts = []
+
+        for document in validated_data['documents']:
+            shortcut = DocumentShortcut.objects.create(
+                original_document=document,
+                folder=validated_data['target_folder'],
+                created_by=request.user
+            )
+            shortcuts.append(shortcut)
+
+        return {
+            'created': shortcuts,
+            'skipped': validated_data['skipped']
+        }
+
+
+# ============================================================================
+# RECENT ACTIVITY SERIALIZERS
+# ============================================================================
+
+class RecentActivitySerializer(serializers.ModelSerializer):
+    """
+    Serializer for RecentActivity model.
+
+    Provides full details of recent activities including:
+    - Activity type (VIEWED, EDITED, UPLOADED, DOWNLOADED, SHARED)
+    - Resource information (document or folder)
+    - Time grouping helper fields
+    - Pinning status
+    """
+    user_name = serializers.SerializerMethodField()
+    user_email = serializers.SerializerMethodField()
+    time_group = serializers.SerializerMethodField()
+    relative_time = serializers.SerializerMethodField()
+    can_pin = serializers.SerializerMethodField()
+
+    class Meta:
+        model = RecentActivity
+        fields = [
+            'id', 'user', 'user_name', 'user_email',
+            'resource_type', 'resource_id', 'resource_name',
+            'activity_type', 'timestamp',
+            'file_type', 'file_size', 'folder_id', 'folder_name', 'folder_path',
+            'confidentiality_level',
+            'is_pinned', 'pinned_at',
+            'time_group', 'relative_time', 'can_pin'
+        ]
+        read_only_fields = fields
+
+    def get_user_name(self, obj):
+        """Get full name of the user"""
+        if obj.user:
+            return obj.user.get_full_name() or obj.user.username
+        return None
+
+    def get_user_email(self, obj):
+        """Get email of the user"""
+        if obj.user:
+            return obj.user.email
+        return None
+
+    def get_time_group(self, obj):
+        """
+        Get time group for UI grouping.
+        Returns: 'today', 'yesterday', 'this_week', 'last_week', 'this_month', 'older'
+        """
+        from django.utils import timezone
+        from datetime import timedelta
+
+        now = timezone.now()
+        timestamp = obj.timestamp
+
+        # Calculate date boundaries
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        yesterday_start = today_start - timedelta(days=1)
+        week_start = today_start - timedelta(days=today_start.weekday())
+        last_week_start = week_start - timedelta(days=7)
+        month_start = today_start.replace(day=1)
+
+        if timestamp >= today_start:
+            return 'today'
+        elif timestamp >= yesterday_start:
+            return 'yesterday'
+        elif timestamp >= week_start:
+            return 'this_week'
+        elif timestamp >= last_week_start:
+            return 'last_week'
+        elif timestamp >= month_start:
+            return 'this_month'
+        else:
+            return 'older'
+
+    def get_relative_time(self, obj):
+        """
+        Get human-readable relative time string.
+        Examples: '2 minutes ago', '1 hour ago', 'Yesterday at 3:45 PM'
+        """
+        from django.utils import timezone
+        from datetime import timedelta
+
+        now = timezone.now()
+        diff = now - obj.timestamp
+
+        if diff < timedelta(minutes=1):
+            return 'Just now'
+        elif diff < timedelta(hours=1):
+            minutes = int(diff.total_seconds() / 60)
+            return f'{minutes} minute{"s" if minutes != 1 else ""} ago'
+        elif diff < timedelta(days=1):
+            hours = int(diff.total_seconds() / 3600)
+            return f'{hours} hour{"s" if hours != 1 else ""} ago'
+        elif diff < timedelta(days=2):
+            return f'Yesterday at {obj.timestamp.strftime("%I:%M %p")}'
+        elif diff < timedelta(days=7):
+            return obj.timestamp.strftime('%A at %I:%M %p')
+        else:
+            return obj.timestamp.strftime('%b %d, %Y')
+
+    def get_can_pin(self, obj):
+        """Check if this activity can be pinned"""
+        can_pin, _ = obj.can_pin()
+        return can_pin
+
+
+class RecentActivityListSerializer(serializers.ModelSerializer):
+    """
+    Minimal serializer for listing recent activities (optimized for performance).
+    """
+    time_group = serializers.SerializerMethodField()
+    relative_time = serializers.SerializerMethodField()
+
+    class Meta:
+        model = RecentActivity
+        fields = [
+            'id', 'resource_type', 'resource_id', 'resource_name',
+            'activity_type', 'timestamp',
+            'file_type', 'file_size', 'folder_path',
+            'confidentiality_level',
+            'is_pinned',
+            'time_group', 'relative_time'
+        ]
+        read_only_fields = fields
+
+    def get_time_group(self, obj):
+        """Get time group for UI grouping"""
+        from django.utils import timezone
+        from datetime import timedelta
+
+        now = timezone.now()
+        timestamp = obj.timestamp
+
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        yesterday_start = today_start - timedelta(days=1)
+        week_start = today_start - timedelta(days=today_start.weekday())
+        last_week_start = week_start - timedelta(days=7)
+        month_start = today_start.replace(day=1)
+
+        if timestamp >= today_start:
+            return 'today'
+        elif timestamp >= yesterday_start:
+            return 'yesterday'
+        elif timestamp >= week_start:
+            return 'this_week'
+        elif timestamp >= last_week_start:
+            return 'last_week'
+        elif timestamp >= month_start:
+            return 'this_month'
+        else:
+            return 'older'
+
+    def get_relative_time(self, obj):
+        """Get human-readable relative time"""
+        from django.utils import timezone
+        from datetime import timedelta
+
+        now = timezone.now()
+        diff = now - obj.timestamp
+
+        if diff < timedelta(minutes=1):
+            return 'Just now'
+        elif diff < timedelta(hours=1):
+            minutes = int(diff.total_seconds() / 60)
+            return f'{minutes}m ago'
+        elif diff < timedelta(days=1):
+            hours = int(diff.total_seconds() / 3600)
+            return f'{hours}h ago'
+        elif diff < timedelta(days=2):
+            return 'Yesterday'
+        elif diff < timedelta(days=7):
+            return obj.timestamp.strftime('%A')
+        else:
+            return obj.timestamp.strftime('%b %d')
+
+
+class RecentActivityPinSerializer(serializers.Serializer):
+    """
+    Serializer for pinning/unpinning a recent activity.
+    """
+    is_pinned = serializers.BooleanField(
+        required=True,
+        help_text='True to pin, False to unpin'
+    )
+
+    def validate(self, attrs):
+        """Validate pin operation"""
+        activity = self.context.get('activity')
+        is_pinned = attrs['is_pinned']
+
+        if is_pinned:
+            # Check if can pin
+            can_pin, reason = activity.can_pin()
+            if not can_pin:
+                raise serializers.ValidationError({'is_pinned': reason})
+        else:
+            # Check if item is actually pinned
+            if not activity.is_pinned:
+                raise serializers.ValidationError({'is_pinned': 'Item is not pinned'})
+
+        return attrs
+
+
+class RecentActivityClearSerializer(serializers.Serializer):
+    """
+    Serializer for clearing recent activity history by date range.
+    """
+    before_date = serializers.DateTimeField(
+        required=True,
+        help_text='Clear activities before this date/time (ISO 8601 format)'
+    )
+    activity_type = serializers.ChoiceField(
+        choices=RecentActivity.ActivityType.choices,
+        required=False,
+        allow_null=True,
+        help_text='Optionally filter by activity type'
+    )
+    resource_type = serializers.ChoiceField(
+        choices=RecentActivity.ResourceType.choices,
+        required=False,
+        allow_null=True,
+        help_text='Optionally filter by resource type (DOCUMENT or FOLDER)'
+    )
+    exclude_pinned = serializers.BooleanField(
+        default=True,
+        help_text='Whether to exclude pinned items from clearing (default: True)'
+    )
+
+    def validate_before_date(self, value):
+        """Ensure date is not in the future"""
+        from django.utils import timezone
+
+        if value > timezone.now():
+            raise serializers.ValidationError('Cannot clear future activities')
+        return value
+
+
+class RecentActivityStatsSerializer(serializers.Serializer):
+    """
+    Serializer for activity statistics response.
+    """
+    total = serializers.IntegerField()
+    by_type = serializers.DictField(
+        child=serializers.IntegerField(),
+        help_text='Count of activities by type (VIEWED, EDITED, etc.)'
+    )
+    by_resource_type = serializers.DictField(
+        child=serializers.IntegerField(),
+        help_text='Count of activities by resource type (DOCUMENT, FOLDER)'
+    )
+    by_day = serializers.ListField(
+        child=serializers.DictField(),
+        help_text='Count of activities by day for the last 30 days'
+    )
+    pinned_count = serializers.IntegerField()
+    pinned_limit = serializers.IntegerField()

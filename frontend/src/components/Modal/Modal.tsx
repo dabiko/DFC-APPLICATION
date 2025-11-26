@@ -142,7 +142,7 @@ export function Modal({
 
                 {/* Footer */}
                 {footer && (
-                  <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-800 flex justify-end gap-3">
+                  <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-800 flex items-center gap-3">
                     {footer}
                   </div>
                 )}

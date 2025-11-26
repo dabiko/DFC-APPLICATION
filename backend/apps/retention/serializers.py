@@ -116,7 +116,7 @@ class LegalHoldDocumentSerializer(serializers.ModelSerializer):
 class LegalHoldSerializer(serializers.ModelSerializer):
     """Serializer for legal holds"""
 
-    placed_by_name = serializers.SerializerMethodField()
+    created_by_name = serializers.SerializerMethodField()
     released_by_name = serializers.SerializerMethodField()
     document_count = serializers.SerializerMethodField()
     held_documents = LegalHoldDocumentSerializer(many=True, read_only=True)
@@ -126,31 +126,34 @@ class LegalHoldSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'case_number',
-            'case_name',
-            'description',
+            'title',
+            'reason',
+            'start_date',
+            'end_date',
             'is_active',
-            'placed_by',
-            'placed_by_name',
-            'placed_at',
+            'created_by',
+            'created_by_name',
+            'created_at',
+            'updated_at',
             'released_by',
             'released_by_name',
             'released_at',
-            'notes',
             'document_count',
             'held_documents',
         ]
         read_only_fields = [
             'id',
-            'placed_by',
-            'placed_at',
+            'created_by',
+            'created_at',
+            'updated_at',
             'released_by',
             'released_at',
         ]
 
-    def get_placed_by_name(self, obj):
-        """Get user who placed the hold"""
-        if obj.placed_by:
-            return obj.placed_by.get_full_name() or obj.placed_by.username
+    def get_created_by_name(self, obj):
+        """Get user who created the hold"""
+        if obj.created_by:
+            return obj.created_by.get_full_name() or obj.created_by.username
         return None
 
     def get_released_by_name(self, obj):

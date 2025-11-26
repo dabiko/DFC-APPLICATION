@@ -10,7 +10,7 @@ import { LayoutDashboard, Search, ChevronLeft, ChevronRight } from 'lucide-react
 import { FolderSidebar } from '@components/Folder'
 import { cn } from '@utils/cn'
 
-// Minimal quick links (Dashboard + Search only)
+// Quick links - Favorites, Recent, and Trash are in Smart Folders section
 const quickLinks = [
   { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { path: '/search', icon: Search, label: 'Global Search' },
@@ -112,7 +112,7 @@ export function DashboardSidebar({
               title={isCollapsed ? item.label : undefined}
             >
               <item.icon className="w-5 h-5 flex-shrink-0" />
-              {!isCollapsed && <span>{item.label}</span>}
+              {!isCollapsed && <span className="flex-1">{item.label}</span>}
 
               {/* Tooltip for collapsed state */}
               {isCollapsed && (

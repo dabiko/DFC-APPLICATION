@@ -171,10 +171,15 @@ class LegalHold(models.Model):
     - Audit trail of placement and release
     """
 
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    # Using BigAutoField to match existing DB schema (bigint with auto-increment)
+    id = models.BigAutoField(primary_key=True)
     case_number = models.CharField(max_length=200, unique=True, db_index=True)
-    case_name = models.CharField(max_length=500)  # Display name for the case
-    description = models.TextField()
+    title = models.CharField(max_length=500)  # Display name for the case
+    reason = models.TextField()  # Why the hold was placed
+
+    # Hold period
+    start_date = models.DateField()  # When the hold starts
+    end_date = models.DateField(null=True, blank=True)  # Optional end date
 
     # Documents under hold (many-to-many through LegalHoldDocument)
     documents = models.ManyToManyField(
@@ -187,13 +192,13 @@ class LegalHold(models.Model):
     is_active = models.BooleanField(default=True, db_index=True)
 
     # Audit
-    placed_by = models.ForeignKey(
+    created_by = models.ForeignKey(
         User,
-        on_delete=models.SET_NULL,
-        null=True,
-        related_name='placed_legal_holds'
+        on_delete=models.CASCADE,
+        related_name='created_legal_holds'
     )
-    placed_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     released_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -203,12 +208,9 @@ class LegalHold(models.Model):
     )
     released_at = models.DateTimeField(null=True, blank=True)
 
-    # Notes
-    notes = models.TextField(blank=True)
-
     class Meta:
         db_table = 'legal_holds'
-        ordering = ['-placed_at']
+        ordering = ['-created_at']
         verbose_name = 'Legal Hold'
         verbose_name_plural = 'Legal Holds'
 

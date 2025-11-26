@@ -89,6 +89,7 @@ def model_to_dict(instance, exclude_fields=None):
     """
     from uuid import UUID
     from decimal import Decimal
+    from django.db.models.fields.files import FieldFile
 
     if exclude_fields is None:
         exclude_fields = []
@@ -103,6 +104,8 @@ def model_to_dict(instance, exclude_fields=None):
         # Handle special field types for JSON serialization
         if value is None:
             pass  # Keep None as is
+        elif isinstance(value, FieldFile):  # FileField - convert to string path or None
+            value = value.name if value else None
         elif isinstance(value, UUID):  # UUID fields
             value = str(value)
         elif hasattr(value, 'isoformat'):  # DateTime fields

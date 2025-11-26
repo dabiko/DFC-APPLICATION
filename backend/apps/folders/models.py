@@ -75,6 +75,31 @@ class Folder(models.Model):
     # Metadata
     description = models.TextField(blank=True)
 
+    # Lock status
+    is_locked = models.BooleanField(
+        default=False,
+        help_text='If True, folder and its contents cannot be modified or deleted'
+    )
+
+    # Soft delete / Trash
+    is_deleted = models.BooleanField(
+        default=False,
+        help_text='If True, folder is in trash'
+    )
+    deleted_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='When the folder was moved to trash'
+    )
+    deleted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='folders_deleted',
+        help_text='User who deleted this folder'
+    )
+
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -94,6 +119,8 @@ class Folder(models.Model):
             models.Index(fields=['owner']),
             models.Index(fields=['department']),
             models.Index(fields=['created_at']),
+            models.Index(fields=['is_deleted']),
+            models.Index(fields=['deleted_at']),
         ]
         unique_together = ['parent', 'name']
         ordering = ['path', 'name']
@@ -157,6 +184,113 @@ class Folder(models.Model):
     def is_ancestor_of(self, folder):
         """Check if this folder is an ancestor of the given folder"""
         return folder.path.startswith(self.path) and folder.id != self.id
+
+    def soft_delete(self, user):
+        """
+        Move folder and all its contents to trash.
+
+        This marks the folder and all descendant folders as deleted.
+        Documents within these folders are also marked as deleted.
+        """
+        from django.utils import timezone
+        from apps.documents.models import Document
+
+        now = timezone.now()
+
+        # Mark this folder as deleted
+        self.is_deleted = True
+        self.deleted_at = now
+        self.deleted_by = user
+        self.save(update_fields=['is_deleted', 'deleted_at', 'deleted_by'])
+
+        # Mark all descendant folders as deleted
+        descendant_folders = self.get_descendants()
+        descendant_folders.update(
+            is_deleted=True,
+            deleted_at=now,
+            deleted_by=user
+        )
+
+        # Mark all documents in this folder and descendants as deleted
+        # Note: Document model only has is_deleted and deleted_at, not deleted_by
+        folder_ids = [self.id] + list(descendant_folders.values_list('id', flat=True))
+        Document.objects.filter(
+            folder_id__in=folder_ids,
+            is_deleted=False
+        ).update(
+            is_deleted=True,
+            deleted_at=now
+        )
+
+        return True
+
+    def restore(self, user):
+        """
+        Restore folder and all its contents from trash.
+
+        This unmarks the folder and all descendant folders as deleted.
+        Documents within these folders are also restored.
+        """
+        from apps.documents.models import Document
+
+        # Check if parent folder exists and is not deleted
+        if self.parent and self.parent.is_deleted:
+            raise ValueError("Cannot restore folder: parent folder is still in trash")
+
+        # Restore this folder
+        self.is_deleted = False
+        self.deleted_at = None
+        self.deleted_by = None
+        self.save(update_fields=['is_deleted', 'deleted_at', 'deleted_by'])
+
+        # Restore all descendant folders
+        descendant_folders = Folder.objects.filter(
+            path__startswith=self.path,
+            is_deleted=True
+        ).exclude(id=self.id)
+        descendant_folders.update(
+            is_deleted=False,
+            deleted_at=None,
+            deleted_by=None
+        )
+
+        # Restore all documents that were deleted at the same time
+        # Note: Document model only has is_deleted and deleted_at, not deleted_by
+        folder_ids = [self.id] + list(descendant_folders.values_list('id', flat=True))
+        Document.objects.filter(
+            folder_id__in=folder_ids,
+            is_deleted=True
+        ).update(
+            is_deleted=False,
+            deleted_at=None
+        )
+
+        return True
+
+    def permanent_delete(self):
+        """
+        Permanently delete folder and all its contents.
+
+        This should only be called on folders that are already in trash.
+        WARNING: This action is irreversible!
+        """
+        from apps.documents.models import Document
+
+        # Get all descendant folder IDs
+        folder_ids = [self.id] + list(self.get_descendants().values_list('id', flat=True))
+
+        # Delete all documents in these folders (this will also delete files from storage)
+        documents = Document.objects.filter(folder_id__in=folder_ids)
+        for doc in documents:
+            doc.delete()  # This triggers the document's delete method to clean up storage
+
+        # Delete all descendant folders first (to avoid FK constraint issues)
+        Folder.objects.filter(id__in=folder_ids).exclude(id=self.id).delete()
+
+        # Delete this folder
+        self.delete()
+
+        return True
 
 
 class FolderTemplate(models.Model):

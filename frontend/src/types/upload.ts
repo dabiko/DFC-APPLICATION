@@ -13,10 +13,33 @@ export type UploadStatus =
   | 'completed'
   | 'error'
   | 'cancelled'
+  | 'duplicate'
 
 /**
  * File Upload Item
  */
+/**
+ * Duplicate file info when upload is blocked
+ */
+export interface DuplicateFileInfo {
+  /** ID of the existing document */
+  documentId: string
+  /** Title of the existing document */
+  title: string
+  /** File name of the existing document */
+  fileName: string
+  /** Folder ID where the existing document lives */
+  folderId: string | null
+  /** Folder name where the existing document lives */
+  folderName: string | null
+  /** Full path to the folder */
+  folderPath: string | null
+  /** Confidentiality level */
+  confidentialityLevel: string
+  /** Document type */
+  documentType: string
+}
+
 export interface FileUploadItem {
   /** Unique ID for this upload */
   id: string
@@ -40,6 +63,8 @@ export interface FileUploadItem {
   uploadSpeed?: number
   /** Time remaining (seconds) */
   timeRemaining?: number
+  /** Duplicate file info (when upload blocked due to existing file) */
+  duplicateInfo?: DuplicateFileInfo
 }
 
 /**
@@ -156,6 +181,8 @@ export interface FileUploadProgressProps {
   onRetry?: (id: string) => void
   /** Callback to remove from list */
   onRemove?: (id: string) => void
+  /** Callback to create shortcut (when duplicate detected) */
+  onCreateShortcut?: (id: string, documentId: string) => void
   /** Show details */
   showDetails?: boolean
   /** Custom class name */

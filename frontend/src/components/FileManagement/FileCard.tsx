@@ -10,6 +10,7 @@ import {
   LockClosedIcon,
   ShareIcon,
   ClockIcon,
+  ArrowTopRightOnSquareIcon,
 } from '@heroicons/react/24/outline'
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid'
 import { cn } from '@utils/cn'
@@ -127,7 +128,10 @@ export const FileCard: FC<FileCardProps> = ({
         {showActions && (
           <button
             onClick={handleFavoriteClick}
-            className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+            className={cn(
+              'absolute top-2 right-2 z-10 transition-opacity',
+              item.isFavorite ? 'opacity-100' : 'opacity-50 group-hover:opacity-100'
+            )}
             title={item.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
           >
             {item.isFavorite ? (
@@ -139,7 +143,7 @@ export const FileCard: FC<FileCardProps> = ({
         )}
 
         {/* Preview/Icon */}
-        <div className="aspect-square bg-gray-100 dark:bg-gray-800 rounded-t-md overflow-hidden flex items-center justify-center p-4">
+        <div className="aspect-square bg-gray-100 dark:bg-gray-800 rounded-t-md overflow-hidden flex items-center justify-center p-4 relative">
           {isFolder ? (
             <FolderIcon className="w-20 h-20 text-blue-500" />
           ) : item.thumbnailUrl ? (
@@ -148,6 +152,15 @@ export const FileCard: FC<FileCardProps> = ({
             <span className="text-6xl">
               {getFileIcon({ name: item.name, type: item.mimeType || '' } as File)}
             </span>
+          )}
+          {/* Shortcut indicator overlay */}
+          {item.isShortcut && (
+            <div
+              className="absolute bottom-1 left-1 p-1 bg-white dark:bg-gray-900 rounded-full shadow-md"
+              title={`Shortcut to: ${item.originalFolderName || 'original location'}`}
+            >
+              <ArrowTopRightOnSquareIcon className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+            </div>
           )}
         </div>
 
@@ -218,7 +231,7 @@ export const FileCard: FC<FileCardProps> = ({
       )}
 
       {/* Icon/Thumbnail */}
-      <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center">
+      <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center relative">
         {isFolder ? (
           <FolderIcon className="w-8 h-8 text-blue-500" />
         ) : item.thumbnailUrl ? (
@@ -227,6 +240,15 @@ export const FileCard: FC<FileCardProps> = ({
           <span className="text-2xl">
             {getFileIcon({ name: item.name, type: item.mimeType || '' } as File)}
           </span>
+        )}
+        {/* Shortcut indicator for list view */}
+        {item.isShortcut && (
+          <div
+            className="absolute -bottom-1 -right-1 p-0.5 bg-white dark:bg-gray-900 rounded-full shadow-sm"
+            title={`Shortcut to: ${item.originalFolderName || 'original location'}`}
+          >
+            <ArrowTopRightOnSquareIcon className="w-3 h-3 text-primary-600 dark:text-primary-400" />
+          </div>
         )}
       </div>
 
@@ -237,6 +259,14 @@ export const FileCard: FC<FileCardProps> = ({
           <span className={getConfidentialityBadgeClass()}>
             {confidentialityIcon} {item.confidentialityLevel}
           </span>
+          {item.isShortcut && (
+            <span
+              className="text-xs text-primary-600 dark:text-primary-400 truncate max-w-[120px]"
+              title={`From: ${item.originalFolderName}`}
+            >
+              from {item.originalFolderName}
+            </span>
+          )}
           {item.isLocked && <LockClosedIcon className="w-3 h-3 text-gray-500" />}
           {item.isShared && <ShareIcon className="w-3 h-3 text-blue-500" />}
         </div>

@@ -47,7 +47,6 @@ export const FolderPropertiesModal: FC<FolderPropertiesModalProps> = ({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
-      onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-labelledby="folder-properties-title"
@@ -155,10 +154,10 @@ export const FolderPropertiesModal: FC<FolderPropertiesModalProps> = ({
                 <div className="col-span-2">
                   <span
                     className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
-                      confidentialityColors[folder.confidentiality]
+                      confidentialityColors[folder.confidentiality] || confidentialityColors.internal
                     }`}
                   >
-                    {confidentialityLabels[folder.confidentiality]}
+                    {confidentialityLabels[folder.confidentiality] || 'Internal'}
                   </span>
                 </div>
               </div>
@@ -213,7 +212,7 @@ export const FolderPropertiesModal: FC<FolderPropertiesModalProps> = ({
                 <span className="text-sm text-gray-600 dark:text-gray-400">Modified:</span>
                 <div className="col-span-2 text-sm text-gray-900 dark:text-gray-100">
                   <div>
-                    {new Date(folder.updatedAt).toLocaleString('en-US', {
+                    {new Date(folder.modifiedAt).toLocaleString('en-US', {
                       year: 'numeric',
                       month: 'long',
                       day: 'numeric',
@@ -222,7 +221,7 @@ export const FolderPropertiesModal: FC<FolderPropertiesModalProps> = ({
                     })}
                   </div>
                   <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                    ({formatDistanceToNow(new Date(folder.updatedAt), { addSuffix: true })})
+                    ({formatDistanceToNow(new Date(folder.modifiedAt), { addSuffix: true })})
                   </div>
                 </div>
               </div>
@@ -256,24 +255,29 @@ export const FolderPropertiesModal: FC<FolderPropertiesModalProps> = ({
               <div className="grid grid-cols-3 gap-4">
                 <span className="text-sm text-gray-600 dark:text-gray-400">Your permissions:</span>
                 <div className="col-span-2 flex flex-wrap gap-1.5">
-                  {folder.permissions.canView && (
+                  {folder.permissions?.canView && (
                     <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded">
                       View
                     </span>
                   )}
-                  {folder.permissions.canEdit && (
+                  {folder.permissions?.canEdit && (
                     <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs rounded">
                       Edit
                     </span>
                   )}
-                  {folder.permissions.canDelete && (
+                  {folder.permissions?.canDelete && (
                     <span className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-xs rounded">
                       Delete
                     </span>
                   )}
-                  {folder.permissions.canManage && (
+                  {folder.permissions?.canManage && (
                     <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs rounded">
                       Manage
+                    </span>
+                  )}
+                  {!folder.permissions && (
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      No permissions data available
                     </span>
                   )}
                 </div>

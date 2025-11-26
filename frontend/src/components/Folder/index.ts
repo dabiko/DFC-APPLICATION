@@ -37,3 +37,6 @@ export { FolderSidebar } from './FolderSidebar'
 
 export { SmartFolderItem } from './SmartFolderItem'
 export type { SmartFolderItemProps } from './SmartFolderItem'
+
+export { ShareFolderModal } from './ShareFolderModal'
+export type { ShareFolderModalProps, FolderPermissionLevel, FolderShareData } from './ShareFolderModal'

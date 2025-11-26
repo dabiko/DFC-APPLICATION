@@ -50,10 +50,10 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',  # CORS middleware - must be first!
     'django.middleware.security.SecurityMiddleware',
     'apps.core.middleware.SecurityHeadersMiddleware',  # Security headers
     'django.middleware.gzip.GZipMiddleware',  # Response compression
-    'corsheaders.middleware.CorsMiddleware',  # CORS middleware
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -126,7 +126,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Africa/Douala'
 USE_I18N = True
 USE_TZ = True
 
@@ -225,8 +225,8 @@ CACHES = {
 
 # MinIO Storage Configuration with Encryption
 DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-AWS_ACCESS_KEY_ID = os.getenv('MINIO_ACCESS_KEY', 'minioadmin')
-AWS_SECRET_ACCESS_KEY = os.getenv('MINIO_SECRET_KEY', 'minioadmin123')
+AWS_ACCESS_KEY_ID = os.getenv('MINIO_ACCESS_KEY', 'dfc_minio_admin')
+AWS_SECRET_ACCESS_KEY = os.getenv('MINIO_SECRET_KEY', 'dfc_minio_password_2025')
 AWS_STORAGE_BUCKET_NAME = os.getenv('MINIO_BUCKET_NAME', 'dfc-documents')
 AWS_S3_ENDPOINT_URL = f"http://{os.getenv('MINIO_ENDPOINT', 'localhost:9000')}"
 AWS_S3_USE_SSL = os.getenv('MINIO_USE_SSL', 'False') == 'True'
@@ -236,8 +236,10 @@ AWS_S3_SIGNATURE_VERSION = 's3v4'
 AWS_S3_FILE_OVERWRITE = False
 
 # Server-side encryption for MinIO/S3
-AWS_S3_ENCRYPTION = True
-AWS_S3_SERVER_SIDE_ENCRYPTION = 'AES256'  # Use AES-256 encryption
+# Set to True only if MinIO has KMS configured (requires Vault or KES setup)
+# For local development without KMS, keep this False
+AWS_S3_ENCRYPTION = os.getenv('AWS_S3_ENCRYPTION', 'False') == 'True'
+AWS_S3_SERVER_SIDE_ENCRYPTION = 'AES256'  # Use AES-256 encryption when enabled
 
 # Security settings
 AWS_QUERYSTRING_AUTH = True  # Use signed URLs

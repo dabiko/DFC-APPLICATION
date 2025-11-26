@@ -99,7 +99,7 @@ export const CreateFolderModal: FC<CreateFolderModalProps> = ({
     }
   }
 
-  const handleClose = (_e?: React.MouseEvent) => {
+  const handleClose = () => {
     // Don't close if template selector is open
     if (showTemplateSelector) {
       return
@@ -110,12 +110,18 @@ export const CreateFolderModal: FC<CreateFolderModalProps> = ({
     }
   }
 
+  // Handle backdrop click - don't close modal
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    // Prevent closing on backdrop click
+    e.stopPropagation()
+  }
+
   if (!isOpen) return null
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/10 backdrop-blur-sm"
-      onClick={handleClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      onClick={handleBackdropClick}
       role="dialog"
       aria-modal="true"
       aria-labelledby="create-folder-title"

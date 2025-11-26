@@ -10,7 +10,12 @@ import {
   ArrowRightIcon,
   TrashIcon,
   InformationCircleIcon,
+  ShareIcon,
+  LockClosedIcon,
+  LockOpenIcon,
+  StarIcon,
 } from '@heroicons/react/24/outline'
+import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid'
 import type { Folder, FolderOperation } from '@/types/folder'
 
 export interface FolderContextMenuProps {
@@ -190,7 +195,45 @@ export const FolderContextMenu: FC<FolderContextMenuProps> = ({
         shortcut="Ctrl+X"
       />
 
+      {/* Share */}
+      <ContextMenuItem
+        label="Share"
+        icon={<ShareIcon className="w-5 h-5" />}
+        onClick={() => onAction('share')}
+        disabled={!canManage}
+      />
+
+      {/* Add to Favorites */}
+      <ContextMenuItem
+        label={folder.isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}
+        icon={
+          folder.isFavorite ? (
+            <StarIconSolid className="w-5 h-5 text-yellow-500" />
+          ) : (
+            <StarIcon className="w-5 h-5" />
+          )
+        }
+        onClick={() => onAction('favorite')}
+      />
+
       <ContextMenuDivider />
+
+      {/* Lock/Unlock */}
+      {folder.isLocked ? (
+        <ContextMenuItem
+          label="Unlock Folder"
+          icon={<LockOpenIcon className="w-5 h-5" />}
+          onClick={() => onAction('unlock')}
+          disabled={!canManage}
+        />
+      ) : (
+        <ContextMenuItem
+          label="Lock Folder"
+          icon={<LockClosedIcon className="w-5 h-5" />}
+          onClick={() => onAction('lock')}
+          disabled={!canManage}
+        />
+      )}
 
       {/* Properties */}
       <ContextMenuItem
@@ -210,23 +253,6 @@ export const FolderContextMenu: FC<FolderContextMenuProps> = ({
         danger
         shortcut="Del"
       />
-
-      {/* Locked folder indicator */}
-      {folder.isLocked && (
-        <>
-          <ContextMenuDivider />
-          <div className="px-3 py-2 text-xs text-red-600 dark:text-red-400 flex items-center gap-2">
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path
-                fillRule="evenodd"
-                d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
-                clipRule="evenodd"
-              />
-            </svg>
-            <span>Folder is locked</span>
-          </div>
-        </>
-      )}
     </div>
   )
 }

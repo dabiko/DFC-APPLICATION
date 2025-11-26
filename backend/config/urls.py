@@ -11,13 +11,22 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.views.generic import RedirectView
+from django.http import JsonResponse
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularSwaggerView,
     SpectacularRedocView,
 )
 
+
+def health_check(request):
+    """Simple health check endpoint for network monitoring."""
+    return JsonResponse({'status': 'healthy'}, status=200)
+
 urlpatterns = [
+    # Health check endpoint (no auth required)
+    path('api/v1/health/', health_check, name='health-check'),
+
     # Root redirect to API docs
     path('', RedirectView.as_view(url='/api/docs/', permanent=False), name='root'),
 

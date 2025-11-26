@@ -102,6 +102,12 @@ export interface FileListItem {
 
   // Tags
   tags?: string[]
+
+  // Shortcut properties (only if this is a shortcut)
+  isShortcut?: boolean
+  originalDocumentId?: string
+  originalFolderId?: string
+  originalFolderName?: string
 }
 
 /**
@@ -249,6 +255,7 @@ export interface FileListProps {
   onSortChange?: (sortBy: SortField, sortOrder: SortOrder) => void
   onViewModeChange?: (viewMode: ViewMode) => void
   onContextMenu?: (event: React.MouseEvent, item: FileListItem) => void
+  onFavoriteToggle?: (item: FileListItem) => void
   isLoading?: boolean
   emptyState?: React.ReactNode
   className?: string

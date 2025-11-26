@@ -50,6 +50,10 @@ LOGGING['loggers']['apps'] = {  # noqa
     'propagate': False,
 }
 
-# CORS Settings for Development (allow all origins for easier testing)
-CORS_ALLOW_ALL_ORIGINS = False
-CORS_ALLOW_CREDENTIALS = False
+# CORS Settings for Development (allow frontend origin)
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+]

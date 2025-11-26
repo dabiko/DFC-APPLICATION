@@ -12,7 +12,8 @@
       "Bash(../.venv/Scripts/python.exe:*)",
       "Bash(npm run lint:*)",
       "Bash(.env.example)",
-      "Bash(npx prettier:*)"
+      "Bash(npx prettier:*)",
+      "Bash(python manage.py shell:*)"
     ],
     "deny": [],
     "ask": []
