@@ -7,6 +7,8 @@ import {
   DocumentTextIcon,
   ClockIcon,
   UserGroupIcon,
+  BellIcon,
+  ArrowRightStartOnRectangleIcon,
 } from '@heroicons/react/24/outline'
 import type { LegalHold, LegalHoldManagerProps } from '@/types/retention'
 import { format, formatDistance } from 'date-fns'
@@ -20,6 +22,9 @@ export const LegalHoldManager: React.FC<LegalHoldManagerProps> = ({
   onEditHold,
   onReleaseHold,
   onViewAudit,
+  onManageCustodians,
+  onManageNotifications,
+  onInitiateRelease,
   loading = false,
 }) => {
   const getReasonLabel = (reason: LegalHold['reason']) => {
@@ -214,35 +219,57 @@ export const LegalHoldManager: React.FC<LegalHoldManagerProps> = ({
               )}
 
               {/* Actions */}
-              <div className="flex items-center gap-2 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex flex-wrap items-center gap-2 pt-4 border-t border-gray-200 dark:border-gray-700">
+                {onManageCustodians && isActive && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onManageCustodians(hold.id)
+                    }}
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                    title="Manage Custodians"
+                  >
+                    <UserGroupIcon className="w-4 h-4" />
+                    Custodians
+                  </button>
+                )}
+                {onManageNotifications && isActive && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onManageNotifications(hold.id)
+                    }}
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                    title="Manage Notifications"
+                  >
+                    <BellIcon className="w-4 h-4" />
+                    Notifications
+                  </button>
+                )}
                 {onEditHold && isActive && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
                       onEditHold(hold.id)
                     }}
-                    className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                    title="Edit Hold"
                   >
                     <PencilIcon className="w-4 h-4" />
                     Edit
                   </button>
                 )}
-                {onReleaseHold && isActive && (
+                {onInitiateRelease && isActive && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
-                      if (
-                        window.confirm(
-                          `Are you sure you want to release hold "${hold.caseName}"?\n\nThis will allow ${hold.documentsOnHold} documents to be modified or deleted according to retention policies.`
-                        )
-                      ) {
-                        onReleaseHold(hold.id)
-                      }
+                      onInitiateRelease(hold.id)
                     }}
-                    className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    title="Initiate Release Workflow"
                   >
-                    <CheckCircleIcon className="w-4 h-4" />
-                    Release Hold
+                    <ArrowRightStartOnRectangleIcon className="w-4 h-4" />
+                    Release
                   </button>
                 )}
                 {onViewAudit && (
@@ -252,6 +279,7 @@ export const LegalHoldManager: React.FC<LegalHoldManagerProps> = ({
                       onViewAudit(hold.id)
                     }}
                     className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                    title="View Audit Log"
                   >
                     View Audit
                   </button>

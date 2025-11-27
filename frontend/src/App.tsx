@@ -15,6 +15,12 @@ import { Dashboard } from '@pages/Dashboard'
 import { TrashPage } from './pages/TrashPage'
 import { FavoritesPage } from './pages/FavoritesPage'
 import { RecentPage } from './pages/RecentPage'
+import { SharedWithMePage } from './pages/SharedWithMePage'
+import { MyDocumentsPage } from './pages/MyDocumentsPage'
+import SmartFolderResultsPage from './pages/SmartFolderResultsPage'
+import { AuditLogPage } from './pages/AuditLogPage'
+import { UsersRolesPage } from './pages/UsersRolesPage'
+import { RetentionDashboardPage } from './pages/RetentionDashboardPage'
 
 function App() {
   return (
@@ -104,6 +110,66 @@ function App() {
               element={
                 <ProtectedRoute>
                   <RecentPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Shared With Me - Protected Route */}
+            <Route
+              path="/shared-with-me"
+              element={
+                <ProtectedRoute>
+                  <SharedWithMePage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* My Documents - Protected Route */}
+            <Route
+              path="/my-documents"
+              element={
+                <ProtectedRoute>
+                  <MyDocumentsPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Smart Folder Results - Protected Route */}
+            <Route
+              path="/smart-folder/:id"
+              element={
+                <ProtectedRoute>
+                  <SmartFolderResultsPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Audit Logs - Protected Route */}
+            <Route
+              path="/audit"
+              element={
+                <ProtectedRoute>
+                  <AuditLogPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Users & Roles - Protected Route */}
+            <Route
+              path="/users"
+              element={
+                <ProtectedRoute>
+                  <UsersRolesPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Retention Management - Protected Route */}
+            <Route
+              path="/retention"
+              element={
+                <ProtectedRoute>
+                  <RetentionDashboardPage />
                 </ProtectedRoute>
               }
             />

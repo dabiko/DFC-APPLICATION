@@ -69,131 +69,134 @@ export function ThreePanelLayout({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   return (
-    <div className={cn('flex flex-col h-screen bg-gray-50 dark:bg-gray-950', className)}>
-      {/* Header */}
-      {header && (
-        <header className="flex-shrink-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
-          {header}
-        </header>
-      )}
-
-      {/* Main content area */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Panel - Desktop */}
-        {!isLeftCollapsed && (
-          <aside
-            className={cn(
-              'hidden lg:flex flex-col bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 transition-all duration-300',
-              'overflow-hidden flex-shrink-0'
-            )}
-            style={leftPanelWidth !== 'auto' ? { width: leftPanelWidth } : undefined}
-          >
-            <div className="flex-1 overflow-y-auto overflow-x-hidden">{leftPanel}</div>
-
-            {collapsibleLeft && (
-              <button
-                onClick={() => setIsLeftCollapsed(true)}
-                className="flex items-center justify-center h-10 border-t border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                aria-label="Collapse left panel"
-              >
-                <ChevronLeftIcon className="h-4 w-4 text-gray-500" />
-              </button>
-            )}
-          </aside>
-        )}
-
-        {/* Left Panel Collapsed - Desktop */}
-        {isLeftCollapsed && collapsibleLeft && (
-          <aside className="hidden lg:flex flex-col bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 w-12">
-            <button
-              onClick={() => setIsLeftCollapsed(false)}
-              className="flex items-center justify-center h-10 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-              aria-label="Expand left panel"
-            >
-              <ChevronRightIcon className="h-4 w-4 text-gray-500" />
-            </button>
-          </aside>
-        )}
-
-        {/* Left Panel - Mobile */}
-        {isMobileMenuOpen && (
-          <>
-            {/* Overlay */}
-            <div
-              className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-              onClick={() => setIsMobileMenuOpen(false)}
-            />
-
-            {/* Drawer */}
-            <aside className="fixed inset-y-0 left-0 w-80 bg-white dark:bg-gray-900 z-50 lg:hidden flex flex-col">
-              <div className="flex items-center justify-between px-4 h-14 border-b border-gray-200 dark:border-gray-800">
-                <h2 className="font-semibold text-gray-900 dark:text-gray-100">Menu</h2>
-                <button
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
-                  aria-label="Close menu"
-                >
-                  <XMarkIcon className="h-5 w-5" />
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto">{leftPanel}</div>
-            </aside>
-          </>
-        )}
-
-        {/* Center Panel */}
-        <main className="flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-950">
-          {/* Mobile menu button */}
-          {showMobileMenu && (
-            <div className="lg:hidden flex items-center px-4 h-14 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
-              <button
-                onClick={() => setIsMobileMenuOpen(true)}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
-                aria-label="Open menu"
-              >
-                <Bars3Icon className="h-6 w-6" />
-              </button>
-            </div>
+    <div className={cn('flex h-screen bg-gray-50 dark:bg-gray-950', className)}>
+      {/* Left Panel - Desktop (Full Height) */}
+      {!isLeftCollapsed && (
+        <aside
+          className={cn(
+            'hidden lg:flex flex-col bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 transition-all duration-300',
+            'overflow-hidden flex-shrink-0 h-full'
           )}
+          style={leftPanelWidth !== 'auto' ? { width: leftPanelWidth } : undefined}
+        >
+          <div className="flex-1 overflow-y-auto overflow-x-hidden">{leftPanel}</div>
 
-          <div className="flex-1 overflow-y-auto overflow-x-hidden">{centerPanel}</div>
-        </main>
-
-        {/* Right Panel - Desktop */}
-        {rightPanel && !isRightCollapsed && (
-          <aside
-            className={cn(
-              'hidden xl:flex flex-col bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 transition-all duration-300',
-              'overflow-hidden'
-            )}
-            style={{ width: rightPanelWidth }}
-          >
-            {collapsibleRight && (
-              <button
-                onClick={() => setIsRightCollapsed(true)}
-                className="flex items-center justify-center h-10 border-b border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                aria-label="Collapse right panel"
-              >
-                <ChevronRightIcon className="h-4 w-4 text-gray-500" />
-              </button>
-            )}
-
-            <div className="flex-1 overflow-y-auto">{rightPanel}</div>
-          </aside>
-        )}
-
-        {/* Right Panel Collapsed - Desktop */}
-        {rightPanel && isRightCollapsed && collapsibleRight && (
-          <aside className="hidden xl:flex flex-col bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 w-12">
+          {collapsibleLeft && (
             <button
-              onClick={() => setIsRightCollapsed(false)}
-              className="flex items-center justify-center h-10 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-              aria-label="Expand right panel"
+              onClick={() => setIsLeftCollapsed(true)}
+              className="flex items-center justify-center h-10 border-t border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              aria-label="Collapse left panel"
             >
               <ChevronLeftIcon className="h-4 w-4 text-gray-500" />
             </button>
+          )}
+        </aside>
+      )}
+
+      {/* Left Panel Collapsed - Desktop (Full Height) */}
+      {isLeftCollapsed && collapsibleLeft && (
+        <aside className="hidden lg:flex flex-col bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 w-12 h-full">
+          <button
+            onClick={() => setIsLeftCollapsed(false)}
+            className="flex items-center justify-center h-10 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            aria-label="Expand left panel"
+          >
+            <ChevronRightIcon className="h-4 w-4 text-gray-500" />
+          </button>
+        </aside>
+      )}
+
+      {/* Left Panel - Mobile */}
+      {isMobileMenuOpen && (
+        <>
+          {/* Overlay */}
+          <div
+            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+
+          {/* Drawer */}
+          <aside className="fixed inset-y-0 left-0 w-80 bg-white dark:bg-gray-900 z-50 lg:hidden flex flex-col">
+            <div className="flex items-center justify-between px-4 h-14 border-b border-gray-200 dark:border-gray-800">
+              <h2 className="font-semibold text-gray-900 dark:text-gray-100">Menu</h2>
+              <button
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
+                aria-label="Close menu"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">{leftPanel}</div>
           </aside>
+        </>
+      )}
+
+      {/* Right Section: Header + Content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Header - spans only the right side of sidebar */}
+        {header && (
+          <header className="flex-shrink-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+            {header}
+          </header>
         )}
+
+        {/* Main content area */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Center Panel */}
+          <main className="flex-1 flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-950">
+            {/* Mobile menu button */}
+            {showMobileMenu && (
+              <div className="lg:hidden flex items-center px-4 h-14 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+                <button
+                  onClick={() => setIsMobileMenuOpen(true)}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
+                  aria-label="Open menu"
+                >
+                  <Bars3Icon className="h-6 w-6" />
+                </button>
+              </div>
+            )}
+
+            <div className="flex-1 overflow-y-auto overflow-x-hidden">{centerPanel}</div>
+          </main>
+
+          {/* Right Panel - Desktop */}
+          {rightPanel && !isRightCollapsed && (
+            <aside
+              className={cn(
+                'hidden xl:flex flex-col bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 transition-all duration-300',
+                'overflow-hidden'
+              )}
+              style={{ width: rightPanelWidth }}
+            >
+              {collapsibleRight && (
+                <button
+                  onClick={() => setIsRightCollapsed(true)}
+                  className="flex items-center justify-center h-10 border-b border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  aria-label="Collapse right panel"
+                >
+                  <ChevronRightIcon className="h-4 w-4 text-gray-500" />
+                </button>
+              )}
+
+              <div className="flex-1 overflow-y-auto">{rightPanel}</div>
+            </aside>
+          )}
+
+          {/* Right Panel Collapsed - Desktop */}
+          {rightPanel && isRightCollapsed && collapsibleRight && (
+            <aside className="hidden xl:flex flex-col bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 w-12">
+              <button
+                onClick={() => setIsRightCollapsed(false)}
+                className="flex items-center justify-center h-10 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                aria-label="Expand right panel"
+              >
+                <ChevronLeftIcon className="h-4 w-4 text-gray-500" />
+              </button>
+            </aside>
+          )}
+        </div>
       </div>
     </div>
   )

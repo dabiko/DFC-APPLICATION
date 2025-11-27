@@ -380,6 +380,8 @@ class SmartFolderListSerializer(serializers.ModelSerializer):
             'is_personal', 'is_global', 'is_active',
             'owner', 'owner_name', 'department', 'department_name',
             'document_count', 'last_count_update',
+            'include_owned', 'include_shared',
+            'display_order', 'is_visible',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'owner', 'document_count', 'last_count_update', 'created_at', 'updated_at']
@@ -400,6 +402,8 @@ class SmartFolderDetailSerializer(serializers.ModelSerializer):
             'owner', 'owner_name', 'department', 'department_name',
             'is_personal', 'is_global', 'is_active',
             'document_count', 'last_count_update',
+            'include_owned', 'include_shared',
+            'display_order', 'is_visible',
             'created_at', 'updated_at', 'created_by', 'created_by_name'
         ]
         read_only_fields = ['id', 'owner', 'document_count', 'last_count_update', 'created_at', 'updated_at', 'created_by']
@@ -415,7 +419,8 @@ class SmartFolderCreateSerializer(serializers.ModelSerializer):
         model = SmartFolder
         fields = [
             'name', 'description', 'criteria', 'icon', 'color',
-            'department', 'is_personal', 'is_global'
+            'department', 'is_personal', 'is_global',
+            'include_owned', 'include_shared', 'is_visible'
         ]
 
     def validate_name(self, value):
@@ -438,7 +443,9 @@ class SmartFolderCreateSerializer(serializers.ModelSerializer):
             'document_type', 'confidentiality_level', 'date_range',
             'folder_path', 'folder_id', 'tags', 'file_type',
             'file_size_min', 'file_size_max', 'owner_id', 'department_id',
-            'search_text', 'created_date_range'
+            'search_text', 'created_date_range',
+            # New filter types for My Documents feature
+            'relative_date', 'state', 'name_contains'
         }
 
         invalid_keys = set(value.keys()) - supported_keys
@@ -447,6 +454,24 @@ class SmartFolderCreateSerializer(serializers.ModelSerializer):
                 f'Unsupported criteria keys: {", ".join(invalid_keys)}. '
                 f'Supported keys: {", ".join(sorted(supported_keys))}'
             )
+
+        # Validate relative_date values
+        if 'relative_date' in value:
+            valid_relative_dates = ['today', 'this_week', 'this_month', 'last_7_days', 'last_30_days']
+            if value['relative_date'] not in valid_relative_dates:
+                raise serializers.ValidationError(
+                    f'relative_date must be one of: {", ".join(valid_relative_dates)}'
+                )
+
+        # Validate state values
+        if 'state' in value:
+            valid_states = ['DRAFT', 'IN_REVIEW', 'APPROVED', 'PUBLISHED', 'ARCHIVED']
+            states = value['state'] if isinstance(value['state'], list) else [value['state']]
+            for s in states:
+                if s not in valid_states:
+                    raise serializers.ValidationError(
+                        f'state must be one of: {", ".join(valid_states)}'
+                    )
 
         # Validate date_range format
         if 'date_range' in value:
@@ -482,6 +507,19 @@ class SmartFolderCreateSerializer(serializers.ModelSerializer):
         is_personal = attrs.get('is_personal', True)
         is_global = attrs.get('is_global', False)
         department = attrs.get('department')
+        name = attrs.get('name')
+
+        # Check for duplicate name for the same user
+        if name:
+            existing = SmartFolder.objects.filter(
+                owner=request.user,
+                name__iexact=name.strip(),
+                is_active=True
+            )
+            if existing.exists():
+                raise serializers.ValidationError({
+                    'name': 'You already have a smart folder with this name'
+                })
 
         # Only staff can create global smart folders
         if is_global and not request.user.is_staff:
@@ -511,12 +549,8 @@ class SmartFolderCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         """Create smart folder with ownership"""
-        request = self.context.get('request')
-        smart_folder = SmartFolder.objects.create(
-            **validated_data,
-            owner=request.user,
-            created_by=request.user
-        )
+        # owner and created_by are set in perform_create of the view
+        smart_folder = SmartFolder.objects.create(**validated_data)
         return smart_folder
 
 
@@ -526,7 +560,10 @@ class SmartFolderUpdateSerializer(serializers.ModelSerializer):
     """
     class Meta:
         model = SmartFolder
-        fields = ['name', 'description', 'criteria', 'icon', 'color', 'is_active']
+        fields = [
+            'name', 'description', 'criteria', 'icon', 'color', 'is_active',
+            'include_owned', 'include_shared', 'is_visible', 'display_order'
+        ]
 
     def validate_name(self, value):
         """Validate smart folder name"""
@@ -555,5 +592,35 @@ class SmartFolderUpdateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 f'Unsupported criteria keys: {", ".join(invalid_keys)}'
             )
+
+        return value
+
+
+class SmartFolderReorderSerializer(serializers.Serializer):
+    """
+    Serializer for reordering smart folders.
+    """
+    ordered_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        min_length=1,
+        help_text='List of smart folder IDs in desired order'
+    )
+
+    def validate_ordered_ids(self, value):
+        """Validate that all IDs belong to the user."""
+        request = self.context.get('request')
+        if not request:
+            raise serializers.ValidationError('Request context required')
+
+        user_folder_ids = set(
+            SmartFolder.objects.filter(owner=request.user)
+            .values_list('id', flat=True)
+        )
+
+        for folder_id in value:
+            if folder_id not in user_folder_ids:
+                raise serializers.ValidationError(
+                    f'Smart folder {folder_id} not found or does not belong to you'
+                )
 
         return value

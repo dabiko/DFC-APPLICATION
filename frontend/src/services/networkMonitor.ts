@@ -36,9 +36,11 @@ export interface NetworkEvent {
 export type NetworkEventListener = (event: NetworkEvent) => void
 
 // Connection quality thresholds
-const SLOW_CONNECTION_RTT_THRESHOLD = 500 // ms - consider slow if RTT > 500ms
-const SLOW_CONNECTION_DOWNLINK_THRESHOLD = 0.5 // Mbps - consider slow if < 0.5 Mbps
-const SLOW_EFFECTIVE_TYPES = ['slow-2g', '2g'] // These are considered slow
+// Note: Starlink and satellite connections have higher latency (100-600ms typical)
+// Only flag as "slow" when connection is genuinely problematic for user experience
+const SLOW_CONNECTION_RTT_THRESHOLD = 2000 // ms - consider slow if RTT > 2 seconds
+const SLOW_CONNECTION_DOWNLINK_THRESHOLD = 0.25 // Mbps - consider slow if < 0.25 Mbps (very slow)
+const SLOW_EFFECTIVE_TYPES = ['slow-2g'] // Only extremely slow connections - '2g' removed as it can still be usable
 
 // Retry configuration
 const INITIAL_RETRY_DELAY = 5 // seconds
@@ -47,7 +49,7 @@ const RETRY_MULTIPLIER = 1.5
 
 // Health check configuration
 const HEALTH_CHECK_INTERVAL = 30000 // 30 seconds when online
-const HEALTH_CHECK_TIMEOUT = 10000 // 10 seconds timeout for health check
+const HEALTH_CHECK_TIMEOUT = 15000 // 15 seconds timeout for health check (accommodates satellite connections)
 
 class NetworkMonitor {
   private state: NetworkState
@@ -256,12 +258,19 @@ class NetworkMonitor {
       console.warn('[NetworkMonitor] Health check failed:', error)
 
       // If browser says we're online but health check fails,
-      // might be a server issue or very slow connection
+      // might be a server issue, temporary network hiccup, or satellite handoff
       if (navigator.onLine) {
-        // Could be slow connection or server down
-        this.state.isSlow = true
-        this.state.status = 'slow'
-        this.notifyListeners('statusChange')
+        // Don't immediately mark as slow - could be temporary
+        // Only mark as slow/offline after multiple consecutive failures
+        this.state.retryCount++
+
+        if (this.state.retryCount >= 3) {
+          // After 3 consecutive failures, mark as having connectivity issues
+          this.state.isSlow = true
+          this.state.status = 'slow'
+          this.notifyListeners('statusChange')
+        }
+        // Otherwise, silently retry on next health check interval
       } else {
         this.updateStatus('offline')
         this.startRetryTimer()

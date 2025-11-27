@@ -10,11 +10,25 @@ from apps.users.models import CustomUser, Department
 
 class DepartmentSerializer(serializers.ModelSerializer):
     """Serializer for Department model"""
+    parent_name = serializers.CharField(source='parent.name', read_only=True, allow_null=True)
+    member_count = serializers.SerializerMethodField()
+    storage_used_gb = serializers.SerializerMethodField()
 
     class Meta:
         model = Department
-        fields = ['id', 'name', 'code', 'parent', 'created_at', 'updated_at']
+        fields = [
+            'id', 'name', 'code', 'parent', 'parent_name',
+            'storage_quota_gb', 'storage_used_gb', 'member_count',
+            'created_at', 'updated_at'
+        ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_member_count(self, obj):
+        return obj.employees.count()
+
+    def get_storage_used_gb(self, obj):
+        # Placeholder - would calculate actual storage usage
+        return 0
 
 
 class UserBasicSerializer(serializers.ModelSerializer):

@@ -1,6 +1,10 @@
 /**
  * ShareDocumentModal Component
  * Modal for creating and managing document shares with permissions, expiry, and link generation
+ *
+ * Supports two sharing modes:
+ * 1. Share with Users - Share directly with internal users (creates SharedItemAccess)
+ * 2. Create Link - Generate a shareable link with optional password protection
  */
 
 import { FC, useState, useEffect, useCallback } from 'react'
@@ -17,6 +21,11 @@ import {
   ArrowDownTrayIcon,
   ChatBubbleLeftRightIcon,
   TrashIcon,
+  MagnifyingGlassIcon,
+  UserPlusIcon,
+  EnvelopeIcon,
+  PencilIcon,
+  Cog6ToothIcon,
 } from '@heroicons/react/24/outline'
 import type { FileListItem } from '@/types/fileManagement'
 import {
@@ -29,6 +38,12 @@ import {
   PERMISSION_LABELS,
   PERMISSION_DESCRIPTIONS,
 } from '@/services/shareService'
+import {
+  shareWithUsers,
+  type PermissionLevel,
+  type ShareWithUsersRequest,
+} from '@/services/sharedWithMeService'
+import { getShareableUsers, type ShareableUser } from '@/services/favoritesService'
 import { toast } from '@/utils/toast'
 
 export interface ShareDocumentModalProps {
@@ -38,14 +53,21 @@ export interface ShareDocumentModalProps {
   onShareCreated?: (share: Share) => void
 }
 
-interface PermissionOption {
+interface LinkPermissionOption {
   value: SharePermission
   label: string
   description: string
   icon: React.ReactNode
 }
 
-const PERMISSION_OPTIONS: PermissionOption[] = [
+interface UserPermissionOption {
+  value: PermissionLevel
+  label: string
+  description: string
+  icon: React.ReactNode
+}
+
+const LINK_PERMISSION_OPTIONS: LinkPermissionOption[] = [
   {
     value: 'VIEW_ONLY',
     label: PERMISSION_LABELS.VIEW_ONLY,
@@ -66,6 +88,33 @@ const PERMISSION_OPTIONS: PermissionOption[] = [
   },
 ]
 
+const USER_PERMISSION_OPTIONS: UserPermissionOption[] = [
+  {
+    value: 'VIEW',
+    label: 'View',
+    description: 'Can view and download the document',
+    icon: <EyeIcon className="w-5 h-5" />,
+  },
+  {
+    value: 'COMMENT',
+    label: 'Comment',
+    description: 'Can view, download, and comment',
+    icon: <ChatBubbleLeftRightIcon className="w-5 h-5" />,
+  },
+  {
+    value: 'EDIT',
+    label: 'Edit',
+    description: 'Can view, download, comment, and edit metadata',
+    icon: <PencilIcon className="w-5 h-5" />,
+  },
+  {
+    value: 'FULL',
+    label: 'Full Access',
+    description: 'Full access including sharing and deletion',
+    icon: <Cog6ToothIcon className="w-5 h-5" />,
+  },
+]
+
 const EXPIRY_OPTIONS = [
   { value: 1, label: '1 day' },
   { value: 7, label: '7 days' },
@@ -80,14 +129,31 @@ export const ShareDocumentModal: FC<ShareDocumentModalProps> = ({
   onClose,
   onShareCreated,
 }) => {
-  // Form state
-  const [permission, setPermission] = useState<SharePermission>('VIEW_ONLY')
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'users' | 'link' | 'existing'>('users')
+
+  // Form state for link sharing
+  const [linkPermission, setLinkPermission] = useState<SharePermission>('VIEW_ONLY')
   const [expiryDays, setExpiryDays] = useState<number>(7)
   const [password, setPassword] = useState('')
   const [usePassword, setUsePassword] = useState(false)
   const [recipientEmails, setRecipientEmails] = useState('')
   const [maxAccessCount, setMaxAccessCount] = useState<string>('')
   const [notes, setNotes] = useState('')
+
+  // Form state for user sharing
+  const [userPermission, setUserPermission] = useState<PermissionLevel>('VIEW')
+  const [message, setMessage] = useState('')
+  const [requireAcceptance, setRequireAcceptance] = useState(false)
+  const [notifyUsers, setNotifyUsers] = useState(true)
+  const [requireAcknowledgement, setRequireAcknowledgement] = useState(false)
+  const [acknowledgementText, setAcknowledgementText] = useState('')
+
+  // User search state
+  const [userSearchQuery, setUserSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<ShareableUser[]>([])
+  const [selectedUsers, setSelectedUsers] = useState<ShareableUser[]>([])
+  const [isSearching, setIsSearching] = useState(false)
 
   // UI state
   const [isCreating, setIsCreating] = useState(false)
@@ -98,33 +164,8 @@ export const ShareDocumentModal: FC<ShareDocumentModalProps> = ({
   // Existing shares
   const [existingShares, setExistingShares] = useState<Share[]>([])
   const [loadingShares, setLoadingShares] = useState(false)
-  const [activeTab, setActiveTab] = useState<'create' | 'existing'>('create')
 
-  // Load existing shares when modal opens
-  useEffect(() => {
-    if (isOpen && item && !item.isShortcut) {
-      loadExistingShares()
-    }
-  }, [isOpen, item])
-
-  // Reset form when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      setPermission('VIEW_ONLY')
-      setExpiryDays(7)
-      setPassword('')
-      setUsePassword(false)
-      setRecipientEmails('')
-      setMaxAccessCount('')
-      setNotes('')
-      setError(null)
-      setCreatedShare(null)
-      setCopied(false)
-      setActiveTab('create')
-    }
-  }, [isOpen])
-
-  const loadExistingShares = async () => {
+  const loadExistingShares = useCallback(async () => {
     if (!item) return
 
     setLoadingShares(true)
@@ -134,14 +175,131 @@ export const ShareDocumentModal: FC<ShareDocumentModalProps> = ({
         const shares = await getSharesForDocument(docId)
         setExistingShares(shares.filter((s) => s.is_active && !s.is_expired))
       }
-    } catch (error) {
-      console.error('Failed to load existing shares:', error)
+    } catch (err) {
+      console.error('Failed to load existing shares:', err)
     } finally {
       setLoadingShares(false)
     }
+  }, [item])
+
+  // Load existing shares when modal opens
+  useEffect(() => {
+    if (isOpen && item && !item.isShortcut) {
+      loadExistingShares()
+    }
+  }, [isOpen, item, loadExistingShares])
+
+  // Reset form when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab('users')
+      setLinkPermission('VIEW_ONLY')
+      setUserPermission('VIEW')
+      setExpiryDays(7)
+      setPassword('')
+      setUsePassword(false)
+      setRecipientEmails('')
+      setMaxAccessCount('')
+      setNotes('')
+      setMessage('')
+      setRequireAcceptance(false)
+      setNotifyUsers(true)
+      setRequireAcknowledgement(false)
+      setAcknowledgementText('')
+      setUserSearchQuery('')
+      setSearchResults([])
+      setSelectedUsers([])
+      setError(null)
+      setCreatedShare(null)
+      setCopied(false)
+    }
+  }, [isOpen])
+
+  // Search users with debounce
+  useEffect(() => {
+    const searchUsers = async () => {
+      if (userSearchQuery.length < 2) {
+        setSearchResults([])
+        return
+      }
+
+      setIsSearching(true)
+      try {
+        const users = await getShareableUsers(userSearchQuery)
+        // Filter out already selected users
+        const selectedIds = new Set(selectedUsers.map((u) => u.id))
+        setSearchResults(users.filter((u) => !selectedIds.has(u.id)))
+      } catch (err) {
+        console.error('Failed to search users:', err)
+      } finally {
+        setIsSearching(false)
+      }
+    }
+
+    const debounceTimer = setTimeout(searchUsers, 300)
+    return () => clearTimeout(debounceTimer)
+  }, [userSearchQuery, selectedUsers])
+
+  // Handle user selection
+  const handleSelectUser = useCallback((user: ShareableUser) => {
+    setSelectedUsers((prev) => [...prev, user])
+    setUserSearchQuery('')
+    setSearchResults([])
+  }, [])
+
+  // Handle user removal
+  const handleRemoveUser = useCallback((userId: number) => {
+    setSelectedUsers((prev) => prev.filter((u) => u.id !== userId))
+  }, [])
+
+  // Handle share with users
+  const handleShareWithUsers = async () => {
+    if (!item || selectedUsers.length === 0) return
+
+    setIsCreating(true)
+    setError(null)
+
+    try {
+      const docId = item.isShortcut ? item.originalDocumentId : item.id
+      if (!docId) {
+        setError('Invalid document')
+        return
+      }
+
+      const request: ShareWithUsersRequest = {
+        document_id: docId,
+        recipient_ids: selectedUsers.map((u) => String(u.id)),
+        permission_level: userPermission,
+        message: message || undefined,
+        notify: notifyUsers,
+        require_acceptance: requireAcceptance,
+        require_acknowledgement: requireAcknowledgement,
+        acknowledgement_text: requireAcknowledgement ? acknowledgementText || undefined : undefined,
+      }
+
+      if (expiryDays > 0) {
+        request.expires_in_days = expiryDays
+      }
+
+      const response = await shareWithUsers(request)
+
+      if (response.success) {
+        toast.success(`Document shared with ${selectedUsers.length} user(s)`)
+        setSelectedUsers([])
+        setMessage('')
+      }
+    } catch (err) {
+      console.error('Failed to share document:', err)
+      const errorMessage = err instanceof Error ? err.message : 'Failed to share document'
+      setError(errorMessage)
+      toast.error(errorMessage)
+    } finally {
+      setIsCreating(false)
+    }
   }
 
-  const handleCreateShare = async () => {
+  // Handle link creation
+  const handleCreateLink = async () => {
     if (!item) return
 
     setIsCreating(true)
@@ -162,7 +320,7 @@ export const ShareDocumentModal: FC<ShareDocumentModalProps> = ({
 
       const shareData: CreateShareRequest = {
         document: docId,
-        permission,
+        permission: linkPermission,
         allow_public_access: true,
       }
 
@@ -213,8 +371,8 @@ export const ShareDocumentModal: FC<ShareDocumentModalProps> = ({
       setCopied(true)
       toast.success('Link copied to clipboard')
       setTimeout(() => setCopied(false), 2000)
-    } catch (error) {
-      console.error('Failed to copy link:', error)
+    } catch (err) {
+      console.error('Failed to copy link:', err)
       toast.error('Failed to copy link to clipboard')
     }
   }, [createdShare])
@@ -224,8 +382,8 @@ export const ShareDocumentModal: FC<ShareDocumentModalProps> = ({
       await revokeShare(shareId)
       setExistingShares((prev) => prev.filter((s) => s.id !== shareId))
       toast.success('Share link revoked successfully')
-    } catch (error) {
-      console.error('Failed to revoke share:', error)
+    } catch (err) {
+      console.error('Failed to revoke share:', err)
       toast.error('Failed to revoke share link')
     }
   }
@@ -273,14 +431,26 @@ export const ShareDocumentModal: FC<ShareDocumentModalProps> = ({
         {/* Tabs */}
         <div className="flex border-b border-gray-200 dark:border-gray-700">
           <button
-            onClick={() => setActiveTab('create')}
-            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'create'
+            onClick={() => setActiveTab('users')}
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+              activeTab === 'users'
                 ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-600'
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
             }`}
           >
-            Create New Link
+            <UserPlusIcon className="w-4 h-4" />
+            Share with Users
+          </button>
+          <button
+            onClick={() => setActiveTab('link')}
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+              activeTab === 'link'
+                ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-600'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
+            }`}
+          >
+            <LinkIcon className="w-4 h-4" />
+            Create Link
           </button>
           <button
             onClick={() => setActiveTab('existing')}
@@ -290,7 +460,7 @@ export const ShareDocumentModal: FC<ShareDocumentModalProps> = ({
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
             }`}
           >
-            Existing Shares ({existingShares.length})
+            Links ({existingShares.length})
           </button>
         </div>
 
@@ -302,7 +472,199 @@ export const ShareDocumentModal: FC<ShareDocumentModalProps> = ({
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{item.path || 'Root'}</p>
           </div>
 
-          {activeTab === 'create' && !createdShare && (
+          {/* Share with Users Tab */}
+          {activeTab === 'users' && (
+            <div className="space-y-6">
+              {/* User Search */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <UserGroupIcon className="w-4 h-4 inline mr-2" />
+                  Add People
+                </label>
+                <div className="relative">
+                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={userSearchQuery}
+                    onChange={(e) => setUserSearchQuery(e.target.value)}
+                    placeholder="Search by name or email..."
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  />
+                  {isSearching && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <div className="w-4 h-4 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Search Results */}
+                {searchResults.length > 0 && (
+                  <div className="mt-2 border border-gray-200 dark:border-gray-700 rounded-lg max-h-40 overflow-y-auto">
+                    {searchResults.map((user) => (
+                      <button
+                        key={user.id}
+                        onClick={() => handleSelectUser(user)}
+                        className="w-full px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
+                          <span className="text-sm font-medium text-primary-600 dark:text-primary-400">
+                            {user.first_name[0]}
+                            {user.last_name[0]}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                            {user.first_name} {user.last_name}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                            {user.email}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Selected Users */}
+                {selectedUsers.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {selectedUsers.map((user) => (
+                      <span
+                        key={user.id}
+                        className="inline-flex items-center gap-1 px-2 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-full text-sm"
+                      >
+                        {user.first_name} {user.last_name}
+                        <button
+                          onClick={() => handleRemoveUser(user.id)}
+                          className="ml-1 hover:text-primary-900 dark:hover:text-primary-100"
+                        >
+                          <XMarkIcon className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Permission Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Permission Level
+                </label>
+                <select
+                  value={userPermission}
+                  onChange={(e) => setUserPermission(e.target.value as PermissionLevel)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                >
+                  {USER_PERMISSION_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label} - {option.description}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Message */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <EnvelopeIcon className="w-4 h-4 inline mr-2" />
+                  Message (optional)
+                </label>
+                <textarea
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="Add a message for the recipients..."
+                  rows={2}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                />
+              </div>
+
+              {/* Options */}
+              <div className="space-y-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notifyUsers}
+                    onChange={(e) => setNotifyUsers(e.target.checked)}
+                    className="rounded border-gray-300 dark:border-gray-600"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                    Send email notification
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={requireAcceptance}
+                    onChange={(e) => setRequireAcceptance(e.target.checked)}
+                    className="rounded border-gray-300 dark:border-gray-600"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                    Require acceptance (invitation)
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={requireAcknowledgement}
+                    onChange={(e) => setRequireAcknowledgement(e.target.checked)}
+                    className="rounded border-gray-300 dark:border-gray-600"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                    Require acknowledgement (for confidential content)
+                  </span>
+                </label>
+              </div>
+
+              {/* Acknowledgement Text */}
+              {requireAcknowledgement && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Acknowledgement Text (optional)
+                  </label>
+                  <textarea
+                    value={acknowledgementText}
+                    onChange={(e) => setAcknowledgementText(e.target.value)}
+                    placeholder="Enter custom acknowledgement text that recipients must agree to..."
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
+                  />
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Leave empty to use default confidentiality acknowledgement text.
+                  </p>
+                </div>
+              )}
+
+              {/* Expiry */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <CalendarIcon className="w-4 h-4 inline mr-2" />
+                  Access Expiration
+                </label>
+                <select
+                  value={expiryDays}
+                  onChange={(e) => setExpiryDays(Number(e.target.value))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                >
+                  {EXPIRY_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Error message */}
+              {error && (
+                <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                  <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Create Link Tab */}
+          {activeTab === 'link' && !createdShare && (
             <div className="space-y-6">
               {/* Permission Selection */}
               <div>
@@ -311,13 +673,13 @@ export const ShareDocumentModal: FC<ShareDocumentModalProps> = ({
                   Permission Level
                 </label>
                 <div className="space-y-2">
-                  {PERMISSION_OPTIONS.map((option) => (
+                  {LINK_PERMISSION_OPTIONS.map((option) => (
                     <label
                       key={option.value}
                       className={`
                         flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors
                         ${
-                          permission === option.value
+                          linkPermission === option.value
                             ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
                             : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
                         }
@@ -327,8 +689,8 @@ export const ShareDocumentModal: FC<ShareDocumentModalProps> = ({
                         type="radio"
                         name="permission"
                         value={option.value}
-                        checked={permission === option.value}
-                        onChange={() => setPermission(option.value)}
+                        checked={linkPermission === option.value}
+                        onChange={() => setLinkPermission(option.value)}
                         className="mt-0.5"
                       />
                       <div className="flex-shrink-0 text-gray-500">{option.icon}</div>
@@ -428,7 +790,7 @@ export const ShareDocumentModal: FC<ShareDocumentModalProps> = ({
           )}
 
           {/* Share created success */}
-          {activeTab === 'create' && createdShare && (
+          {activeTab === 'link' && createdShare && (
             <div className="space-y-6">
               <div className="text-center py-4">
                 <div className="w-16 h-16 mx-auto bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mb-4">
@@ -609,10 +971,50 @@ export const ShareDocumentModal: FC<ShareDocumentModalProps> = ({
           >
             {createdShare ? 'Done' : 'Cancel'}
           </button>
-          {activeTab === 'create' && !createdShare && (
+
+          {/* Share with Users button */}
+          {activeTab === 'users' && (
             <button
               type="button"
-              onClick={handleCreateShare}
+              onClick={handleShareWithUsers}
+              disabled={isCreating || selectedUsers.length === 0}
+              className="px-4 py-2 text-sm font-medium bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {isCreating ? (
+                <>
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      fill="none"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  Sharing...
+                </>
+              ) : (
+                <>
+                  <UserPlusIcon className="w-4 h-4" />
+                  Share with {selectedUsers.length || ''} User
+                  {selectedUsers.length !== 1 ? 's' : ''}
+                </>
+              )}
+            </button>
+          )}
+
+          {/* Create Link button */}
+          {activeTab === 'link' && !createdShare && (
+            <button
+              type="button"
+              onClick={handleCreateLink}
               disabled={isCreating || (usePassword && !password)}
               className="px-4 py-2 text-sm font-medium bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >

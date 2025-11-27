@@ -1,17 +1,18 @@
 /**
  * DashboardSidebar Component
  * Enterprise-standard folder-focused sidebar
- * Layout: Logo + Quick Links + Folder Tree + Storage + Toggle
+ * Layout: Logo + Quick Access + Folder Tree + Storage + Toggle
  */
 
 import { NavLink } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { LayoutDashboard, Search, ChevronLeft, ChevronRight } from 'lucide-react'
-import { FolderSidebar } from '@components/Folder'
+import { FolderSidebar, SmartFolderItem } from '@components/Folder'
+import { getSmartFolders } from '@/utils/smartFolders'
 import { cn } from '@utils/cn'
 
-// Quick links - Favorites, Recent, and Trash are in Smart Folders section
-const quickLinks = [
+// Navigation links (non-smart folder items)
+const navLinks = [
   { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { path: '/search', icon: Search, label: 'Global Search' },
 ]
@@ -30,6 +31,9 @@ export function DashboardSidebar({
     const saved = localStorage.getItem('sidebar-collapsed')
     return saved ? JSON.parse(saved) : false
   })
+
+  // Get smart folders (My Documents, Shared with Me, Recent, Favorites, Trash)
+  const smartFolders = useMemo(() => getSmartFolders(), [])
 
   // Use external state if provided, otherwise use internal state
   const isCollapsed = externalCollapsed !== undefined ? externalCollapsed : internalCollapsed
@@ -62,28 +66,61 @@ export function DashboardSidebar({
         isCollapsed ? 'w-16' : 'w-64'
       )}
     >
-      {/* Top Toggle Button */}
+      {/* Logo and Toggle Button */}
       <div
         className={cn(
-          'flex items-center p-2 border-b border-gray-200 dark:border-gray-800',
-          isCollapsed ? 'justify-center' : 'justify-end'
+          'flex items-center border-b border-gray-200 dark:border-gray-800 h-16',
+          isCollapsed ? 'justify-center px-2' : 'justify-between px-3'
         )}
       >
-        <button
-          onClick={toggleSidebar}
-          className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-          aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          title={isCollapsed ? 'Expand sidebar (Ctrl+B)' : 'Collapse sidebar (Ctrl+B)'}
-        >
-          {isCollapsed ? (
-            <ChevronRight className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-          ) : (
+        {/* Logo */}
+        <div className={cn('flex items-center gap-3', isCollapsed && 'hidden')}>
+          <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center flex-shrink-0">
+            <span className="text-white font-bold text-sm">DFC</span>
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+              Digital Filing Cabinet
+            </h1>
+            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">Document Management</p>
+          </div>
+        </div>
+
+        {/* Collapsed Logo */}
+        {isCollapsed && (
+          <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
+            <span className="text-white font-bold text-sm">DFC</span>
+          </div>
+        )}
+
+        {/* Toggle Button - only visible when expanded */}
+        {!isCollapsed && (
+          <button
+            onClick={toggleSidebar}
+            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            aria-label="Collapse sidebar"
+            title="Collapse sidebar (Ctrl+B)"
+          >
             <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-          )}
-        </button>
+          </button>
+        )}
       </div>
 
-      {/* Quick Links Section */}
+      {/* Expand button below logo when collapsed */}
+      {isCollapsed && (
+        <div className="flex justify-center py-2 border-b border-gray-200 dark:border-gray-800">
+          <button
+            onClick={toggleSidebar}
+            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            aria-label="Expand sidebar"
+            title="Expand sidebar (Ctrl+B)"
+          >
+            <ChevronRight className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+          </button>
+        </div>
+      )}
+
+      {/* Quick Access Section */}
       <div
         className={cn(
           'border-b border-gray-200 dark:border-gray-800',
@@ -96,7 +133,8 @@ export function DashboardSidebar({
           </div>
         )}
         <div className="space-y-1">
-          {quickLinks.map((item) => (
+          {/* Navigation links (Dashboard, Global Search) */}
+          {navLinks.map((item) => (
             <NavLink
               key={item.path}
               to={item.path}
@@ -121,6 +159,17 @@ export function DashboardSidebar({
                 </div>
               )}
             </NavLink>
+          ))}
+
+          {/* Smart folders (My Documents, Shared with Me, Recent, Favorites, Trash) - with counts */}
+          {smartFolders.map((smartFolder) => (
+            <SmartFolderItem
+              key={smartFolder.id}
+              folder={smartFolder}
+              isSelected={false}
+              onClick={() => {}}
+              isCollapsed={isCollapsed}
+            />
           ))}
         </div>
       </div>
@@ -165,21 +214,19 @@ export function DashboardSidebar({
         )}
       </div>
 
-      {/* Bottom Toggle Button */}
-      <div className="border-t border-gray-200 dark:border-gray-800">
-        <button
-          onClick={toggleSidebar}
-          className="w-full flex items-center justify-center h-10 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-          aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          {isCollapsed ? (
-            <ChevronRight className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-          ) : (
-            <ChevronLeft className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-          )}
-        </button>
-      </div>
+      {/* Bottom Toggle Button - only visible when expanded */}
+      {!isCollapsed && (
+        <div className="flex items-center justify-end border-t border-gray-200 dark:border-gray-800 p-2">
+          <button
+            onClick={toggleSidebar}
+            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            aria-label="Collapse sidebar"
+            title="Collapse sidebar (Ctrl+B)"
+          >
+            <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+          </button>
+        </div>
+      )}
     </aside>
   )
 }

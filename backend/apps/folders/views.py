@@ -1,12 +1,12 @@
 """
 Views for folder management and hierarchy.
 """
-from rest_framework import generics, status, permissions
+from rest_framework import generics, status, permissions, serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.http import Http404
 from django.db.models import Q, Count
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse, inline_serializer
 
 from apps.folders.models import Folder, FolderTemplate, SmartFolder
 from apps.folders.serializers import (
@@ -979,4 +979,54 @@ class SmartFolderRefreshCountView(APIView):
             'name': smart_folder.name,
             'document_count': smart_folder.document_count,
             'last_count_update': smart_folder.last_count_update
+        })
+
+
+@extend_schema(
+    tags=['Smart Folders'],
+    request=inline_serializer(
+        'SmartFolderReorderRequest',
+        fields={
+            'ordered_ids': serializers.ListField(
+                child=serializers.UUIDField(),
+                help_text='List of smart folder IDs in desired order'
+            )
+        }
+    ),
+    responses={
+        200: OpenApiResponse(description='Smart folders reordered successfully'),
+        400: OpenApiResponse(description='Invalid request data'),
+    }
+)
+class SmartFolderReorderView(APIView):
+    """
+    Reorder user's smart folders.
+
+    Accepts a list of smart folder IDs in the desired display order.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        """Reorder smart folders"""
+        from apps.folders.serializers import SmartFolderReorderSerializer
+
+        serializer = SmartFolderReorderSerializer(
+            data=request.data,
+            context={'request': request}
+        )
+
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        ordered_ids = serializer.validated_data['ordered_ids']
+        updated_count = SmartFolder.reorder_items(request.user, ordered_ids)
+
+        logger.info(
+            f"Smart folders reordered: {updated_count} updated by user {request.user.username}"
+        )
+
+        return Response({
+            'success': True,
+            'message': 'Smart folders reordered successfully',
+            'updated_count': updated_count
         })

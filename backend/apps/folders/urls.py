@@ -20,6 +20,7 @@ from apps.folders.views import (
     SmartFolderDetailView,
     SmartFolderDocumentsView,
     SmartFolderRefreshCountView,
+    SmartFolderReorderView,
 )
 
 app_name = 'folders'
@@ -48,6 +49,7 @@ urlpatterns = [
 
     # Smart folder endpoints
     path('smart-folders/', SmartFolderListCreateView.as_view(), name='smart_folder_list_create'),
+    path('smart-folders/reorder/', SmartFolderReorderView.as_view(), name='smart_folder_reorder'),
     path('smart-folders/<uuid:pk>/', SmartFolderDetailView.as_view(), name='smart_folder_detail'),
     path('smart-folders/<uuid:pk>/documents/', SmartFolderDocumentsView.as_view(), name='smart_folder_documents'),
     path('smart-folders/<uuid:pk>/refresh/', SmartFolderRefreshCountView.as_view(), name='smart_folder_refresh'),

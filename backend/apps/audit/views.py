@@ -17,6 +17,28 @@ from apps.audit.serializers import (
 )
 
 
+class CanViewAuditLogs(permissions.BasePermission):
+    """
+    Permission class to check if user can view audit logs.
+
+    Users can view audit logs if they:
+    - Are a superuser
+    - Are staff
+    - Have the 'view_audit_log' permission
+    """
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        # Superusers and staff can always view
+        if request.user.is_superuser or request.user.is_staff:
+            return True
+
+        # Check for specific permission
+        return request.user.has_perm('audit.view_audit_log')
+
+
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     """
     ViewSet for viewing audit logs.
@@ -33,7 +55,7 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = AuditLog.objects.all()
     serializer_class = AuditLogSerializer
-    permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]  # Only admins can view audit logs
+    permission_classes = [permissions.IsAuthenticated, CanViewAuditLogs]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['resource_name', 'action', 'resource_type', 'user__email']
     ordering_fields = ['timestamp', 'action', 'resource_type', 'outcome']

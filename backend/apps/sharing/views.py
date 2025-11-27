@@ -5,6 +5,8 @@ Views:
 - ShareViewSet: Authenticated CRUD operations for shares
 - PublicShareAccessView: Public access to shares (no authentication required)
 - PublicShareDownloadView: Direct download for authorized shares
+- SharedWithMeViewSet: "Shared with Me" functionality
+- ShareInvitationViewSet: Share invitation management
 """
 
 from rest_framework import viewsets, status
@@ -16,14 +18,31 @@ from django.http import FileResponse, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.db.models import Count, Q
 from django.utils import timezone
-from apps.sharing.models import Share, ShareAccess
+from datetime import timedelta
+from apps.sharing.models import (
+    Share, ShareAccess, SharedItemAccess, ShareInvitation,
+    Notification, NotificationPreferences
+)
 from apps.sharing.serializers import (
     ShareSerializer,
     CreateShareSerializer,
     PublicShareAccessSerializer,
     ShareAnalyticsSerializer,
     RevokeShareSerializer,
-    ShareAccessSerializer
+    ShareAccessSerializer,
+    SharedItemAccessSerializer,
+    SharedItemAccessListSerializer,
+    ShortcutUpdateSerializer,
+    SharedWithMeStatsSerializer,
+    ShareInvitationSerializer,
+    AcceptInvitationSerializer,
+    DeclineInvitationSerializer,
+    CreateShareWithUserSerializer,
+    RequestAccessSerializer,
+    NotificationSerializer,
+    NotificationListSerializer,
+    NotificationPreferencesSerializer,
+    MarkNotificationsReadSerializer,
 )
 from apps.audit.models import AuditLog
 import mimetypes
@@ -354,3 +373,617 @@ def verify_share_password(request, token):
         'valid': is_valid,
         'message': 'Correct password' if is_valid else 'Incorrect password'
     })
+
+
+# ============================================================================
+# Shared With Me Views
+# ============================================================================
+
+
+class SharedWithMeViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for "Shared with Me" functionality.
+
+    Lists all documents and folders shared with the current user.
+    Supports filtering, shortcuts, and statistics.
+    """
+
+    permission_classes = [IsAuthenticated]
+    serializer_class = SharedItemAccessSerializer
+
+    def get_queryset(self):
+        """Return items shared with the current user"""
+        queryset = SharedItemAccess.objects.filter(
+            recipient=self.request.user,
+            is_active=True,
+            is_hidden=False
+        ).select_related('shared_by')
+
+        # Apply filters
+        resource_type = self.request.query_params.get('resource_type')
+        if resource_type:
+            queryset = queryset.filter(resource_type=resource_type)
+
+        shared_by = self.request.query_params.get('shared_by')
+        if shared_by:
+            queryset = queryset.filter(shared_by_id=shared_by)
+
+        permission_level = self.request.query_params.get('permission_level')
+        if permission_level:
+            queryset = queryset.filter(permission_level=permission_level)
+
+        is_external = self.request.query_params.get('is_external')
+        if is_external is not None:
+            queryset = queryset.filter(is_external_share=is_external.lower() == 'true')
+
+        is_shortcut = self.request.query_params.get('is_shortcut')
+        if is_shortcut is not None:
+            queryset = queryset.filter(is_shortcut=is_shortcut.lower() == 'true')
+
+        # Date filters
+        date_from = self.request.query_params.get('date_from')
+        if date_from:
+            queryset = queryset.filter(shared_at__gte=date_from)
+
+        date_to = self.request.query_params.get('date_to')
+        if date_to:
+            queryset = queryset.filter(shared_at__lte=date_to)
+
+        # Search
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(resource_name__icontains=search) |
+                Q(shared_by__first_name__icontains=search) |
+                Q(shared_by__last_name__icontains=search) |
+                Q(shared_by__email__icontains=search)
+            )
+
+        return queryset.order_by('-is_shortcut', 'shortcut_order', '-shared_at')
+
+    def get_serializer_class(self):
+        """Use lightweight serializer for list views"""
+        if self.action == 'list':
+            return SharedItemAccessListSerializer
+        return SharedItemAccessSerializer
+
+    def list(self, request, *args, **kwargs):
+        """
+        List shared items with grouping by shortcuts and time.
+        """
+        queryset = self.filter_queryset(self.get_queryset())
+
+        # Separate shortcuts from regular items
+        shortcuts = queryset.filter(is_shortcut=True).order_by('shortcut_order')
+        regular_items = queryset.filter(is_shortcut=False)
+
+        # Group regular items by time
+        now = timezone.now()
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        week_start = today_start - timedelta(days=today_start.weekday())
+        month_start = today_start.replace(day=1)
+
+        today_items = regular_items.filter(shared_at__gte=today_start)
+        this_week_items = regular_items.filter(
+            shared_at__gte=week_start,
+            shared_at__lt=today_start
+        )
+        this_month_items = regular_items.filter(
+            shared_at__gte=month_start,
+            shared_at__lt=week_start
+        )
+        earlier_items = regular_items.filter(shared_at__lt=month_start)
+
+        serializer_class = self.get_serializer_class()
+
+        return Response({
+            'shortcuts': serializer_class(shortcuts, many=True).data,
+            'today': serializer_class(today_items[:50], many=True).data,
+            'this_week': serializer_class(this_week_items[:50], many=True).data,
+            'this_month': serializer_class(this_month_items[:50], many=True).data,
+            'earlier': serializer_class(earlier_items[:50], many=True).data,
+            'total_count': queryset.count(),
+        })
+
+    @action(detail=True, methods=['post'])
+    def shortcut(self, request, pk=None):
+        """Add or remove item from shortcuts"""
+        item = self.get_object()
+        serializer = ShortcutUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        is_shortcut = serializer.validated_data['is_shortcut']
+        order = serializer.validated_data.get('order')
+
+        if is_shortcut:
+            # Check max shortcuts limit
+            current_count = SharedItemAccess.objects.filter(
+                recipient=request.user,
+                is_shortcut=True
+            ).count()
+
+            if current_count >= SharedItemAccess.MAX_SHORTCUTS and not item.is_shortcut:
+                return Response(
+                    {'error': f'Maximum {SharedItemAccess.MAX_SHORTCUTS} shortcuts allowed'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            item.add_shortcut(order)
+        else:
+            item.remove_shortcut()
+
+        return Response({
+            'success': True,
+            'is_shortcut': item.is_shortcut,
+            'shortcut_order': item.shortcut_order
+        })
+
+    @action(detail=True, methods=['post'])
+    def hide(self, request, pk=None):
+        """Hide an item from the list"""
+        item = self.get_object()
+        item.hide()
+
+        return Response({'success': True, 'message': 'Item hidden from list'})
+
+    @action(detail=True, methods=['post'])
+    def unhide(self, request, pk=None):
+        """Unhide an item"""
+        item = get_object_or_404(
+            SharedItemAccess,
+            pk=pk,
+            recipient=request.user
+        )
+        item.unhide()
+
+        return Response({'success': True, 'message': 'Item restored to list'})
+
+    @action(detail=True, methods=['post'])
+    def access(self, request, pk=None):
+        """Record access to a shared item"""
+        item = self.get_object()
+        item.record_access()
+
+        return Response({'success': True})
+
+    @action(detail=True, methods=['delete'])
+    def leave(self, request, pk=None):
+        """Remove yourself from a share (leave shared folder/document)"""
+        item = self.get_object()
+
+        # Don't actually delete, just mark as inactive
+        item.is_active = False
+        item.save(update_fields=['is_active'])
+
+        # Log the action
+        AuditLog.log_action(
+            user=request.user,
+            action='SHARED_ACCESS_LEAVE',
+            resource_type=item.resource_type,
+            resource_id=str(item.resource_id),
+            resource_name=item.resource_name,
+            details={
+                'shared_by': str(item.shared_by.id),
+            }
+        )
+
+        return Response({'success': True, 'message': 'You have left this shared item'})
+
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """Get statistics for shared with me items"""
+        user = request.user
+        base_queryset = SharedItemAccess.objects.filter(
+            recipient=user,
+            is_active=True,
+            is_hidden=False
+        )
+
+        # Calculate stats
+        total = base_queryset.count()
+        unread = base_queryset.filter(first_viewed_at__isnull=True).count()
+        documents = base_queryset.filter(resource_type=SharedItemAccess.ResourceType.DOCUMENT).count()
+        folders = base_queryset.filter(resource_type=SharedItemAccess.ResourceType.FOLDER).count()
+        shortcuts = base_queryset.filter(is_shortcut=True).count()
+        external = base_queryset.filter(is_external_share=True).count()
+
+        # By permission
+        by_permission = {}
+        for level in SharedItemAccess.PermissionLevel:
+            by_permission[level.value] = base_queryset.filter(permission_level=level.value).count()
+
+        # By sharer (top 10)
+        by_sharer = list(
+            base_queryset.values(
+                'shared_by__id',
+                'shared_by__first_name',
+                'shared_by__last_name',
+                'shared_by__email'
+            ).annotate(count=Count('id')).order_by('-count')[:10]
+        )
+
+        # Recent (last 7 days)
+        week_ago = timezone.now() - timedelta(days=7)
+        recent_count = base_queryset.filter(shared_at__gte=week_ago).count()
+
+        # Pending invitations count
+        pending_invitations = ShareInvitation.objects.filter(
+            invited_user=user,
+            status=ShareInvitation.Status.PENDING
+        ).count()
+
+        return Response({
+            'total': total,
+            'unread': unread,
+            'documents': documents,
+            'folders': folders,
+            'shortcuts': shortcuts,
+            'external': external,
+            'by_permission': by_permission,
+            'by_sharer': by_sharer,
+            'recent_count': recent_count,
+            'pending_invitations': pending_invitations,
+        })
+
+    @action(detail=False, methods=['get'])
+    def hidden(self, request):
+        """Get list of hidden items"""
+        queryset = SharedItemAccess.objects.filter(
+            recipient=request.user,
+            is_active=True,
+            is_hidden=True
+        ).select_related('shared_by')
+
+        serializer = SharedItemAccessListSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def request_access(self, request, pk=None):
+        """Request higher permission level for a shared item"""
+        item = self.get_object()
+        serializer = RequestAccessSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        requested_permission = serializer.validated_data['requested_permission']
+        reason = serializer.validated_data['reason']
+
+        # Log the access request
+        AuditLog.log_action(
+            user=request.user,
+            action='SHARED_ACCESS_REQUEST',
+            resource_type=item.resource_type,
+            resource_id=str(item.resource_id),
+            resource_name=item.resource_name,
+            details={
+                'current_permission': item.permission_level,
+                'requested_permission': requested_permission,
+                'reason': reason,
+                'owner_id': str(item.shared_by.id),
+            }
+        )
+
+        # TODO: Send notification to the owner
+        # This would typically trigger an email or in-app notification
+
+        return Response({
+            'success': True,
+            'message': 'Access request submitted successfully'
+        })
+
+
+class ShareInvitationViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for managing share invitations.
+
+    Users can view, accept, or decline invitations.
+    """
+
+    permission_classes = [IsAuthenticated]
+    serializer_class = ShareInvitationSerializer
+
+    def get_queryset(self):
+        """Return pending invitations for the current user"""
+        return ShareInvitation.objects.filter(
+            invited_user=self.request.user
+        ).select_related('invited_by').order_by('-invited_at')
+
+    @action(detail=False, methods=['get'])
+    def pending(self, request):
+        """Get only pending invitations"""
+        queryset = self.get_queryset().filter(status=ShareInvitation.Status.PENDING)
+
+        # Filter out expired
+        queryset = queryset.filter(
+            Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now())
+        )
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def accept(self, request, pk=None):
+        """Accept a share invitation"""
+        invitation = self.get_object()
+
+        serializer = AcceptInvitationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        acknowledged = serializer.validated_data.get('acknowledged', False)
+
+        try:
+            shared_access = invitation.accept(acknowledged=acknowledged)
+            return Response({
+                'success': True,
+                'message': 'Invitation accepted',
+                'shared_item': SharedItemAccessSerializer(shared_access).data
+            })
+        except ValueError as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    @action(detail=True, methods=['post'])
+    def decline(self, request, pk=None):
+        """Decline a share invitation"""
+        invitation = self.get_object()
+
+        serializer = DeclineInvitationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        reason = serializer.validated_data.get('reason', '')
+
+        try:
+            invitation.decline(reason=reason)
+            return Response({
+                'success': True,
+                'message': 'Invitation declined'
+            })
+        except ValueError as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def share_with_users(request):
+    """
+    Share a document or folder with specific users.
+
+    This creates SharedItemAccess records (direct shares) or
+    ShareInvitation records (if acceptance is required).
+    """
+    serializer = CreateShareWithUserSerializer(
+        data=request.data,
+        context={'request': request}
+    )
+    serializer.is_valid(raise_exception=True)
+
+    results = serializer.save()
+
+    # Log the sharing action
+    resource_type = 'DOCUMENT' if request.data.get('document_id') else 'FOLDER'
+    resource_id = request.data.get('document_id') or request.data.get('folder_id')
+
+    AuditLog.log_action(
+        user=request.user,
+        action='SHARE_WITH_USERS',
+        resource_type=resource_type,
+        resource_id=str(resource_id),
+        resource_name='',  # Could fetch from DB if needed
+        details={
+            'recipient_count': len(results),
+            'results': results,
+        }
+    )
+
+    # Create notifications for recipients
+    from apps.sharing.tasks import create_share_notification
+
+    for result in results:
+        notification_type = 'SHARE_INVITATION' if result['type'] == 'invitation' else 'SHARE_RECEIVED'
+
+        # Get resource name
+        if request.data.get('document_id'):
+            from apps.documents.models import Document
+            try:
+                doc = Document.objects.get(id=request.data.get('document_id'))
+                resource_name = doc.title
+            except Document.DoesNotExist:
+                resource_name = 'Unknown'
+        else:
+            from apps.folders.models import Folder
+            try:
+                folder = Folder.objects.get(id=request.data.get('folder_id'))
+                resource_name = folder.name
+            except Folder.DoesNotExist:
+                resource_name = 'Unknown'
+
+        # Queue notification task
+        create_share_notification.delay(
+            recipient_id=result['recipient_id'],
+            shared_by_id=str(request.user.id),
+            resource_type=resource_type,
+            resource_id=str(resource_id),
+            resource_name=resource_name,
+            permission_level=request.data.get('permission_level', 'VIEW'),
+            notification_type=notification_type,
+            send_email=request.data.get('notify', True),
+        )
+
+    return Response({
+        'success': True,
+        'message': f'Shared with {len(results)} user(s)',
+        'results': results
+    })
+
+
+# ============================================================================
+# Notification Views
+# ============================================================================
+
+
+class NotificationViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing user notifications.
+
+    Supports listing, reading, and marking notifications as read.
+    """
+
+    permission_classes = [IsAuthenticated]
+    serializer_class = NotificationSerializer
+
+    def get_queryset(self):
+        """Return notifications for the current user"""
+        return Notification.objects.filter(
+            recipient=self.request.user
+        ).select_related('actor').order_by('-created_at')
+
+    def get_serializer_class(self):
+        """Use lightweight serializer for list views"""
+        if self.action == 'list':
+            return NotificationListSerializer
+        return NotificationSerializer
+
+    def list(self, request, *args, **kwargs):
+        """
+        List notifications with counts.
+        """
+        queryset = self.filter_queryset(self.get_queryset())
+
+        # Get counts
+        total_count = queryset.count()
+        unread_count = queryset.filter(is_read=False).count()
+
+        # Apply pagination
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            response = self.get_paginated_response(serializer.data)
+            response.data['total_count'] = total_count
+            response.data['unread_count'] = unread_count
+            return response
+
+        serializer = self.get_serializer(queryset[:50], many=True)
+        return Response({
+            'results': serializer.data,
+            'total_count': total_count,
+            'unread_count': unread_count,
+        })
+
+    @action(detail=False, methods=['get'])
+    def unread(self, request):
+        """Get only unread notifications"""
+        queryset = self.get_queryset().filter(is_read=False)[:20]
+        serializer = NotificationListSerializer(queryset, many=True)
+        return Response({
+            'results': serializer.data,
+            'unread_count': self.get_queryset().filter(is_read=False).count(),
+        })
+
+    @action(detail=False, methods=['get'])
+    def count(self, request):
+        """Get notification counts"""
+        queryset = self.get_queryset()
+        return Response({
+            'total': queryset.count(),
+            'unread': queryset.filter(is_read=False).count(),
+        })
+
+    @action(detail=True, methods=['post'])
+    def read(self, request, pk=None):
+        """Mark a single notification as read"""
+        notification = self.get_object()
+        notification.mark_as_read()
+        return Response({'success': True, 'is_read': True})
+
+    @action(detail=False, methods=['post'])
+    def mark_read(self, request):
+        """Mark multiple notifications as read"""
+        serializer = MarkNotificationsReadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        notification_ids = serializer.validated_data.get('notification_ids', [])
+
+        if notification_ids:
+            # Mark specific notifications as read
+            updated = Notification.objects.filter(
+                recipient=request.user,
+                id__in=notification_ids,
+                is_read=False
+            ).update(is_read=True, read_at=timezone.now())
+        else:
+            # Mark all as read
+            updated = Notification.objects.filter(
+                recipient=request.user,
+                is_read=False
+            ).update(is_read=True, read_at=timezone.now())
+
+        return Response({
+            'success': True,
+            'marked_count': updated,
+        })
+
+    @action(detail=False, methods=['delete'])
+    def clear_all(self, request):
+        """Delete all notifications for the user"""
+        deleted_count, _ = Notification.objects.filter(
+            recipient=request.user
+        ).delete()
+
+        return Response({
+            'success': True,
+            'deleted_count': deleted_count,
+        })
+
+    @action(detail=False, methods=['delete'])
+    def clear_read(self, request):
+        """Delete only read notifications"""
+        deleted_count, _ = Notification.objects.filter(
+            recipient=request.user,
+            is_read=True
+        ).delete()
+
+        return Response({
+            'success': True,
+            'deleted_count': deleted_count,
+        })
+
+
+class NotificationPreferencesView(APIView):
+    """
+    View for managing user notification preferences.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        """Get current user's notification preferences"""
+        preferences = NotificationPreferences.get_or_create_for_user(request.user)
+        serializer = NotificationPreferencesSerializer(preferences)
+        return Response(serializer.data)
+
+    def patch(self, request):
+        """Update notification preferences"""
+        preferences = NotificationPreferences.get_or_create_for_user(request.user)
+        serializer = NotificationPreferencesSerializer(
+            preferences,
+            data=request.data,
+            partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def put(self, request):
+        """Replace notification preferences"""
+        preferences = NotificationPreferences.get_or_create_for_user(request.user)
+        serializer = NotificationPreferencesSerializer(
+            preferences,
+            data=request.data
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)

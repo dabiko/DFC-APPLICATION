@@ -18,6 +18,7 @@ from apps.users.serializers import (
     PasswordChangeSerializer,
     DepartmentSerializer
 )
+from apps.users.views_management import UserManagementSerializer
 from apps.users.emails import send_welcome_email
 
 
@@ -272,30 +273,73 @@ class PasswordChangeView(APIView):
 
 @extend_schema(
     tags=['Users'],
+    parameters=[
+        OpenApiParameter(name='search', description='Search by name or email', type=str),
+        OpenApiParameter(name='status', description='Filter by status (active, inactive, locked)', type=str),
+        OpenApiParameter(name='department', description='Filter by department ID', type=int),
+        OpenApiParameter(name='mfa_status', description='Filter by MFA status (enabled, disabled)', type=str),
+        OpenApiParameter(name='page', description='Page number', type=int),
+        OpenApiParameter(name='page_size', description='Items per page', type=int),
+    ],
     responses={
-        200: UserSerializer(many=True),
+        200: UserManagementSerializer(many=True),
     }
 )
 class UserListView(generics.ListAPIView):
     """
-    List all users in the system.
+    List all users in the system with filtering and search.
     Requires authentication.
     """
-    queryset = CustomUser.objects.select_related('department').all()
-    serializer_class = UserSerializer
+    queryset = CustomUser.objects.select_related('department', 'organization').all()
+    serializer_class = UserManagementSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         """
-        Optionally filter users by department
+        Filter users by various criteria
         """
-        queryset = super().get_queryset()
-        department_id = self.request.query_params.get('department', None)
+        from django.db.models import Q
+        from django.utils import timezone
 
-        if department_id is not None:
+        queryset = super().get_queryset()
+
+        # Search filter
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(first_name__icontains=search) |
+                Q(last_name__icontains=search) |
+                Q(email__icontains=search) |
+                Q(username__icontains=search)
+            )
+
+        # Department filter
+        department_id = self.request.query_params.get('department')
+        if department_id:
             queryset = queryset.filter(department_id=department_id)
 
-        return queryset
+        # Status filter
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            now = timezone.now()
+            if status_filter == 'active':
+                queryset = queryset.filter(is_active=True).exclude(
+                    account_locked_until__gt=now
+                )
+            elif status_filter == 'inactive':
+                queryset = queryset.filter(is_active=False)
+            elif status_filter == 'locked':
+                queryset = queryset.filter(account_locked_until__gt=now)
+
+        # MFA filter
+        mfa_status = self.request.query_params.get('mfa_status')
+        if mfa_status:
+            if mfa_status == 'enabled':
+                queryset = queryset.filter(mfa_enabled=True)
+            elif mfa_status == 'disabled':
+                queryset = queryset.filter(mfa_enabled=False)
+
+        return queryset.order_by('-created_at')
 
 
 @extend_schema(

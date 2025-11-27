@@ -2,7 +2,11 @@
  * ShareFolderModal Component
  * Enterprise-grade folder sharing with granular permission controls
  *
- * Folder permissions are different from document permissions:
+ * Supports two sharing modes:
+ * 1. Share with Users - Share directly with internal users (creates SharedItemAccess)
+ * 2. Create Link - Generate a shareable link with optional password protection
+ *
+ * Folder permissions:
  * - VIEW: Can see folder contents and navigate
  * - CONTRIBUTE: Can add files/folders but not modify existing
  * - EDIT: Can modify contents (add, edit, delete files/subfolders)
@@ -25,8 +29,18 @@ import {
   PencilIcon,
   TrashIcon,
   Cog6ToothIcon,
+  MagnifyingGlassIcon,
+  UserPlusIcon,
+  EnvelopeIcon,
 } from '@heroicons/react/24/outline'
 import type { Folder } from '@/types/folder'
+import {
+  shareWithUsers,
+  type PermissionLevel,
+  type ShareWithUsersRequest,
+} from '@/services/sharedWithMeService'
+import { getShareableUsers, type ShareableUser } from '@/services/favoritesService'
+import { toast } from '@/utils/toast'
 
 export interface ShareFolderModalProps {
   isOpen: boolean
@@ -51,6 +65,7 @@ export interface FolderShareData {
 
 interface PermissionOption {
   value: FolderPermissionLevel
+  apiValue: PermissionLevel
   label: string
   description: string
   icon: React.ReactNode
@@ -60,6 +75,7 @@ interface PermissionOption {
 const FOLDER_PERMISSION_OPTIONS: PermissionOption[] = [
   {
     value: 'VIEW',
+    apiValue: 'VIEW',
     label: 'View',
     description: 'Can view folder contents and download files',
     icon: <EyeIcon className="w-5 h-5" />,
@@ -67,6 +83,7 @@ const FOLDER_PERMISSION_OPTIONS: PermissionOption[] = [
   },
   {
     value: 'CONTRIBUTE',
+    apiValue: 'COMMENT',
     label: 'Contribute',
     description: 'Can add new files and folders',
     icon: <PlusIcon className="w-5 h-5" />,
@@ -74,6 +91,7 @@ const FOLDER_PERMISSION_OPTIONS: PermissionOption[] = [
   },
   {
     value: 'EDIT',
+    apiValue: 'EDIT',
     label: 'Edit',
     description: 'Can modify, rename, and delete contents',
     icon: <PencilIcon className="w-5 h-5" />,
@@ -81,6 +99,7 @@ const FOLDER_PERMISSION_OPTIONS: PermissionOption[] = [
   },
   {
     value: 'FULL_CONTROL',
+    apiValue: 'FULL',
     label: 'Full Control',
     description: 'Complete control including sharing and settings',
     icon: <Cog6ToothIcon className="w-5 h-5" />,
@@ -108,21 +127,34 @@ export const ShareFolderModal: FC<ShareFolderModalProps> = ({
   onClose,
   onShareCreated,
 }) => {
-  // Form state
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'users' | 'link' | 'existing'>('users')
+
+  // Form state for user sharing
   const [permission, setPermission] = useState<FolderPermissionLevel>('VIEW')
-  const [expiryDays, setExpiryDays] = useState<number>(30)
+  const [expiryDays, setExpiryDays] = useState<number>(0)
+  const [message, setMessage] = useState('')
+  const [requireAcceptance, setRequireAcceptance] = useState(false)
+  const [notifyUsers, setNotifyUsers] = useState(true)
+  const [requireAcknowledgement, setRequireAcknowledgement] = useState(false)
+  const [acknowledgementText, setAcknowledgementText] = useState('')
+
+  // User search state
+  const [userSearchQuery, setUserSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<ShareableUser[]>([])
+  const [selectedUsers, setSelectedUsers] = useState<ShareableUser[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+
+  // Link sharing state
   const [password, setPassword] = useState('')
   const [usePassword, setUsePassword] = useState(false)
-  const [recipientEmails, setRecipientEmails] = useState('')
   const [includeSubfolders, setIncludeSubfolders] = useState(true)
-  const [_notes, setNotes] = useState('')
 
   // UI state
   const [isCreating, setIsCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [createdShare, setCreatedShare] = useState<FolderShareData | null>(null)
   const [copied, setCopied] = useState(false)
-  const [activeTab, setActiveTab] = useState<'create' | 'existing'>('create')
 
   // Existing shares (mock data for now)
   const [existingShares, setExistingShares] = useState<FolderShareData[]>([])
@@ -130,49 +162,142 @@ export const ShareFolderModal: FC<ShareFolderModalProps> = ({
   // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
+      setActiveTab('users')
       setPermission('VIEW')
-      setExpiryDays(30)
+      setExpiryDays(0)
+      setMessage('')
+      setRequireAcceptance(false)
+      setNotifyUsers(true)
+      setRequireAcknowledgement(false)
+      setAcknowledgementText('')
+      setUserSearchQuery('')
+      setSearchResults([])
+      setSelectedUsers([])
       setPassword('')
       setUsePassword(false)
-      setRecipientEmails('')
       setIncludeSubfolders(true)
-      setNotes('')
       setError(null)
       setCreatedShare(null)
       setCopied(false)
-      setActiveTab('create')
     }
   }, [isOpen])
 
-  const handleCreateShare = async () => {
+  // Search users with debounce
+  useEffect(() => {
+    const searchUsers = async () => {
+      if (userSearchQuery.length < 2) {
+        setSearchResults([])
+        return
+      }
+
+      setIsSearching(true)
+      try {
+        const users = await getShareableUsers(userSearchQuery)
+        // Filter out already selected users
+        const selectedIds = new Set(selectedUsers.map((u) => u.id))
+        setSearchResults(users.filter((u) => !selectedIds.has(u.id)))
+      } catch (error) {
+        console.error('Failed to search users:', error)
+      } finally {
+        setIsSearching(false)
+      }
+    }
+
+    const debounceTimer = setTimeout(searchUsers, 300)
+    return () => clearTimeout(debounceTimer)
+  }, [userSearchQuery, selectedUsers])
+
+  // Handle user selection
+  const handleSelectUser = useCallback((user: ShareableUser) => {
+    setSelectedUsers((prev) => [...prev, user])
+    setUserSearchQuery('')
+    setSearchResults([])
+  }, [])
+
+  // Handle user removal
+  const handleRemoveUser = useCallback((userId: number) => {
+    setSelectedUsers((prev) => prev.filter((u) => u.id !== userId))
+  }, [])
+
+  // Get API permission level from form permission
+  const getApiPermission = useCallback((perm: FolderPermissionLevel): PermissionLevel => {
+    const option = FOLDER_PERMISSION_OPTIONS.find((o) => o.value === perm)
+    return option?.apiValue || 'VIEW'
+  }, [])
+
+  // Handle share with users
+  const handleShareWithUsers = async () => {
+    if (!folder || selectedUsers.length === 0) return
+
+    setIsCreating(true)
+    setError(null)
+
+    try {
+      const request: ShareWithUsersRequest = {
+        folder_id: folder.id,
+        recipient_ids: selectedUsers.map((u) => String(u.id)),
+        permission_level: getApiPermission(permission),
+        message: message || undefined,
+        notify: notifyUsers,
+        require_acceptance: requireAcceptance,
+        require_acknowledgement: requireAcknowledgement,
+        acknowledgement_text: requireAcknowledgement ? acknowledgementText || undefined : undefined,
+      }
+
+      if (expiryDays > 0) {
+        request.expires_in_days = expiryDays
+      }
+
+      const response = await shareWithUsers(request)
+
+      if (response.success) {
+        toast.success(`Folder shared with ${selectedUsers.length} user(s)`)
+        setSelectedUsers([])
+        setMessage('')
+
+        // Create a share data object for the callback
+        const shareData: FolderShareData = {
+          id: crypto.randomUUID(),
+          folderId: folder.id,
+          permission,
+          recipientEmails: selectedUsers.map((u) => u.email),
+          expiresAt:
+            expiryDays > 0
+              ? new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000).toISOString()
+              : null,
+          shareUrl: '',
+          isPasswordProtected: false,
+          includeSubfolders: true,
+          createdAt: new Date().toISOString(),
+        }
+
+        onShareCreated?.(shareData)
+      }
+    } catch (err) {
+      console.error('Failed to share folder:', err)
+      const errorMessage = err instanceof Error ? err.message : 'Failed to share folder'
+      setError(errorMessage)
+      toast.error(errorMessage)
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
+  // Handle link creation (existing functionality)
+  const handleCreateLink = async () => {
     if (!folder) return
 
     setIsCreating(true)
     setError(null)
 
     try {
-      // Parse recipient emails
-      const emails = recipientEmails
-        .split(/[,\n]/)
-        .map((e) => e.trim())
-        .filter((e) => e.length > 0)
-
-      // Validate emails
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      const invalidEmails = emails.filter((e) => !emailRegex.test(e))
-      if (invalidEmails.length > 0) {
-        setError(`Invalid email addresses: ${invalidEmails.join(', ')}`)
-        setIsCreating(false)
-        return
-      }
-
-      // TODO: Call backend API to create folder share
+      // TODO: Implement link-based folder sharing via backend
       // For now, create mock share data
       const mockShare: FolderShareData = {
         id: crypto.randomUUID(),
         folderId: folder.id,
         permission,
-        recipientEmails: emails,
+        recipientEmails: [],
         expiresAt:
           expiryDays > 0
             ? new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000).toISOString()
@@ -185,11 +310,10 @@ export const ShareFolderModal: FC<ShareFolderModalProps> = ({
 
       setCreatedShare(mockShare)
       onShareCreated?.(mockShare)
-
-      // Add to existing shares
       setExistingShares((prev) => [mockShare, ...prev])
+      toast.success('Share link created')
     } catch (err) {
-      console.error('Failed to create folder share:', err)
+      console.error('Failed to create share link:', err)
       setError(err instanceof Error ? err.message : 'Failed to create share link')
     } finally {
       setIsCreating(false)
@@ -203,15 +327,18 @@ export const ShareFolderModal: FC<ShareFolderModalProps> = ({
       const fullUrl = `${window.location.origin}${createdShare.shareUrl}`
       await navigator.clipboard.writeText(fullUrl)
       setCopied(true)
+      toast.success('Link copied to clipboard')
       setTimeout(() => setCopied(false), 2000)
     } catch (error) {
       console.error('Failed to copy link:', error)
+      toast.error('Failed to copy link')
     }
   }, [createdShare])
 
   const handleRevokeShare = async (shareId: string) => {
     // TODO: Call backend API to revoke share
     setExistingShares((prev) => prev.filter((s) => s.id !== shareId))
+    toast.success('Share revoked')
   }
 
   const handleClose = () => {
@@ -220,7 +347,7 @@ export const ShareFolderModal: FC<ShareFolderModalProps> = ({
     }
   }
 
-  const getPermissionLabel = (perm: FolderPermissionLevel): string => {
+  const getPermissionLabelForFolder = (perm: FolderPermissionLevel): string => {
     return FOLDER_PERMISSION_OPTIONS.find((o) => o.value === perm)?.label || perm
   }
 
@@ -261,14 +388,26 @@ export const ShareFolderModal: FC<ShareFolderModalProps> = ({
         {/* Tabs */}
         <div className="flex border-b border-gray-200 dark:border-gray-700">
           <button
-            onClick={() => setActiveTab('create')}
-            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'create'
+            onClick={() => setActiveTab('users')}
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+              activeTab === 'users'
                 ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-600'
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
             }`}
           >
-            Create New Share
+            <UserPlusIcon className="w-4 h-4" />
+            Share with Users
+          </button>
+          <button
+            onClick={() => setActiveTab('link')}
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+              activeTab === 'link'
+                ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-600'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
+            }`}
+          >
+            <LinkIcon className="w-4 h-4" />
+            Create Link
           </button>
           <button
             onClick={() => setActiveTab('existing')}
@@ -278,7 +417,7 @@ export const ShareFolderModal: FC<ShareFolderModalProps> = ({
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
             }`}
           >
-            Active Shares ({existingShares.length})
+            Active ({existingShares.length})
           </button>
         </div>
 
@@ -299,7 +438,199 @@ export const ShareFolderModal: FC<ShareFolderModalProps> = ({
             )}
           </div>
 
-          {activeTab === 'create' && !createdShare && (
+          {/* Share with Users Tab */}
+          {activeTab === 'users' && (
+            <div className="space-y-6">
+              {/* User Search */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <UserGroupIcon className="w-4 h-4 inline mr-2" />
+                  Add People
+                </label>
+                <div className="relative">
+                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={userSearchQuery}
+                    onChange={(e) => setUserSearchQuery(e.target.value)}
+                    placeholder="Search by name or email..."
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  />
+                  {isSearching && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <div className="w-4 h-4 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Search Results */}
+                {searchResults.length > 0 && (
+                  <div className="mt-2 border border-gray-200 dark:border-gray-700 rounded-lg max-h-40 overflow-y-auto">
+                    {searchResults.map((user) => (
+                      <button
+                        key={user.id}
+                        onClick={() => handleSelectUser(user)}
+                        className="w-full px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
+                          <span className="text-sm font-medium text-primary-600 dark:text-primary-400">
+                            {user.first_name[0]}
+                            {user.last_name[0]}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                            {user.first_name} {user.last_name}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                            {user.email}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Selected Users */}
+                {selectedUsers.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {selectedUsers.map((user) => (
+                      <span
+                        key={user.id}
+                        className="inline-flex items-center gap-1 px-2 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-full text-sm"
+                      >
+                        {user.first_name} {user.last_name}
+                        <button
+                          onClick={() => handleRemoveUser(user.id)}
+                          className="ml-1 hover:text-primary-900 dark:hover:text-primary-100"
+                        >
+                          <XMarkIcon className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Permission Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Permission Level
+                </label>
+                <select
+                  value={permission}
+                  onChange={(e) => setPermission(e.target.value as FolderPermissionLevel)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                >
+                  {FOLDER_PERMISSION_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label} - {option.description}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Message */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <EnvelopeIcon className="w-4 h-4 inline mr-2" />
+                  Message (optional)
+                </label>
+                <textarea
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="Add a message for the recipients..."
+                  rows={2}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                />
+              </div>
+
+              {/* Options */}
+              <div className="space-y-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notifyUsers}
+                    onChange={(e) => setNotifyUsers(e.target.checked)}
+                    className="rounded border-gray-300 dark:border-gray-600"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                    Send email notification
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={requireAcceptance}
+                    onChange={(e) => setRequireAcceptance(e.target.checked)}
+                    className="rounded border-gray-300 dark:border-gray-600"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                    Require acceptance (invitation)
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={requireAcknowledgement}
+                    onChange={(e) => setRequireAcknowledgement(e.target.checked)}
+                    className="rounded border-gray-300 dark:border-gray-600"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                    Require acknowledgement (for confidential content)
+                  </span>
+                </label>
+              </div>
+
+              {/* Acknowledgement Text */}
+              {requireAcknowledgement && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Acknowledgement Text (optional)
+                  </label>
+                  <textarea
+                    value={acknowledgementText}
+                    onChange={(e) => setAcknowledgementText(e.target.value)}
+                    placeholder="Enter custom acknowledgement text that recipients must agree to..."
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
+                  />
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Leave empty to use default confidentiality acknowledgement text.
+                  </p>
+                </div>
+              )}
+
+              {/* Expiry */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <CalendarIcon className="w-4 h-4 inline mr-2" />
+                  Access Expiration
+                </label>
+                <select
+                  value={expiryDays}
+                  onChange={(e) => setExpiryDays(Number(e.target.value))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                >
+                  {EXPIRY_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Error message */}
+              {error && (
+                <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                  <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Create Link Tab */}
+          {activeTab === 'link' && !createdShare && (
             <div className="space-y-6">
               {/* Permission Selection */}
               <div>
@@ -322,7 +653,7 @@ export const ShareFolderModal: FC<ShareFolderModalProps> = ({
                     >
                       <input
                         type="radio"
-                        name="permission"
+                        name="link-permission"
                         value={option.value}
                         checked={permission === option.value}
                         onChange={() => setPermission(option.value)}
@@ -366,16 +697,13 @@ export const ShareFolderModal: FC<ShareFolderModalProps> = ({
                     Include all subfolders and their contents
                   </span>
                 </label>
-                <p className="ml-6 mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Permissions will apply to all nested folders and files
-                </p>
               </div>
 
               {/* Expiry Selection */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   <CalendarIcon className="w-4 h-4 inline mr-2" />
-                  Share Expiration
+                  Link Expiration
                 </label>
                 <select
                   value={expiryDays}
@@ -415,23 +743,6 @@ export const ShareFolderModal: FC<ShareFolderModalProps> = ({
                 )}
               </div>
 
-              {/* Recipient Emails */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Invite people (optional)
-                </label>
-                <textarea
-                  value={recipientEmails}
-                  onChange={(e) => setRecipientEmails(e.target.value)}
-                  placeholder="Enter email addresses (comma or newline separated)"
-                  rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                />
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  An email notification with the share link will be sent to these addresses
-                </p>
-              </div>
-
               {/* Error message */}
               {error && (
                 <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
@@ -441,8 +752,8 @@ export const ShareFolderModal: FC<ShareFolderModalProps> = ({
             </div>
           )}
 
-          {/* Share created success */}
-          {activeTab === 'create' && createdShare && (
+          {/* Share link created success */}
+          {activeTab === 'link' && createdShare && (
             <div className="space-y-6">
               <div className="text-center py-4">
                 <div className="w-16 h-16 mx-auto bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mb-4">
@@ -453,7 +764,7 @@ export const ShareFolderModal: FC<ShareFolderModalProps> = ({
                 </h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                   Share this link to grant{' '}
-                  {getPermissionLabel(createdShare.permission).toLowerCase()} access
+                  {getPermissionLabelForFolder(createdShare.permission).toLowerCase()} access
                 </p>
               </div>
 
@@ -494,7 +805,7 @@ export const ShareFolderModal: FC<ShareFolderModalProps> = ({
                 <div className="flex justify-between">
                   <span className="text-gray-500 dark:text-gray-400">Permission:</span>
                   <span className="text-gray-900 dark:text-gray-100">
-                    {getPermissionLabel(createdShare.permission)}
+                    {getPermissionLabelForFolder(createdShare.permission)}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -523,7 +834,7 @@ export const ShareFolderModal: FC<ShareFolderModalProps> = ({
                 onClick={() => setCreatedShare(null)}
                 className="w-full px-4 py-2 text-sm font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg transition-colors"
               >
-                Create Another Share
+                Create Another Link
               </button>
             </div>
           )}
@@ -547,7 +858,7 @@ export const ShareFolderModal: FC<ShareFolderModalProps> = ({
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                          {getPermissionLabel(share.permission)} Access
+                          {getPermissionLabelForFolder(share.permission)} Access
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                           Created {new Date(share.createdAt).toLocaleDateString()}
@@ -580,25 +891,28 @@ export const ShareFolderModal: FC<ShareFolderModalProps> = ({
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        readOnly
-                        value={`${window.location.origin}${share.shareUrl}`}
-                        className="flex-1 px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 rounded border-0"
-                      />
-                      <button
-                        onClick={async () => {
-                          await navigator.clipboard.writeText(
-                            `${window.location.origin}${share.shareUrl}`
-                          )
-                        }}
-                        className="p-1 text-gray-500 hover:text-primary-600 transition-colors"
-                        title="Copy link"
-                      >
-                        <ClipboardDocumentIcon className="w-4 h-4" />
-                      </button>
-                    </div>
+                    {share.shareUrl && (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          readOnly
+                          value={`${window.location.origin}${share.shareUrl}`}
+                          className="flex-1 px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 rounded border-0"
+                        />
+                        <button
+                          onClick={async () => {
+                            await navigator.clipboard.writeText(
+                              `${window.location.origin}${share.shareUrl}`
+                            )
+                            toast.success('Link copied')
+                          }}
+                          className="p-1 text-gray-500 hover:text-primary-600 transition-colors"
+                          title="Copy link"
+                        >
+                          <ClipboardDocumentIcon className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))
               )}
@@ -616,10 +930,50 @@ export const ShareFolderModal: FC<ShareFolderModalProps> = ({
           >
             {createdShare ? 'Done' : 'Cancel'}
           </button>
-          {activeTab === 'create' && !createdShare && (
+
+          {/* Share with Users button */}
+          {activeTab === 'users' && (
             <button
               type="button"
-              onClick={handleCreateShare}
+              onClick={handleShareWithUsers}
+              disabled={isCreating || selectedUsers.length === 0}
+              className="px-4 py-2 text-sm font-medium bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {isCreating ? (
+                <>
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      fill="none"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  Sharing...
+                </>
+              ) : (
+                <>
+                  <UserPlusIcon className="w-4 h-4" />
+                  Share with {selectedUsers.length || ''} User
+                  {selectedUsers.length !== 1 ? 's' : ''}
+                </>
+              )}
+            </button>
+          )}
+
+          {/* Create Link button */}
+          {activeTab === 'link' && !createdShare && (
+            <button
+              type="button"
+              onClick={handleCreateLink}
               disabled={isCreating || (usePassword && !password)}
               className="px-4 py-2 text-sm font-medium bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >

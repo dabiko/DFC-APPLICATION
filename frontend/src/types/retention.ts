@@ -479,6 +479,9 @@ export interface LegalHoldManagerProps {
   onEditHold?: (holdId: string) => void
   onReleaseHold?: (holdId: string) => void
   onViewAudit?: (holdId: string) => void
+  onManageCustodians?: (holdId: string) => void
+  onManageNotifications?: (holdId: string) => void
+  onInitiateRelease?: (holdId: string) => void
   loading?: boolean
 }
 

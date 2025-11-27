@@ -357,22 +357,30 @@ class SmartFolder(models.Model):
     """
 
     ICON_CHOICES = [
-        ('star', 'Star'),
-        ('bookmark', 'Bookmark'),
+        ('folder-search', 'Folder Search'),
+        ('folder-star', 'Folder Star'),
+        ('folder-clock', 'Folder Clock'),
         ('filter', 'Filter'),
         ('search', 'Search'),
+        ('star', 'Star'),
+        ('bookmark', 'Bookmark'),
         ('tag', 'Tag'),
+        ('calendar', 'Calendar'),
+        ('briefcase', 'Briefcase'),
         ('folder_special', 'Special Folder'),
     ]
 
     COLOR_CHOICES = [
-        ('#FF5733', 'Red'),
-        ('#33FF57', 'Green'),
-        ('#3357FF', 'Blue'),
-        ('#FF33F5', 'Purple'),
-        ('#F5FF33', 'Yellow'),
-        ('#33FFF5', 'Cyan'),
-        ('#FF8C33', 'Orange'),
+        ('blue', 'Blue'),
+        ('green', 'Green'),
+        ('yellow', 'Yellow'),
+        ('orange', 'Orange'),
+        ('red', 'Red'),
+        ('purple', 'Purple'),
+        ('pink', 'Pink'),
+        ('teal', 'Teal'),
+        ('indigo', 'Indigo'),
+        ('gray', 'Gray'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -396,12 +404,12 @@ class SmartFolder(models.Model):
     icon = models.CharField(
         max_length=50,
         choices=ICON_CHOICES,
-        default='folder_special'
+        default='folder-search'
     )
     color = models.CharField(
-        max_length=7,
+        max_length=20,
         choices=COLOR_CHOICES,
-        default='#3357FF'
+        default='blue'
     )
 
     # Ownership and visibility
@@ -452,6 +460,27 @@ class SmartFolder(models.Model):
         help_text='When document_count was last updated'
     )
 
+    # Scope settings for "My Documents" feature
+    include_owned = models.BooleanField(
+        default=True,
+        help_text='Include documents owned by the user'
+    )
+    include_shared = models.BooleanField(
+        default=False,
+        help_text='Include documents shared with the user'
+    )
+
+    # Display settings
+    display_order = models.IntegerField(
+        default=0,
+        db_index=True,
+        help_text='Order in which to display in sidebar'
+    )
+    is_visible = models.BooleanField(
+        default=True,
+        help_text='Whether to show in sidebar'
+    )
+
     class Meta:
         db_table = 'smart_folders'
         verbose_name = 'Smart Folder'
@@ -463,8 +492,10 @@ class SmartFolder(models.Model):
             models.Index(fields=['is_global']),
             models.Index(fields=['is_active']),
             models.Index(fields=['created_at']),
+            models.Index(fields=['owner', 'display_order']),
+            models.Index(fields=['owner', 'is_visible']),
         ]
-        ordering = ['name']
+        ordering = ['display_order', 'name']
 
     def __str__(self):
         return f"{self.name} ({'Personal' if self.is_personal else 'Shared'})"
@@ -481,12 +512,27 @@ class SmartFolder(models.Model):
         """
         from apps.documents.models import Document
         from django.db.models import Q
+        from django.utils import timezone
+        from datetime import timedelta
 
         # Start with all non-deleted documents
         queryset = Document.objects.filter(is_deleted=False)
 
-        # Apply permission filtering if user provided
-        if user and not user.is_staff:
+        # Apply scope filtering based on include_owned and include_shared
+        effective_user = user or self.owner
+        scope_filter = Q()
+
+        if self.include_owned:
+            scope_filter |= Q(owner=effective_user)
+
+        if self.include_shared:
+            # TODO: Add shared document filtering when sharing model is integrated
+            pass
+
+        if scope_filter:
+            queryset = queryset.filter(scope_filter)
+        elif user and not user.is_staff:
+            # Fallback to department filter if no scope specified
             queryset = queryset.filter(department=user.department)
 
         # Apply search criteria
@@ -580,6 +626,44 @@ class SmartFolder(models.Model):
             if 'to' in created_range:
                 queryset = queryset.filter(created_at__lte=created_range['to'])
 
+        # Relative date filter (today, this_week, this_month, last_7_days, last_30_days)
+        if 'relative_date' in criteria:
+            relative = criteria['relative_date']
+            now = timezone.now()
+
+            if relative == 'today':
+                start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+                queryset = queryset.filter(updated_at__gte=start)
+            elif relative == 'this_week':
+                start = now - timedelta(days=now.weekday())
+                start = start.replace(hour=0, minute=0, second=0, microsecond=0)
+                queryset = queryset.filter(updated_at__gte=start)
+            elif relative == 'this_month':
+                start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                queryset = queryset.filter(updated_at__gte=start)
+            elif relative == 'last_7_days':
+                start = now - timedelta(days=7)
+                queryset = queryset.filter(updated_at__gte=start)
+            elif relative == 'last_30_days':
+                start = now - timedelta(days=30)
+                queryset = queryset.filter(updated_at__gte=start)
+
+        # Document state filter (DRAFT, IN_REVIEW, APPROVED, etc.)
+        if 'state' in criteria:
+            states = criteria['state']
+            if isinstance(states, list):
+                queryset = queryset.filter(state__in=states)
+            else:
+                queryset = queryset.filter(state=states)
+
+        # Name/title contains filter
+        if 'name_contains' in criteria:
+            name_query = criteria['name_contains']
+            queryset = queryset.filter(
+                Q(title__icontains=name_query) |
+                Q(file_name__icontains=name_query)
+            )
+
         return queryset.distinct()
 
     def update_document_count(self):
@@ -600,3 +684,38 @@ class SmartFolder(models.Model):
         if user.is_staff:
             return True
         return False
+
+    @classmethod
+    def get_next_order(cls, user) -> int:
+        """Get the next display order for a new smart folder."""
+        last_folder = cls.objects.filter(owner=user).order_by('-display_order').first()
+        if last_folder:
+            return last_folder.display_order + 1
+        return 0
+
+    @classmethod
+    def reorder_items(cls, user, ordered_ids: list) -> int:
+        """
+        Reorder smart folders based on provided ID list.
+
+        Args:
+            user: The user whose smart folders to reorder
+            ordered_ids: List of smart folder IDs in desired order
+
+        Returns:
+            int: Number of items updated
+        """
+        updated_count = 0
+        for index, folder_id in enumerate(ordered_ids):
+            updated = cls.objects.filter(
+                id=folder_id,
+                owner=user
+            ).update(display_order=index)
+            updated_count += updated
+        return updated_count
+
+    def save(self, *args, **kwargs):
+        # Auto-set display_order for new items
+        if self._state.adding and self.display_order == 0:
+            self.display_order = self.get_next_order(self.owner)
+        super().save(*args, **kwargs)

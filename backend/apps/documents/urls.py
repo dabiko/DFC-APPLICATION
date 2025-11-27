@@ -51,6 +51,23 @@ from apps.documents.views import (
     RecentActivityClearView,
     RecentActivityStatsView,
     AdminRecentActivityListView,
+    # My Documents views
+    MyDocumentsListView,
+    MyDocumentsStatsView,
+    # Pinned Items views (Quick Access)
+    PinnedItemListView,
+    PinnedItemCreateView,
+    PinnedItemDetailView,
+    PinnedItemReorderView,
+    PinnedItemUpdateView,
+    CheckPinStatusView,
+    # Document State views
+    DocumentStateStatsView,
+    DocumentsByStateView,
+    PendingReviewView,
+    DocumentStateHistoryView,
+    DocumentStateChangeView,
+    DocumentAllowedTransitionsView,
 )
 from apps.classification.views import ApplyClassificationManuallyView
 
@@ -129,4 +146,24 @@ urlpatterns = [
 
     # Admin Recent Activity endpoint
     path('admin/recent/', AdminRecentActivityListView.as_view(), name='admin_recent_list'),
+
+    # My Documents endpoints
+    path('my-documents/', MyDocumentsListView.as_view(), name='my_documents_list'),
+    path('my-documents/stats/', MyDocumentsStatsView.as_view(), name='my_documents_stats'),
+
+    # Pinned Items endpoints (Quick Access)
+    path('pinned/', PinnedItemListView.as_view(), name='pinned_list'),
+    path('pinned/create/', PinnedItemCreateView.as_view(), name='pinned_create'),
+    path('pinned/reorder/', PinnedItemReorderView.as_view(), name='pinned_reorder'),
+    path('pinned/check/', CheckPinStatusView.as_view(), name='pinned_check'),
+    path('pinned/<uuid:id>/', PinnedItemDetailView.as_view(), name='pinned_detail'),
+    path('pinned/<uuid:id>/update/', PinnedItemUpdateView.as_view(), name='pinned_update'),
+
+    # Document State endpoints
+    path('states/stats/', DocumentStateStatsView.as_view(), name='state_stats'),
+    path('states/my-documents/', DocumentsByStateView.as_view(), name='documents_by_state'),
+    path('states/pending-review/', PendingReviewView.as_view(), name='pending_review'),
+    path('<uuid:id>/state-history/', DocumentStateHistoryView.as_view(), name='state_history'),
+    path('<uuid:id>/change-state/', DocumentStateChangeView.as_view(), name='change_state'),
+    path('<uuid:id>/allowed-transitions/', DocumentAllowedTransitionsView.as_view(), name='allowed_transitions'),
 ]

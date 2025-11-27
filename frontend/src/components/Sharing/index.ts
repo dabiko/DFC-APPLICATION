@@ -10,6 +10,8 @@ export { SharedByMeView } from './SharedByMeView'
 export { SharedWithMeView } from './SharedWithMeView'
 export { ShareNotifications } from './ShareNotifications'
 export { CollaborationPanel } from './CollaborationPanel'
+export { AcknowledgementModal } from './AcknowledgementModal'
+export { RequestAccessModal } from './RequestAccessModal'
 
 // Re-export types for convenience
 export type {

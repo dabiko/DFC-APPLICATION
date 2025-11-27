@@ -69,19 +69,6 @@ export function DashboardHeader({ user, notifications = [], onLogout }: Dashboar
 
   return (
     <header className="h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 flex items-center justify-between gap-6">
-      {/* Logo and Company Name */}
-      <div className="flex items-center gap-3 flex-shrink-0">
-        <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
-          <span className="text-white font-bold text-sm">DFC</span>
-        </div>
-        <div className="hidden md:block">
-          <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            Digital Filing Cabinet
-          </h1>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Enterprise Document Management</p>
-        </div>
-      </div>
-
       {/* Center - App Navigation */}
       <div className="flex-1">
         <TopNavigationBar />

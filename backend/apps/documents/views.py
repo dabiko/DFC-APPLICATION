@@ -3141,3 +3141,950 @@ class AdminRecentActivityListView(generics.ListAPIView):
         limit = min(int(self.request.query_params.get('limit', 100)), 500)
 
         return queryset[:limit]
+
+
+# ============================================================================
+# MY DOCUMENTS VIEWS
+# ============================================================================
+
+@extend_schema(
+    tags=['My Documents'],
+    parameters=[
+        OpenApiParameter(
+            name='document_type',
+            type=str,
+            location=OpenApiParameter.QUERY,
+            description='Filter by document type'
+        ),
+        OpenApiParameter(
+            name='confidentiality',
+            type=str,
+            location=OpenApiParameter.QUERY,
+            description='Filter by confidentiality level (PUBLIC, INTERNAL, CONFIDENTIAL, HIGHLY_CONFIDENTIAL)'
+        ),
+        OpenApiParameter(
+            name='search',
+            type=str,
+            location=OpenApiParameter.QUERY,
+            description='Search by title or file name'
+        ),
+        OpenApiParameter(
+            name='sort_by',
+            type=str,
+            location=OpenApiParameter.QUERY,
+            description='Sort field (updated_at, created_at, title, file_size)',
+            enum=['updated_at', 'created_at', 'title', 'file_size']
+        ),
+        OpenApiParameter(
+            name='sort_order',
+            type=str,
+            location=OpenApiParameter.QUERY,
+            description='Sort order (asc, desc)',
+            enum=['asc', 'desc']
+        ),
+        OpenApiParameter(
+            name='limit',
+            type=int,
+            location=OpenApiParameter.QUERY,
+            description='Maximum number of results (default: 100, max: 500)'
+        ),
+    ],
+    responses={
+        200: OpenApiResponse(description='List of user documents with time grouping'),
+    }
+)
+class MyDocumentsListView(APIView):
+    """
+    List all documents owned by the authenticated user.
+
+    Features:
+    - Time-based grouping (Today, This Week, This Month, Earlier)
+    - Filtering by document type and confidentiality
+    - Search by title or file name
+    - Sorting options
+
+    GET /api/v1/documents/my-documents/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        """Get user's documents with grouping and filtering"""
+        from datetime import timedelta
+        from apps.documents.serializers import MyDocumentListItemSerializer
+
+        user = request.user
+
+        # Base queryset - documents owned by user
+        queryset = Document.objects.filter(
+            owner=user,
+            is_deleted=False
+        ).select_related('folder', 'department').prefetch_related('document_tags__tag')
+
+        # Filter by document type
+        document_type = request.query_params.get('document_type')
+        if document_type:
+            queryset = queryset.filter(document_type=document_type)
+
+        # Filter by confidentiality
+        confidentiality = request.query_params.get('confidentiality')
+        if confidentiality:
+            queryset = queryset.filter(confidentiality_level=confidentiality.upper())
+
+        # Search filter
+        search = request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(title__icontains=search) | Q(file_name__icontains=search)
+            )
+
+        # Sorting
+        sort_by = request.query_params.get('sort_by', 'updated_at')
+        sort_order = request.query_params.get('sort_order', 'desc')
+        if sort_by in ['updated_at', 'created_at', 'title', 'file_size']:
+            order_prefix = '-' if sort_order == 'desc' else ''
+            queryset = queryset.order_by(f'{order_prefix}{sort_by}')
+        else:
+            queryset = queryset.order_by('-updated_at')
+
+        # Apply limit
+        limit = min(int(request.query_params.get('limit', 100)), 500)
+        documents = list(queryset[:limit])
+
+        # Serialize documents
+        serializer = MyDocumentListItemSerializer(documents, many=True)
+
+        # Group by time
+        grouped = {
+            'today': [],
+            'this_week': [],
+            'this_month': [],
+            'earlier': []
+        }
+
+        for item in serializer.data:
+            time_group = item.get('time_group', 'earlier')
+            grouped[time_group].append(item)
+
+        return Response({
+            'total_count': len(documents),
+            'grouped': grouped,
+            'results': serializer.data
+        })
+
+
+@extend_schema(
+    tags=['My Documents'],
+    responses={
+        200: OpenApiResponse(description='Statistics about user documents'),
+    }
+)
+class MyDocumentsStatsView(APIView):
+    """
+    Get statistics about user's documents.
+
+    Returns:
+    - Total document count
+    - Total folder count
+    - Documents created today/this week
+    - Storage used
+    - Breakdown by document type
+    - Breakdown by confidentiality level
+
+    GET /api/v1/documents/my-documents/stats/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        """Get document statistics for the user"""
+        from datetime import timedelta
+        from django.db.models import Count, Sum
+        from apps.folders.models import Folder
+
+        user = request.user
+        now = timezone.now()
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        week_start = today_start - timedelta(days=today_start.weekday())
+
+        # Base queryset
+        documents = Document.objects.filter(owner=user, is_deleted=False)
+
+        # Total documents
+        total_documents = documents.count()
+
+        # Total folders owned by user
+        total_folders = Folder.objects.filter(owner=user, is_deleted=False).count()
+
+        # Documents created today
+        documents_today = documents.filter(created_at__gte=today_start).count()
+
+        # Documents created this week
+        documents_this_week = documents.filter(created_at__gte=week_start).count()
+
+        # Storage used
+        storage_used = documents.aggregate(total=Sum('file_size'))['total'] or 0
+
+        # Format storage
+        def format_bytes(size):
+            for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+                if size < 1024:
+                    return f"{size:.1f} {unit}"
+                size /= 1024
+            return f"{size:.1f} PB"
+
+        # By document type
+        by_document_type = dict(
+            documents.values('document_type')
+            .annotate(count=Count('id'))
+            .values_list('document_type', 'count')
+        )
+
+        # By confidentiality level
+        by_confidentiality = dict(
+            documents.values('confidentiality_level')
+            .annotate(count=Count('id'))
+            .values_list('confidentiality_level', 'count')
+        )
+
+        return Response({
+            'total_documents': total_documents,
+            'total_folders': total_folders,
+            'documents_today': documents_today,
+            'documents_this_week': documents_this_week,
+            'storage_used_bytes': storage_used,
+            'storage_used_formatted': format_bytes(storage_used),
+            'by_document_type': by_document_type,
+            'by_confidentiality': by_confidentiality
+        })
+
+
+# ============================================================================
+# PINNED ITEMS VIEWS (Quick Access)
+# ============================================================================
+
+@extend_schema(
+    tags=['Pinned Items'],
+    responses={
+        200: OpenApiResponse(description='List of pinned items'),
+    }
+)
+class PinnedItemListView(generics.ListAPIView):
+    """
+    List all pinned items for the current user.
+
+    Returns items ordered by display_order for Quick Access section.
+
+    GET /api/v1/documents/pinned/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        from apps.documents.models import PinnedItem
+        return PinnedItem.objects.filter(
+            user=self.request.user
+        ).select_related('document', 'folder', 'document__folder')
+
+    def get_serializer_class(self):
+        from apps.documents.serializers import PinnedItemSerializer
+        return PinnedItemSerializer
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+
+        from apps.documents.models import PinnedItem
+        return Response({
+            'count': queryset.count(),
+            'max_items': PinnedItem.MAX_PINNED_ITEMS,
+            'can_pin_more': queryset.count() < PinnedItem.MAX_PINNED_ITEMS,
+            'results': serializer.data
+        })
+
+
+@extend_schema(
+    tags=['Pinned Items'],
+    responses={
+        201: OpenApiResponse(description='Item pinned successfully'),
+        400: OpenApiResponse(description='Validation error'),
+    }
+)
+class PinnedItemCreateView(generics.CreateAPIView):
+    """
+    Pin a document, folder, or shared item.
+
+    POST /api/v1/documents/pinned/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_serializer_class(self):
+        from apps.documents.serializers import PinnedItemCreateSerializer
+        return PinnedItemCreateSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        pin = serializer.save()
+
+        from apps.documents.serializers import PinnedItemSerializer
+        response_serializer = PinnedItemSerializer(pin)
+
+        logger.info(
+            f"Item pinned: {pin.id} ({pin.item_type}) by user {request.user.username}"
+        )
+
+        return Response({
+            'success': True,
+            'message': 'Item pinned successfully',
+            'pin': response_serializer.data
+        }, status=status.HTTP_201_CREATED)
+
+
+@extend_schema(
+    tags=['Pinned Items'],
+    responses={
+        200: OpenApiResponse(description='Pin details'),
+        404: OpenApiResponse(description='Pin not found'),
+    }
+)
+class PinnedItemDetailView(generics.RetrieveDestroyAPIView):
+    """
+    Get or delete a specific pinned item.
+
+    GET /api/v1/documents/pinned/{id}/
+    DELETE /api/v1/documents/pinned/{id}/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'id'
+
+    def get_queryset(self):
+        from apps.documents.models import PinnedItem
+        return PinnedItem.objects.filter(user=self.request.user)
+
+    def get_serializer_class(self):
+        from apps.documents.serializers import PinnedItemSerializer
+        return PinnedItemSerializer
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        pin_id = instance.id
+        display_name = instance.get_display_name()
+        instance.delete()
+
+        logger.info(
+            f"Pin removed: {pin_id} by user {request.user.username}"
+        )
+
+        return Response({
+            'success': True,
+            'message': f'Unpinned "{display_name}"',
+            'unpinned_id': str(pin_id)
+        }, status=status.HTTP_200_OK)
+
+
+@extend_schema(
+    tags=['Pinned Items'],
+    responses={
+        200: OpenApiResponse(description='Items reordered successfully'),
+        400: OpenApiResponse(description='Validation error'),
+    }
+)
+class PinnedItemReorderView(APIView):
+    """
+    Reorder pinned items.
+
+    POST /api/v1/documents/pinned/reorder/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        from apps.documents.serializers import PinnedItemReorderSerializer
+        from apps.documents.models import PinnedItem
+
+        serializer = PinnedItemReorderSerializer(
+            data=request.data,
+            context={'request': request}
+        )
+        serializer.is_valid(raise_exception=True)
+
+        ordered_ids = serializer.validated_data['ordered_ids']
+        updated_count = PinnedItem.reorder_items(request.user, ordered_ids)
+
+        logger.info(
+            f"Pinned items reordered: {updated_count} items by user {request.user.username}"
+        )
+
+        return Response({
+            'success': True,
+            'message': f'Reordered {updated_count} items',
+            'updated_count': updated_count
+        })
+
+
+@extend_schema(
+    tags=['Pinned Items'],
+    responses={
+        200: OpenApiResponse(description='Pin updated successfully'),
+        400: OpenApiResponse(description='Validation error'),
+        404: OpenApiResponse(description='Pin not found'),
+    }
+)
+class PinnedItemUpdateView(APIView):
+    """
+    Update a pinned item (custom label).
+
+    PATCH /api/v1/documents/pinned/{id}/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, id):
+        from apps.documents.models import PinnedItem
+        from apps.documents.serializers import PinnedItemUpdateSerializer, PinnedItemSerializer
+
+        try:
+            pin = PinnedItem.objects.get(id=id, user=request.user)
+        except PinnedItem.DoesNotExist:
+            return Response(
+                {'error': 'Pin not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = PinnedItemUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        if 'custom_label' in serializer.validated_data:
+            pin.custom_label = serializer.validated_data['custom_label']
+            pin.save(update_fields=['custom_label', 'updated_at'])
+
+        response_serializer = PinnedItemSerializer(pin)
+
+        return Response({
+            'success': True,
+            'message': 'Pin updated successfully',
+            'pin': response_serializer.data
+        })
+
+
+@extend_schema(
+    tags=['Pinned Items'],
+    responses={
+        200: OpenApiResponse(description='Pin status for item'),
+    }
+)
+class CheckPinStatusView(APIView):
+    """
+    Check if a specific item is pinned.
+
+    GET /api/v1/documents/pinned/check/?item_type=DOCUMENT&item_id=uuid
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from apps.documents.models import PinnedItem
+
+        item_type = request.query_params.get('item_type')
+        item_id = request.query_params.get('item_id')
+
+        if not item_type or not item_id:
+            return Response({
+                'error': 'item_type and item_id are required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check if pinned
+        pin = None
+        if item_type == 'DOCUMENT':
+            pin = PinnedItem.objects.filter(
+                user=request.user,
+                document_id=item_id
+            ).first()
+        elif item_type == 'FOLDER':
+            pin = PinnedItem.objects.filter(
+                user=request.user,
+                folder_id=item_id
+            ).first()
+        elif item_type in ['SHARED_DOCUMENT', 'SHARED_FOLDER']:
+            pin = PinnedItem.objects.filter(
+                user=request.user,
+                shared_item_id=item_id
+            ).first()
+
+        return Response({
+            'is_pinned': pin is not None,
+            'pin_id': str(pin.id) if pin else None
+        })
+
+
+# ============================================================================
+# DOCUMENT STATE VIEWS
+# ============================================================================
+
+@extend_schema(
+    tags=['Document States'],
+    responses={
+        200: OpenApiResponse(description='Document state statistics'),
+    }
+)
+class DocumentStateStatsView(APIView):
+    """
+    Get statistics about document states for the current user.
+
+    Returns counts by state and pending review counts.
+
+    GET /api/v1/documents/states/stats/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from django.db.models import Count
+        from apps.documents.models import DocumentState
+
+        user = request.user
+
+        # User's documents by state
+        my_docs = Document.objects.filter(owner=user, is_deleted=False)
+        my_docs_by_state = dict(
+            my_docs.values('state')
+            .annotate(count=Count('id'))
+            .values_list('state', 'count')
+        )
+
+        # Documents pending my review (documents I can approve/reject)
+        # For now, staff can review any document in review state
+        # In a full implementation, this would check department/role permissions
+        pending_my_review = 0
+        if user.is_staff:
+            pending_my_review = Document.objects.filter(
+                state=DocumentState.IN_REVIEW,
+                is_deleted=False
+            ).exclude(owner=user).count()
+        else:
+            # Non-staff can review documents from same department
+            pending_my_review = Document.objects.filter(
+                state=DocumentState.IN_REVIEW,
+                department=user.department,
+                is_deleted=False
+            ).exclude(owner=user).count()
+
+        # My drafts
+        my_drafts = my_docs_by_state.get(DocumentState.DRAFT, 0)
+
+        # My documents in review
+        my_in_review = my_docs_by_state.get(DocumentState.IN_REVIEW, 0)
+
+        return Response({
+            'total': my_docs.count(),
+            'by_state': my_docs_by_state,
+            'pending_my_review': pending_my_review,
+            'my_drafts': my_drafts,
+            'my_in_review': my_in_review
+        })
+
+
+@extend_schema(
+    tags=['Document States'],
+    parameters=[
+        OpenApiParameter(
+            name='state',
+            type=str,
+            location=OpenApiParameter.QUERY,
+            description='Filter by state (DRAFT, IN_REVIEW, APPROVED, PUBLISHED, ARCHIVED)',
+            enum=['DRAFT', 'IN_REVIEW', 'APPROVED', 'PUBLISHED', 'ARCHIVED']
+        ),
+        OpenApiParameter(
+            name='limit',
+            type=int,
+            location=OpenApiParameter.QUERY,
+            description='Maximum number of results (default: 100)'
+        ),
+    ],
+    responses={
+        200: OpenApiResponse(description='Documents filtered by state'),
+    }
+)
+class DocumentsByStateView(APIView):
+    """
+    List user's documents filtered by state.
+
+    GET /api/v1/documents/states/my-documents/
+    GET /api/v1/documents/states/my-documents/?state=DRAFT
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from apps.documents.serializers import DocumentWithStateSerializer
+
+        user = request.user
+
+        # Base queryset - user's documents
+        queryset = Document.objects.filter(
+            owner=user,
+            is_deleted=False
+        ).select_related(
+            'folder', 'department',
+            'submitted_by', 'reviewed_by'
+        ).prefetch_related('document_tags__tag')
+
+        # Filter by state
+        state = request.query_params.get('state')
+        if state:
+            queryset = queryset.filter(state=state.upper())
+
+        # Order by updated_at
+        queryset = queryset.order_by('-updated_at')
+
+        # Apply limit
+        limit = min(int(request.query_params.get('limit', 100)), 500)
+        documents = list(queryset[:limit])
+
+        serializer = DocumentWithStateSerializer(documents, many=True)
+
+        return Response({
+            'count': len(documents),
+            'state_filter': state,
+            'results': serializer.data
+        })
+
+
+@extend_schema(
+    tags=['Document States'],
+    parameters=[
+        OpenApiParameter(
+            name='limit',
+            type=int,
+            location=OpenApiParameter.QUERY,
+            description='Maximum number of results (default: 50)'
+        ),
+    ],
+    responses={
+        200: OpenApiResponse(description='Documents pending review'),
+    }
+)
+class PendingReviewView(APIView):
+    """
+    List documents pending the current user's review.
+
+    Shows documents that the user can approve or reject based on
+    their role and department.
+
+    GET /api/v1/documents/states/pending-review/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from apps.documents.serializers import PendingReviewSerializer
+        from apps.documents.models import DocumentState
+
+        user = request.user
+
+        # Base queryset - documents in review, not owned by user
+        queryset = Document.objects.filter(
+            state=DocumentState.IN_REVIEW,
+            is_deleted=False
+        ).exclude(
+            owner=user
+        ).select_related(
+            'folder', 'owner', 'department', 'submitted_by'
+        )
+
+        # Non-staff can only review from same department
+        if not user.is_staff:
+            queryset = queryset.filter(department=user.department)
+
+        # Order by submission time (oldest first - FIFO)
+        queryset = queryset.order_by('submitted_for_review_at')
+
+        # Apply limit
+        limit = min(int(request.query_params.get('limit', 50)), 200)
+        documents = list(queryset[:limit])
+
+        serializer = PendingReviewSerializer(documents, many=True)
+
+        return Response({
+            'count': len(documents),
+            'results': serializer.data
+        })
+
+
+@extend_schema(
+    tags=['Document States'],
+    responses={
+        200: OpenApiResponse(description='Document state history'),
+        404: OpenApiResponse(description='Document not found'),
+    }
+)
+class DocumentStateHistoryView(APIView):
+    """
+    Get state transition history for a document.
+
+    GET /api/v1/documents/{id}/state-history/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, id):
+        from apps.documents.models import DocumentStateTransition
+        from apps.documents.serializers import DocumentStateTransitionSerializer
+
+        # Get document
+        try:
+            document = Document.objects.select_related('department').get(
+                pk=id, is_deleted=False
+            )
+        except Document.DoesNotExist:
+            return Response(
+                {'error': 'Document not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Check permissions
+        if not request.user.is_staff:
+            if document.owner != request.user and document.department != request.user.department:
+                return Response(
+                    {'error': 'You do not have permission to view this document'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+        # Get state transitions
+        transitions = DocumentStateTransition.objects.filter(
+            document=document
+        ).select_related('transitioned_by').order_by('-transitioned_at')
+
+        serializer = DocumentStateTransitionSerializer(transitions, many=True)
+
+        return Response({
+            'document_id': str(document.id),
+            'document_title': document.title,
+            'current_state': document.state,
+            'current_state_label': document.get_state_display(),
+            'transitions': serializer.data
+        })
+
+
+@extend_schema(
+    tags=['Document States'],
+    request=inline_serializer(
+        'DocumentStateChangeRequest',
+        fields={
+            'to_state': serializers.ChoiceField(choices=[
+                ('IN_REVIEW', 'In Review'),
+                ('APPROVED', 'Approved'),
+                ('DRAFT', 'Draft'),
+                ('PUBLISHED', 'Published'),
+                ('ARCHIVED', 'Archived'),
+            ]),
+            'notes': serializers.CharField(required=False),
+            'rejection_reason': serializers.CharField(required=False),
+        }
+    ),
+    responses={
+        200: OpenApiResponse(description='State changed successfully'),
+        400: OpenApiResponse(description='Invalid state transition'),
+        403: OpenApiResponse(description='Permission denied'),
+        404: OpenApiResponse(description='Document not found'),
+    }
+)
+class DocumentStateChangeView(APIView):
+    """
+    Change document state.
+
+    Valid transitions:
+    - DRAFT → IN_REVIEW (submit for review)
+    - IN_REVIEW → APPROVED (approve)
+    - IN_REVIEW → DRAFT (reject - requires rejection_reason)
+    - APPROVED → PUBLISHED (publish)
+    - APPROVED → ARCHIVED (archive before publishing)
+    - PUBLISHED → ARCHIVED (archive)
+    - ARCHIVED → DRAFT (restore)
+
+    POST /api/v1/documents/{id}/change-state/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, id):
+        from apps.documents.serializers import DocumentStateChangeSerializer, DocumentWithStateSerializer
+        from apps.documents.models import DocumentState, DocumentStateTransition
+
+        # Get document
+        try:
+            document = Document.objects.select_related(
+                'folder', 'department', 'owner'
+            ).get(pk=id, is_deleted=False)
+        except Document.DoesNotExist:
+            return Response(
+                {'error': 'Document not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Permission checks based on transition type
+        user = request.user
+        to_state = request.data.get('to_state')
+
+        # Check if user can perform this transition
+        can_transition = False
+        error_message = None
+
+        if to_state == DocumentState.IN_REVIEW:
+            # Only owner can submit for review
+            can_transition = document.owner == user
+            error_message = 'Only the document owner can submit for review'
+
+        elif to_state == DocumentState.APPROVED:
+            # Staff or same-department can approve
+            if document.owner == user:
+                error_message = 'Cannot approve your own document'
+            elif user.is_staff:
+                can_transition = True
+            elif user.department == document.department:
+                can_transition = True
+            else:
+                error_message = 'You do not have permission to approve this document'
+
+        elif to_state == DocumentState.DRAFT:
+            # Reject (from IN_REVIEW) or restore (from ARCHIVED)
+            if document.state == DocumentState.IN_REVIEW:
+                # Rejecting - same rules as approve
+                if document.owner == user:
+                    error_message = 'Cannot reject your own document'
+                elif user.is_staff:
+                    can_transition = True
+                elif user.department == document.department:
+                    can_transition = True
+                else:
+                    error_message = 'You do not have permission to reject this document'
+            elif document.state == DocumentState.ARCHIVED:
+                # Restoring - owner or staff
+                can_transition = document.owner == user or user.is_staff
+                error_message = 'Only the document owner can restore from archive'
+
+        elif to_state == DocumentState.PUBLISHED:
+            # Owner or staff can publish after approval
+            can_transition = document.owner == user or user.is_staff
+            error_message = 'Only the document owner can publish'
+
+        elif to_state == DocumentState.ARCHIVED:
+            # Owner or staff can archive
+            can_transition = document.owner == user or user.is_staff
+            error_message = 'Only the document owner can archive'
+
+        if not can_transition:
+            return Response(
+                {'error': error_message or 'Permission denied'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Validate and perform transition
+        serializer = DocumentStateChangeSerializer(
+            data=request.data,
+            context={'request': request, 'document': document}
+        )
+
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            transition = serializer.save()
+        except ValueError as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Refresh document from DB
+        document.refresh_from_db()
+
+        # Log the state change
+        logger.info(
+            f"Document {document.id} state changed: {transition.from_state} → {transition.to_state} "
+            f"by user {user.username}"
+        )
+
+        # Return updated document
+        doc_serializer = DocumentWithStateSerializer(document)
+
+        return Response({
+            'success': True,
+            'message': f'Document state changed to {document.get_state_display()}',
+            'transition': {
+                'id': str(transition.id),
+                'from_state': transition.from_state,
+                'to_state': transition.to_state,
+                'transitioned_at': transition.transitioned_at.isoformat()
+            },
+            'document': doc_serializer.data
+        })
+
+
+@extend_schema(
+    tags=['Document States'],
+    responses={
+        200: OpenApiResponse(description='Available state transitions'),
+        404: OpenApiResponse(description='Document not found'),
+    }
+)
+class DocumentAllowedTransitionsView(APIView):
+    """
+    Get allowed state transitions for a document.
+
+    Returns the list of states the document can transition to
+    based on its current state and user permissions.
+
+    GET /api/v1/documents/{id}/allowed-transitions/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, id):
+        from apps.documents.models import DocumentState, DocumentStateTransition
+
+        # Get document
+        try:
+            document = Document.objects.select_related('department', 'owner').get(
+                pk=id, is_deleted=False
+            )
+        except Document.DoesNotExist:
+            return Response(
+                {'error': 'Document not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        user = request.user
+
+        # Get all valid transitions from current state
+        valid_transitions = DocumentStateTransition.get_allowed_transitions(document.state)
+
+        # Filter by user permissions
+        allowed = []
+        for target_state in valid_transitions:
+            can_perform = False
+
+            if target_state == DocumentState.IN_REVIEW:
+                can_perform = document.owner == user
+
+            elif target_state == DocumentState.APPROVED:
+                if document.owner != user:
+                    can_perform = user.is_staff or user.department == document.department
+
+            elif target_state == DocumentState.DRAFT:
+                if document.state == DocumentState.IN_REVIEW:
+                    # Reject
+                    if document.owner != user:
+                        can_perform = user.is_staff or user.department == document.department
+                elif document.state == DocumentState.ARCHIVED:
+                    # Restore
+                    can_perform = document.owner == user or user.is_staff
+
+            elif target_state in [DocumentState.PUBLISHED, DocumentState.ARCHIVED]:
+                can_perform = document.owner == user or user.is_staff
+
+            if can_perform:
+                allowed.append({
+                    'state': target_state,
+                    'label': dict(DocumentState.choices).get(target_state, target_state),
+                    'requires_reason': (
+                        document.state == DocumentState.IN_REVIEW and
+                        target_state == DocumentState.DRAFT
+                    )
+                })
+
+        return Response({
+            'document_id': str(document.id),
+            'current_state': document.state,
+            'current_state_label': document.get_state_display(),
+            'allowed_transitions': allowed
+        })

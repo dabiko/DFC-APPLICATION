@@ -1248,7 +1248,7 @@ export const FolderContentView: FC = () => {
         isOpen={!!folderToShare}
         folder={folderToShare}
         onClose={() => setFolderToShare(null)}
-        onShare={handleShareFolder}
+        onShareCreated={handleShareFolder}
       />
 
       {/* File Preview Modal */}

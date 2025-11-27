@@ -5,6 +5,15 @@ import uuid
 import hashlib
 
 
+class DocumentState(models.TextChoices):
+    """Document lifecycle states."""
+    DRAFT = 'DRAFT', 'Draft'
+    IN_REVIEW = 'IN_REVIEW', 'In Review'
+    APPROVED = 'APPROVED', 'Approved'
+    PUBLISHED = 'PUBLISHED', 'Published'
+    ARCHIVED = 'ARCHIVED', 'Archived'
+
+
 class Document(models.Model):
     """
     Core document model for storing file metadata and content.
@@ -18,6 +27,7 @@ class Document(models.Model):
     - Full-text search support (extracted text)
     - OCR support for scanned documents
     - Multi-tenant organization support
+    - Document lifecycle state management
     """
 
     CONFIDENTIALITY_CHOICES = [
@@ -235,6 +245,88 @@ class Document(models.Model):
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
 
+    # Document State / Lifecycle
+    state = models.CharField(
+        max_length=20,
+        choices=DocumentState.choices,
+        default=DocumentState.DRAFT,
+        db_index=True,
+        help_text='Current lifecycle state of the document'
+    )
+    submitted_for_review_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='When document was submitted for review'
+    )
+    submitted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='documents_submitted',
+        help_text='User who submitted the document for review'
+    )
+    reviewed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='When document was reviewed (approved/rejected)'
+    )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='documents_reviewed',
+        help_text='User who reviewed the document'
+    )
+    approved_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='When document was approved'
+    )
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='documents_approved',
+        help_text='User who approved the document'
+    )
+    published_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='When document was published'
+    )
+    published_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='documents_published',
+        help_text='User who published the document'
+    )
+    archived_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='When document was archived'
+    )
+    archived_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='documents_archived',
+        help_text='User who archived the document'
+    )
+    review_notes = models.TextField(
+        blank=True,
+        help_text='Notes from reviewer (optional)'
+    )
+    rejection_reason = models.TextField(
+        blank=True,
+        help_text='Reason for rejection (if rejected)'
+    )
+
     class Meta:
         db_table = 'documents'
         verbose_name = 'Document'
@@ -248,6 +340,8 @@ class Document(models.Model):
             models.Index(fields=['checksum']),
             models.Index(fields=['created_at']),
             models.Index(fields=['is_deleted']),
+            models.Index(fields=['state']),
+            models.Index(fields=['state', 'owner']),
         ]
         ordering = ['-created_at']
 
@@ -1002,3 +1096,430 @@ class RecentActivity(models.Model):
         self.pinned_at = None
         self.save(update_fields=['is_pinned', 'pinned_at'])
         return True
+
+
+class PinnedItem(models.Model):
+    """
+    Pinned items for Quick Access section in My Documents.
+
+    Allows users to pin documents and folders for quick access.
+    Supports:
+    - Pinning owned documents
+    - Pinning owned folders
+    - Pinning shared items (as shortcuts)
+    - Custom ordering via drag-and-drop
+    - Maximum 20 pinned items per user
+
+    Usage:
+        # Pin a document
+        pinned = PinnedItem.objects.create(
+            user=user,
+            item_type='DOCUMENT',
+            document=document,
+            display_order=0
+        )
+
+        # Pin a folder
+        pinned = PinnedItem.objects.create(
+            user=user,
+            item_type='FOLDER',
+            folder=folder,
+            display_order=1
+        )
+
+        # Pin a shared item
+        pinned = PinnedItem.objects.create(
+            user=user,
+            item_type='SHARED_DOCUMENT',
+            shared_item_id=shared_access_id,
+            shared_item_name='Shared Report.pdf',
+            display_order=2
+        )
+    """
+
+    ITEM_TYPE_CHOICES = [
+        ('DOCUMENT', 'Document'),
+        ('FOLDER', 'Folder'),
+        ('SHARED_DOCUMENT', 'Shared Document'),
+        ('SHARED_FOLDER', 'Shared Folder'),
+    ]
+
+    MAX_PINNED_ITEMS = 20
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    # Owner of the pin
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='pinned_items'
+    )
+
+    # Item type
+    item_type = models.CharField(
+        max_length=20,
+        choices=ITEM_TYPE_CHOICES
+    )
+
+    # For owned documents
+    document = models.ForeignKey(
+        'Document',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='pins'
+    )
+
+    # For owned folders
+    folder = models.ForeignKey(
+        'folders.Folder',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='pins'
+    )
+
+    # For shared items (reference to SharedItemAccess)
+    shared_item_id = models.UUIDField(
+        null=True,
+        blank=True,
+        help_text='ID of SharedItemAccess for shared items'
+    )
+    shared_item_name = models.CharField(
+        max_length=500,
+        blank=True,
+        help_text='Cached name for shared items'
+    )
+
+    # Display order for drag-and-drop reordering
+    display_order = models.IntegerField(
+        default=0,
+        db_index=True,
+        help_text='Order of item in Quick Access (lower = first)'
+    )
+
+    # Custom label (optional override)
+    custom_label = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text='Custom display label (optional)'
+    )
+
+    # Timestamps
+    pinned_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Pinned Item'
+        verbose_name_plural = 'Pinned Items'
+        db_table = 'pinned_items'
+        ordering = ['display_order', '-pinned_at']
+        # Ensure unique pins per user
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'document'],
+                condition=models.Q(document__isnull=False),
+                name='unique_user_document_pin'
+            ),
+            models.UniqueConstraint(
+                fields=['user', 'folder'],
+                condition=models.Q(folder__isnull=False),
+                name='unique_user_folder_pin'
+            ),
+            models.UniqueConstraint(
+                fields=['user', 'shared_item_id'],
+                condition=models.Q(shared_item_id__isnull=False),
+                name='unique_user_shared_item_pin'
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['user', 'display_order']),
+            models.Index(fields=['user', 'item_type']),
+        ]
+
+    def __str__(self):
+        return f"Pin: {self.get_display_name()} ({self.user.email})"
+
+    def get_display_name(self) -> str:
+        """Get the display name for this pinned item."""
+        if self.custom_label:
+            return self.custom_label
+        if self.document:
+            return self.document.title
+        if self.folder:
+            return self.folder.name
+        if self.shared_item_name:
+            return self.shared_item_name
+        return "Unknown Item"
+
+    def get_item_id(self) -> str:
+        """Get the ID of the pinned item."""
+        if self.document:
+            return str(self.document.id)
+        if self.folder:
+            return str(self.folder.id)
+        if self.shared_item_id:
+            return str(self.shared_item_id)
+        return str(self.id)
+
+    @classmethod
+    def get_user_pin_count(cls, user) -> int:
+        """Get the count of pinned items for a user."""
+        return cls.objects.filter(user=user).count()
+
+    @classmethod
+    def can_user_pin(cls, user) -> tuple:
+        """
+        Check if user can pin more items.
+
+        Returns:
+            tuple: (can_pin: bool, reason: str or None)
+        """
+        pin_count = cls.get_user_pin_count(user)
+        if pin_count >= cls.MAX_PINNED_ITEMS:
+            return False, f"Maximum of {cls.MAX_PINNED_ITEMS} pinned items reached"
+        return True, None
+
+    @classmethod
+    def get_next_order(cls, user) -> int:
+        """Get the next display order for a new pin."""
+        last_pin = cls.objects.filter(user=user).order_by('-display_order').first()
+        if last_pin:
+            return last_pin.display_order + 1
+        return 0
+
+    @classmethod
+    def reorder_items(cls, user, ordered_ids: list) -> int:
+        """
+        Reorder pinned items based on provided ID list.
+
+        Args:
+            user: The user whose pins to reorder
+            ordered_ids: List of pin IDs in desired order
+
+        Returns:
+            int: Number of items updated
+        """
+        updated_count = 0
+        for index, pin_id in enumerate(ordered_ids):
+            updated = cls.objects.filter(
+                id=pin_id,
+                user=user
+            ).update(display_order=index)
+            updated_count += updated
+        return updated_count
+
+    def clean(self):
+        """Validate the pinned item."""
+        from django.core.exceptions import ValidationError
+
+        # Must have exactly one item reference
+        refs = [self.document, self.folder, self.shared_item_id]
+        non_null_refs = [r for r in refs if r is not None]
+
+        if len(non_null_refs) == 0:
+            raise ValidationError("Must specify document, folder, or shared_item_id")
+        if len(non_null_refs) > 1:
+            raise ValidationError("Can only specify one of document, folder, or shared_item_id")
+
+        # Validate item_type matches the reference
+        if self.document and self.item_type != 'DOCUMENT':
+            raise ValidationError("item_type must be 'DOCUMENT' when document is set")
+        if self.folder and self.item_type != 'FOLDER':
+            raise ValidationError("item_type must be 'FOLDER' when folder is set")
+        if self.shared_item_id and self.item_type not in ['SHARED_DOCUMENT', 'SHARED_FOLDER']:
+            raise ValidationError("item_type must be 'SHARED_DOCUMENT' or 'SHARED_FOLDER' for shared items")
+
+    def save(self, *args, **kwargs):
+        # Auto-set display_order for new items
+        if self._state.adding and self.display_order == 0:
+            self.display_order = self.get_next_order(self.user)
+        super().save(*args, **kwargs)
+
+
+class DocumentStateTransition(models.Model):
+    """
+    Audit trail for document state changes.
+
+    Records every state transition with:
+    - From/to states
+    - Who made the change
+    - When it happened
+    - Optional notes/reason
+
+    This provides a complete audit trail for document lifecycle management.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    document = models.ForeignKey(
+        Document,
+        on_delete=models.CASCADE,
+        related_name='state_transitions',
+        help_text='Document that changed state'
+    )
+
+    from_state = models.CharField(
+        max_length=20,
+        choices=DocumentState.choices,
+        help_text='Previous state'
+    )
+    to_state = models.CharField(
+        max_length=20,
+        choices=DocumentState.choices,
+        help_text='New state'
+    )
+
+    transitioned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='document_state_transitions',
+        help_text='User who made the state change'
+    )
+
+    transitioned_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text='When the state change occurred'
+    )
+
+    notes = models.TextField(
+        blank=True,
+        help_text='Optional notes for this transition'
+    )
+
+    # For rejection transitions
+    rejection_reason = models.TextField(
+        blank=True,
+        help_text='Reason for rejection (if applicable)'
+    )
+
+    class Meta:
+        db_table = 'document_state_transitions'
+        verbose_name = 'Document State Transition'
+        verbose_name_plural = 'Document State Transitions'
+        ordering = ['-transitioned_at']
+        indexes = [
+            models.Index(fields=['document', '-transitioned_at']),
+            models.Index(fields=['transitioned_by', '-transitioned_at']),
+            models.Index(fields=['from_state', 'to_state']),
+        ]
+
+    def __str__(self):
+        return f"{self.document.title}: {self.from_state} → {self.to_state}"
+
+    # Valid state transitions
+    VALID_TRANSITIONS = {
+        DocumentState.DRAFT: [DocumentState.IN_REVIEW],
+        DocumentState.IN_REVIEW: [DocumentState.APPROVED, DocumentState.DRAFT],  # DRAFT = rejected
+        DocumentState.APPROVED: [DocumentState.PUBLISHED, DocumentState.ARCHIVED],
+        DocumentState.PUBLISHED: [DocumentState.ARCHIVED],
+        DocumentState.ARCHIVED: [DocumentState.DRAFT],  # Restore
+    }
+
+    @classmethod
+    def is_valid_transition(cls, from_state: str, to_state: str) -> bool:
+        """
+        Check if a state transition is valid.
+
+        Args:
+            from_state: Current state
+            to_state: Target state
+
+        Returns:
+            bool: True if transition is valid
+        """
+        valid_targets = cls.VALID_TRANSITIONS.get(from_state, [])
+        return to_state in valid_targets
+
+    @classmethod
+    def get_allowed_transitions(cls, current_state: str) -> list:
+        """
+        Get list of valid target states from current state.
+
+        Args:
+            current_state: The current document state
+
+        Returns:
+            list: List of valid target states
+        """
+        return cls.VALID_TRANSITIONS.get(current_state, [])
+
+    @classmethod
+    def create_transition(
+        cls,
+        document: Document,
+        to_state: str,
+        user,
+        notes: str = '',
+        rejection_reason: str = ''
+    ):
+        """
+        Create a state transition and update the document.
+
+        Args:
+            document: The document to transition
+            to_state: Target state
+            user: User making the transition
+            notes: Optional notes
+            rejection_reason: Reason for rejection (if rejecting)
+
+        Returns:
+            DocumentStateTransition: The created transition record
+
+        Raises:
+            ValueError: If transition is invalid
+        """
+        from django.utils import timezone
+
+        from_state = document.state
+
+        if not cls.is_valid_transition(from_state, to_state):
+            raise ValueError(
+                f"Invalid transition from {from_state} to {to_state}. "
+                f"Allowed: {cls.get_allowed_transitions(from_state)}"
+            )
+
+        # Create transition record
+        transition = cls.objects.create(
+            document=document,
+            from_state=from_state,
+            to_state=to_state,
+            transitioned_by=user,
+            notes=notes,
+            rejection_reason=rejection_reason
+        )
+
+        # Update document state
+        now = timezone.now()
+        document.state = to_state
+
+        # Update relevant timestamp fields based on transition
+        if to_state == DocumentState.IN_REVIEW:
+            document.submitted_for_review_at = now
+            document.submitted_by = user
+        elif to_state == DocumentState.APPROVED:
+            document.reviewed_at = now
+            document.reviewed_by = user
+            document.approved_at = now
+            document.approved_by = user
+            document.review_notes = notes
+        elif to_state == DocumentState.DRAFT and from_state == DocumentState.IN_REVIEW:
+            # Rejection
+            document.reviewed_at = now
+            document.reviewed_by = user
+            document.rejection_reason = rejection_reason
+        elif to_state == DocumentState.PUBLISHED:
+            document.published_at = now
+            document.published_by = user
+        elif to_state == DocumentState.ARCHIVED:
+            document.archived_at = now
+            document.archived_by = user
+        elif to_state == DocumentState.DRAFT and from_state == DocumentState.ARCHIVED:
+            # Restore from archive
+            document.archived_at = None
+            document.archived_by = None
+
+        document.save()
+
+        return transition

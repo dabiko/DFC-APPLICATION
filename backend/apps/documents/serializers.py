@@ -70,7 +70,7 @@ class DocumentListSerializer(serializers.ModelSerializer):
         model = Document
         fields = [
             'id', 'title', 'file_name', 'file_size', 'file_size_mb',
-            'file_type', 'document_type', 'confidentiality_level',
+            'file_type', 'document_type', 'confidentiality_level', 'state',
             'owner', 'owner_name', 'department', 'department_name',
             'folder', 'folder_name', 'version_number', 'is_current_version',
             'created_at', 'updated_at', 'tags'
@@ -1832,3 +1832,704 @@ class RecentActivityStatsSerializer(serializers.Serializer):
     )
     pinned_count = serializers.IntegerField()
     pinned_limit = serializers.IntegerField()
+
+
+# ============================================================================
+# MY DOCUMENTS SERIALIZERS
+# ============================================================================
+
+
+class MyDocumentListItemSerializer(serializers.ModelSerializer):
+    """
+    Serializer for listing documents in My Documents view.
+    Includes time grouping and folder information.
+    """
+    folder_name = serializers.CharField(source='folder.name', read_only=True)
+    folder_path = serializers.CharField(source='folder.path', read_only=True)
+    department_name = serializers.CharField(source='department.name', read_only=True)
+    time_ago = serializers.SerializerMethodField()
+    time_group = serializers.SerializerMethodField()
+    tags = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Document
+        fields = [
+            'id', 'title', 'file_name', 'file_size', 'file_type',
+            'document_type', 'confidentiality_level',
+            'folder', 'folder_name', 'folder_path',
+            'department', 'department_name',
+            'version_number', 'document_date',
+            'created_at', 'updated_at',
+            'time_ago', 'time_group', 'tags',
+        ]
+        read_only_fields = fields
+
+    def get_tags(self, obj):
+        """Get tag names for the document"""
+        return [dt.tag.name for dt in obj.document_tags.select_related('tag')]
+
+    def get_time_ago(self, obj):
+        """Get human-readable time ago string"""
+        from django.utils import timezone
+        from datetime import timedelta
+
+        now = timezone.now()
+        diff = now - obj.updated_at
+
+        if diff < timedelta(minutes=1):
+            return 'Just now'
+        elif diff < timedelta(hours=1):
+            minutes = int(diff.total_seconds() / 60)
+            return f'{minutes}m ago'
+        elif diff < timedelta(days=1):
+            hours = int(diff.total_seconds() / 3600)
+            return f'{hours}h ago'
+        elif diff < timedelta(days=2):
+            return 'Yesterday'
+        elif diff < timedelta(days=7):
+            return obj.updated_at.strftime('%A')
+        else:
+            return obj.updated_at.strftime('%b %d')
+
+    def get_time_group(self, obj):
+        """Get time group for UI grouping"""
+        from django.utils import timezone
+        from datetime import timedelta
+
+        now = timezone.now()
+        timestamp = obj.updated_at
+
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        week_start = today_start - timedelta(days=today_start.weekday())
+        month_start = today_start.replace(day=1)
+
+        if timestamp >= today_start:
+            return 'today'
+        elif timestamp >= week_start:
+            return 'this_week'
+        elif timestamp >= month_start:
+            return 'this_month'
+        else:
+            return 'earlier'
+
+
+class MyDocumentsStatsSerializer(serializers.Serializer):
+    """
+    Serializer for My Documents statistics.
+    """
+    total_documents = serializers.IntegerField()
+    total_folders = serializers.IntegerField()
+    documents_today = serializers.IntegerField()
+    documents_this_week = serializers.IntegerField()
+    storage_used_bytes = serializers.IntegerField()
+    storage_used_formatted = serializers.CharField()
+
+    # By type breakdown
+    by_document_type = serializers.DictField(
+        child=serializers.IntegerField(),
+        help_text='Count of documents by type'
+    )
+
+    # By confidentiality breakdown
+    by_confidentiality = serializers.DictField(
+        child=serializers.IntegerField(),
+        help_text='Count of documents by confidentiality level'
+    )
+
+
+class MyDocumentsGroupedSerializer(serializers.Serializer):
+    """
+    Serializer for grouped My Documents response.
+    Groups documents by time period.
+    """
+    today = MyDocumentListItemSerializer(many=True)
+    this_week = MyDocumentListItemSerializer(many=True)
+    this_month = MyDocumentListItemSerializer(many=True)
+    earlier = MyDocumentListItemSerializer(many=True)
+    total_count = serializers.IntegerField()
+
+
+# ============================================================================
+# PINNED ITEMS SERIALIZERS (Quick Access)
+# ============================================================================
+
+class PinnedItemSerializer(serializers.ModelSerializer):
+    """
+    Serializer for PinnedItem model.
+    Includes resolved item details for documents and folders.
+    """
+    display_name = serializers.SerializerMethodField()
+    item_id = serializers.SerializerMethodField()
+    item_details = serializers.SerializerMethodField()
+    is_accessible = serializers.SerializerMethodField()
+
+    class Meta:
+        from apps.documents.models import PinnedItem
+        model = PinnedItem
+        fields = [
+            'id', 'item_type', 'display_order', 'custom_label',
+            'display_name', 'item_id', 'item_details', 'is_accessible',
+            'pinned_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'pinned_at', 'updated_at']
+
+    def get_display_name(self, obj):
+        """Get the display name for the pinned item."""
+        return obj.get_display_name()
+
+    def get_item_id(self, obj):
+        """Get the actual item ID (document, folder, or shared item)."""
+        return obj.get_item_id()
+
+    def get_is_accessible(self, obj):
+        """Check if the pinned item is still accessible."""
+        if obj.document:
+            return not obj.document.is_deleted
+        if obj.folder:
+            return not obj.folder.is_deleted
+        if obj.shared_item_id:
+            # Check if shared access still exists
+            from apps.sharing.models import SharedItemAccess
+            return SharedItemAccess.objects.filter(
+                id=obj.shared_item_id,
+                is_active=True
+            ).exists()
+        return False
+
+    def get_item_details(self, obj):
+        """Get additional details about the pinned item."""
+        if obj.document:
+            return {
+                'type': 'document',
+                'title': obj.document.title,
+                'file_name': obj.document.file_name,
+                'file_type': obj.document.file_type,
+                'file_size': obj.document.file_size,
+                'confidentiality_level': obj.document.confidentiality_level,
+                'document_type': obj.document.document_type,
+                'folder_id': str(obj.document.folder_id) if obj.document.folder_id else None,
+                'folder_name': obj.document.folder.name if obj.document.folder else None,
+            }
+        elif obj.folder:
+            return {
+                'type': 'folder',
+                'name': obj.folder.name,
+                'path': obj.folder.path,
+                'parent_id': str(obj.folder.parent_id) if obj.folder.parent_id else None,
+                'document_count': obj.folder.documents.filter(is_deleted=False).count(),
+            }
+        elif obj.shared_item_id:
+            return {
+                'type': 'shared',
+                'name': obj.shared_item_name,
+                'shared_item_id': str(obj.shared_item_id),
+            }
+        return None
+
+
+class PinnedItemCreateSerializer(serializers.Serializer):
+    """
+    Serializer for creating a new pinned item.
+    """
+    item_type = serializers.ChoiceField(
+        choices=['DOCUMENT', 'FOLDER', 'SHARED_DOCUMENT', 'SHARED_FOLDER']
+    )
+    document_id = serializers.UUIDField(required=False, allow_null=True)
+    folder_id = serializers.UUIDField(required=False, allow_null=True)
+    shared_item_id = serializers.UUIDField(required=False, allow_null=True)
+    custom_label = serializers.CharField(max_length=255, required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        """Validate that the correct ID is provided based on item_type."""
+        item_type = attrs.get('item_type')
+        document_id = attrs.get('document_id')
+        folder_id = attrs.get('folder_id')
+        shared_item_id = attrs.get('shared_item_id')
+
+        if item_type == 'DOCUMENT':
+            if not document_id:
+                raise serializers.ValidationError({
+                    'document_id': 'Required for DOCUMENT item type'
+                })
+            # Verify document exists and user has access
+            from apps.documents.models import Document
+            try:
+                document = Document.objects.get(pk=document_id, is_deleted=False)
+                user = self.context['request'].user
+                # User must own the document or be staff
+                if document.owner != user and not user.is_staff:
+                    raise serializers.ValidationError({
+                        'document_id': 'You do not have access to this document'
+                    })
+                attrs['document'] = document
+            except Document.DoesNotExist:
+                raise serializers.ValidationError({
+                    'document_id': 'Document not found'
+                })
+
+        elif item_type == 'FOLDER':
+            if not folder_id:
+                raise serializers.ValidationError({
+                    'folder_id': 'Required for FOLDER item type'
+                })
+            # Verify folder exists and user has access
+            from apps.folders.models import Folder
+            try:
+                folder = Folder.objects.get(pk=folder_id, is_deleted=False)
+                user = self.context['request'].user
+                # User must own the folder or be staff
+                if folder.owner != user and not user.is_staff:
+                    raise serializers.ValidationError({
+                        'folder_id': 'You do not have access to this folder'
+                    })
+                attrs['folder'] = folder
+            except Folder.DoesNotExist:
+                raise serializers.ValidationError({
+                    'folder_id': 'Folder not found'
+                })
+
+        elif item_type in ['SHARED_DOCUMENT', 'SHARED_FOLDER']:
+            if not shared_item_id:
+                raise serializers.ValidationError({
+                    'shared_item_id': 'Required for shared item types'
+                })
+            # Verify shared access exists
+            from apps.sharing.models import SharedItemAccess
+            try:
+                shared_access = SharedItemAccess.objects.get(
+                    pk=shared_item_id,
+                    recipient=self.context['request'].user,
+                    is_active=True
+                )
+                attrs['shared_access'] = shared_access
+                attrs['shared_item_name'] = shared_access.resource_name
+            except SharedItemAccess.DoesNotExist:
+                raise serializers.ValidationError({
+                    'shared_item_id': 'Shared item not found or access revoked'
+                })
+
+        return attrs
+
+    def create(self, validated_data):
+        """Create the pinned item."""
+        from apps.documents.models import PinnedItem
+
+        user = self.context['request'].user
+
+        # Check if user can pin more items
+        can_pin, reason = PinnedItem.can_user_pin(user)
+        if not can_pin:
+            raise serializers.ValidationError({'non_field_errors': [reason]})
+
+        # Check for existing pin
+        item_type = validated_data['item_type']
+        existing_pin = None
+
+        if item_type == 'DOCUMENT':
+            existing_pin = PinnedItem.objects.filter(
+                user=user,
+                document=validated_data['document']
+            ).first()
+        elif item_type == 'FOLDER':
+            existing_pin = PinnedItem.objects.filter(
+                user=user,
+                folder=validated_data['folder']
+            ).first()
+        elif item_type in ['SHARED_DOCUMENT', 'SHARED_FOLDER']:
+            existing_pin = PinnedItem.objects.filter(
+                user=user,
+                shared_item_id=validated_data.get('shared_item_id')
+            ).first()
+
+        if existing_pin:
+            raise serializers.ValidationError({
+                'non_field_errors': ['This item is already pinned']
+            })
+
+        # Create the pin
+        pin_data = {
+            'user': user,
+            'item_type': item_type,
+            'custom_label': validated_data.get('custom_label', ''),
+        }
+
+        if item_type == 'DOCUMENT':
+            pin_data['document'] = validated_data['document']
+        elif item_type == 'FOLDER':
+            pin_data['folder'] = validated_data['folder']
+        elif item_type in ['SHARED_DOCUMENT', 'SHARED_FOLDER']:
+            pin_data['shared_item_id'] = validated_data['shared_item_id']
+            pin_data['shared_item_name'] = validated_data.get('shared_item_name', '')
+
+        return PinnedItem.objects.create(**pin_data)
+
+
+class PinnedItemReorderSerializer(serializers.Serializer):
+    """
+    Serializer for reordering pinned items.
+    """
+    ordered_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        min_length=1,
+        help_text='List of pin IDs in desired order'
+    )
+
+    def validate_ordered_ids(self, value):
+        """Validate all IDs belong to the user."""
+        from apps.documents.models import PinnedItem
+
+        user = self.context['request'].user
+        user_pin_ids = set(
+            PinnedItem.objects.filter(user=user).values_list('id', flat=True)
+        )
+        provided_ids = set(value)
+
+        # Check for invalid IDs
+        invalid_ids = provided_ids - user_pin_ids
+        if invalid_ids:
+            raise serializers.ValidationError(
+                f'Invalid pin IDs: {list(invalid_ids)}'
+            )
+
+        return value
+
+
+class PinnedItemUpdateSerializer(serializers.Serializer):
+    """
+    Serializer for updating a pinned item (custom label).
+    """
+    custom_label = serializers.CharField(max_length=255, required=False, allow_blank=True)
+
+
+# ============================================================================
+# DOCUMENT STATE SERIALIZERS
+# ============================================================================
+
+
+class DocumentStateTransitionSerializer(serializers.ModelSerializer):
+    """
+    Serializer for DocumentStateTransition model.
+    Provides audit trail for document state changes.
+    """
+    transitioned_by_name = serializers.SerializerMethodField()
+    from_state_label = serializers.SerializerMethodField()
+    to_state_label = serializers.SerializerMethodField()
+    relative_time = serializers.SerializerMethodField()
+
+    class Meta:
+        from apps.documents.models import DocumentStateTransition
+        model = DocumentStateTransition
+        fields = [
+            'id', 'document', 'from_state', 'to_state',
+            'from_state_label', 'to_state_label',
+            'transitioned_by', 'transitioned_by_name',
+            'transitioned_at', 'relative_time',
+            'notes', 'rejection_reason'
+        ]
+        read_only_fields = fields
+
+    def get_transitioned_by_name(self, obj):
+        """Get the name of the user who made the transition."""
+        if obj.transitioned_by:
+            return obj.transitioned_by.get_full_name() or obj.transitioned_by.username
+        return None
+
+    def get_from_state_label(self, obj):
+        """Get human-readable label for from_state."""
+        from apps.documents.models import DocumentState
+        labels = dict(DocumentState.choices)
+        return labels.get(obj.from_state, obj.from_state)
+
+    def get_to_state_label(self, obj):
+        """Get human-readable label for to_state."""
+        from apps.documents.models import DocumentState
+        labels = dict(DocumentState.choices)
+        return labels.get(obj.to_state, obj.to_state)
+
+    def get_relative_time(self, obj):
+        """Get human-readable relative time."""
+        from django.utils import timezone
+        from datetime import timedelta
+
+        now = timezone.now()
+        diff = now - obj.transitioned_at
+
+        if diff < timedelta(minutes=1):
+            return 'Just now'
+        elif diff < timedelta(hours=1):
+            minutes = int(diff.total_seconds() / 60)
+            return f'{minutes}m ago'
+        elif diff < timedelta(days=1):
+            hours = int(diff.total_seconds() / 3600)
+            return f'{hours}h ago'
+        elif diff < timedelta(days=2):
+            return 'Yesterday'
+        elif diff < timedelta(days=7):
+            return obj.transitioned_at.strftime('%A')
+        else:
+            return obj.transitioned_at.strftime('%b %d, %Y')
+
+
+class DocumentStateChangeSerializer(serializers.Serializer):
+    """
+    Serializer for changing document state.
+    Validates transition is allowed and handles state-specific requirements.
+    """
+    to_state = serializers.ChoiceField(
+        choices=[
+            ('IN_REVIEW', 'In Review'),
+            ('APPROVED', 'Approved'),
+            ('DRAFT', 'Draft'),  # For rejection or restore
+            ('PUBLISHED', 'Published'),
+            ('ARCHIVED', 'Archived'),
+        ],
+        help_text='Target state for the document'
+    )
+    notes = serializers.CharField(
+        max_length=5000,
+        required=False,
+        allow_blank=True,
+        help_text='Optional notes for this transition'
+    )
+    rejection_reason = serializers.CharField(
+        max_length=5000,
+        required=False,
+        allow_blank=True,
+        help_text='Required when rejecting (transitioning from IN_REVIEW to DRAFT)'
+    )
+
+    def validate(self, attrs):
+        """Validate the state transition is allowed."""
+        from apps.documents.models import DocumentStateTransition, DocumentState
+
+        document = self.context.get('document')
+        to_state = attrs.get('to_state')
+        rejection_reason = attrs.get('rejection_reason', '')
+
+        if not document:
+            raise serializers.ValidationError('Document not found in context')
+
+        # Check if transition is valid
+        if not DocumentStateTransition.is_valid_transition(document.state, to_state):
+            allowed = DocumentStateTransition.get_allowed_transitions(document.state)
+            allowed_labels = [dict(DocumentState.choices).get(s, s) for s in allowed]
+            raise serializers.ValidationError({
+                'to_state': f'Cannot transition from {document.get_state_display()} to {attrs.get("to_state")}. '
+                           f'Allowed transitions: {", ".join(allowed_labels) if allowed_labels else "none"}'
+            })
+
+        # Require rejection_reason when rejecting
+        if document.state == DocumentState.IN_REVIEW and to_state == DocumentState.DRAFT:
+            if not rejection_reason:
+                raise serializers.ValidationError({
+                    'rejection_reason': 'Rejection reason is required when rejecting a document'
+                })
+
+        attrs['document'] = document
+        return attrs
+
+    def create(self, validated_data):
+        """Perform the state transition."""
+        from apps.documents.models import DocumentStateTransition
+
+        document = validated_data['document']
+        to_state = validated_data['to_state']
+        notes = validated_data.get('notes', '')
+        rejection_reason = validated_data.get('rejection_reason', '')
+        user = self.context['request'].user
+
+        # Create the transition
+        transition = DocumentStateTransition.create_transition(
+            document=document,
+            to_state=to_state,
+            user=user,
+            notes=notes,
+            rejection_reason=rejection_reason
+        )
+
+        return transition
+
+
+class DocumentWithStateSerializer(serializers.ModelSerializer):
+    """
+    Serializer for documents that includes state information.
+    Used in My Documents listing with state tabs.
+    """
+    folder_name = serializers.CharField(source='folder.name', read_only=True)
+    folder_path = serializers.CharField(source='folder.path', read_only=True)
+    department_name = serializers.CharField(source='department.name', read_only=True)
+    state_label = serializers.SerializerMethodField()
+    allowed_transitions = serializers.SerializerMethodField()
+    time_ago = serializers.SerializerMethodField()
+    time_group = serializers.SerializerMethodField()
+    tags = serializers.SerializerMethodField()
+    submitted_by_name = serializers.SerializerMethodField()
+    reviewed_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Document
+        fields = [
+            'id', 'title', 'file_name', 'file_size', 'file_type',
+            'document_type', 'confidentiality_level',
+            'folder', 'folder_name', 'folder_path',
+            'department', 'department_name',
+            'version_number', 'document_date',
+            'created_at', 'updated_at',
+            'time_ago', 'time_group', 'tags',
+            # State fields
+            'state', 'state_label', 'allowed_transitions',
+            'submitted_for_review_at', 'submitted_by', 'submitted_by_name',
+            'reviewed_at', 'reviewed_by', 'reviewed_by_name',
+            'approved_at', 'published_at', 'archived_at',
+            'review_notes', 'rejection_reason',
+        ]
+        read_only_fields = fields
+
+    def get_state_label(self, obj):
+        """Get human-readable state label."""
+        return obj.get_state_display()
+
+    def get_allowed_transitions(self, obj):
+        """Get list of allowed state transitions."""
+        from apps.documents.models import DocumentStateTransition, DocumentState
+        allowed = DocumentStateTransition.get_allowed_transitions(obj.state)
+        return [
+            {'state': s, 'label': dict(DocumentState.choices).get(s, s)}
+            for s in allowed
+        ]
+
+    def get_tags(self, obj):
+        """Get tag names for the document."""
+        return [dt.tag.name for dt in obj.document_tags.select_related('tag')]
+
+    def get_time_ago(self, obj):
+        """Get human-readable time ago string."""
+        from django.utils import timezone
+        from datetime import timedelta
+
+        now = timezone.now()
+        diff = now - obj.updated_at
+
+        if diff < timedelta(minutes=1):
+            return 'Just now'
+        elif diff < timedelta(hours=1):
+            minutes = int(diff.total_seconds() / 60)
+            return f'{minutes}m ago'
+        elif diff < timedelta(days=1):
+            hours = int(diff.total_seconds() / 3600)
+            return f'{hours}h ago'
+        elif diff < timedelta(days=2):
+            return 'Yesterday'
+        elif diff < timedelta(days=7):
+            return obj.updated_at.strftime('%A')
+        else:
+            return obj.updated_at.strftime('%b %d')
+
+    def get_time_group(self, obj):
+        """Get time group for UI grouping."""
+        from django.utils import timezone
+        from datetime import timedelta
+
+        now = timezone.now()
+        timestamp = obj.updated_at
+
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        week_start = today_start - timedelta(days=today_start.weekday())
+        month_start = today_start.replace(day=1)
+
+        if timestamp >= today_start:
+            return 'today'
+        elif timestamp >= week_start:
+            return 'this_week'
+        elif timestamp >= month_start:
+            return 'this_month'
+        else:
+            return 'earlier'
+
+    def get_submitted_by_name(self, obj):
+        """Get name of user who submitted for review."""
+        if obj.submitted_by:
+            return obj.submitted_by.get_full_name() or obj.submitted_by.username
+        return None
+
+    def get_reviewed_by_name(self, obj):
+        """Get name of reviewer."""
+        if obj.reviewed_by:
+            return obj.reviewed_by.get_full_name() or obj.reviewed_by.username
+        return None
+
+
+class PendingReviewSerializer(serializers.ModelSerializer):
+    """
+    Serializer for documents pending the current user's review action.
+    Shows documents where user is expected to approve/reject.
+    """
+    owner_name = serializers.SerializerMethodField()
+    folder_name = serializers.CharField(source='folder.name', read_only=True)
+    submitted_by_name = serializers.SerializerMethodField()
+    time_pending = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Document
+        fields = [
+            'id', 'title', 'file_name', 'file_size', 'file_type',
+            'document_type', 'confidentiality_level',
+            'folder', 'folder_name',
+            'owner', 'owner_name',
+            'submitted_for_review_at', 'submitted_by', 'submitted_by_name',
+            'time_pending',
+        ]
+        read_only_fields = fields
+
+    def get_owner_name(self, obj):
+        """Get document owner's name."""
+        if obj.owner:
+            return obj.owner.get_full_name() or obj.owner.username
+        return None
+
+    def get_submitted_by_name(self, obj):
+        """Get name of user who submitted for review."""
+        if obj.submitted_by:
+            return obj.submitted_by.get_full_name() or obj.submitted_by.username
+        return None
+
+    def get_time_pending(self, obj):
+        """Get how long the document has been pending review."""
+        from django.utils import timezone
+        from datetime import timedelta
+
+        if not obj.submitted_for_review_at:
+            return None
+
+        now = timezone.now()
+        diff = now - obj.submitted_for_review_at
+
+        if diff < timedelta(hours=1):
+            minutes = int(diff.total_seconds() / 60)
+            return f'{minutes}m'
+        elif diff < timedelta(days=1):
+            hours = int(diff.total_seconds() / 3600)
+            return f'{hours}h'
+        else:
+            days = diff.days
+            return f'{days}d'
+
+
+class DocumentStateStatsSerializer(serializers.Serializer):
+    """
+    Serializer for document state statistics.
+    """
+    total = serializers.IntegerField()
+    by_state = serializers.DictField(
+        child=serializers.IntegerField(),
+        help_text='Count of documents by state'
+    )
+    pending_my_review = serializers.IntegerField(
+        help_text='Documents awaiting current user\'s review action'
+    )
+    my_drafts = serializers.IntegerField(
+        help_text='User\'s draft documents'
+    )
+    my_in_review = serializers.IntegerField(
+        help_text='User\'s documents currently in review'
+    )

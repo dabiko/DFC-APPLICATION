@@ -54,6 +54,16 @@ from apps.users.views_collections import (
     ExportFavoritesView,
     CollectionItemsView,
 )
+from apps.users.views_management import (
+    UserManagementListView,
+    UserActivateView,
+    UserDeactivateView,
+    UserUnlockView,
+    UserResetPasswordView,
+    SecurityStatsView,
+    LockedAccountsView,
+    UserManagementStatsView,
+)
 
 app_name = 'users'
 
@@ -118,4 +128,17 @@ urlpatterns = [
 
     # Favorites - Export
     path('favorites/export/', ExportFavoritesView.as_view(), name='favorites_export'),
+
+    # User Management endpoints (admin)
+    path('users/<int:pk>/activate/', UserActivateView.as_view(), name='user_activate'),
+    path('users/<int:pk>/deactivate/', UserDeactivateView.as_view(), name='user_deactivate'),
+    path('users/<int:pk>/unlock/', UserUnlockView.as_view(), name='user_unlock'),
+    path('users/<int:pk>/reset-password/', UserResetPasswordView.as_view(), name='user_reset_password'),
+
+    # Security endpoints
+    path('security/stats/', SecurityStatsView.as_view(), name='security_stats'),
+    path('security/locked-accounts/', LockedAccountsView.as_view(), name='locked_accounts'),
+
+    # Dashboard stats
+    path('stats/', UserManagementStatsView.as_view(), name='user_management_stats'),
 ]
