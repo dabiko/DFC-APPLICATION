@@ -346,3 +346,6 @@ from apps.users.models_otp import EmailOTP, PhoneOTP
 
 # Import Favorites models
 from apps.users.models_favorites import FavoriteFolder, FavoriteDocument
+
+# Import Settings models
+from apps.users.settings_models import UserPreferences, NotificationSettings, SecuritySettings

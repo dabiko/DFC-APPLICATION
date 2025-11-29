@@ -542,3 +542,178 @@ def log_folder_activity(user, folder, activity_type):
 
     except Exception as e:
         logger.error(f"Failed to log folder activity: {e}", exc_info=True)
+
+
+# ========================================
+# Workflow Auto-Trigger Signals
+# ========================================
+
+@receiver(post_save, sender=Document)
+def auto_trigger_workflow_on_upload(sender, instance, created, **kwargs):
+    """
+    Automatically trigger workflows when a document is uploaded.
+
+    Evaluates all active WorkflowAutoTriggerRule entries to determine
+    if any workflows should be automatically started for the new document.
+
+    Args:
+        sender: The Document model class
+        instance: The Document instance
+        created: Boolean indicating if this is a new document
+        **kwargs: Additional signal arguments
+    """
+    # Only trigger on new document uploads
+    if not created:
+        return
+
+    # Skip during migrations or fixture loading
+    if kwargs.get('raw', False):
+        return
+
+    # Skip if document is deleted
+    if instance.is_deleted:
+        return
+
+    # Skip if document doesn't have a file yet (waiting for upload)
+    if not instance.minio_object_key:
+        return
+
+    try:
+        from apps.workflows.models import WorkflowAutoTriggerRule
+
+        # Get organization from document
+        organization = getattr(instance, 'organization', None)
+        if not organization and instance.folder:
+            organization = getattr(instance.folder, 'organization', None)
+
+        # Get all active rules, ordered by priority
+        rules = WorkflowAutoTriggerRule.objects.filter(
+            is_active=True
+        ).select_related(
+            'workflow_template'
+        ).order_by('priority')
+
+        # Filter by organization if applicable
+        if organization:
+            rules = rules.filter(
+                models.Q(organization=organization) |
+                models.Q(organization__isnull=True)
+            )
+
+        # Evaluate each rule
+        triggered_workflows = []
+        for rule in rules:
+            if rule.matches_document(instance):
+                logger.info(
+                    f"Document {instance.id} matches auto-trigger rule '{rule.name}'"
+                )
+
+                # Get the user who uploaded the document
+                user = getattr(instance, '_current_user', None)
+                if not user:
+                    user = instance.created_by or instance.owner
+
+                # Trigger the workflow
+                try:
+                    workflow_instance = rule.trigger_workflow(instance, user)
+                    triggered_workflows.append({
+                        'rule': rule.name,
+                        'workflow': str(workflow_instance.id),
+                        'template': rule.workflow_template.name
+                    })
+                    logger.info(
+                        f"Auto-triggered workflow '{rule.workflow_template.name}' "
+                        f"for document {instance.id} (rule: {rule.name})"
+                    )
+                except Exception as trigger_error:
+                    logger.error(
+                        f"Failed to trigger workflow for rule '{rule.name}': {trigger_error}",
+                        exc_info=True
+                    )
+
+                # Stop processing if rule says so
+                if rule.stop_processing:
+                    logger.debug(
+                        f"Stopping rule evaluation after rule '{rule.name}' "
+                        f"(stop_processing=True)"
+                    )
+                    break
+
+        if triggered_workflows:
+            logger.info(
+                f"Auto-triggered {len(triggered_workflows)} workflow(s) "
+                f"for document {instance.id}: {triggered_workflows}"
+            )
+
+    except ImportError:
+        # Workflows app may not be installed
+        logger.debug("Workflows app not available, skipping auto-trigger check")
+    except Exception as e:
+        # Don't fail the document save if auto-trigger fails
+        logger.error(
+            f"Failed to evaluate auto-trigger rules for document {instance.id}: {e}",
+            exc_info=True
+        )
+
+
+def check_auto_trigger_rules_for_document(document, user=None):
+    """
+    Helper function to manually check and trigger workflow rules for a document.
+
+    This can be called from views or tasks to re-evaluate rules for an existing
+    document (e.g., after metadata update).
+
+    Args:
+        document: The Document instance to check
+        user: The user initiating the check (defaults to document owner)
+
+    Returns:
+        list: List of triggered workflow instances
+    """
+    try:
+        from apps.workflows.models import WorkflowAutoTriggerRule
+
+        # Get organization from document
+        organization = getattr(document, 'organization', None)
+        if not organization and document.folder:
+            organization = getattr(document.folder, 'organization', None)
+
+        # Get all active rules, ordered by priority
+        rules = WorkflowAutoTriggerRule.objects.filter(
+            is_active=True
+        ).select_related(
+            'workflow_template'
+        ).order_by('priority')
+
+        # Filter by organization if applicable
+        if organization:
+            from django.db import models as db_models
+            rules = rules.filter(
+                db_models.Q(organization=organization) |
+                db_models.Q(organization__isnull=True)
+            )
+
+        triggered_workflows = []
+        for rule in rules:
+            if rule.matches_document(document):
+                try:
+                    workflow_instance = rule.trigger_workflow(document, user)
+                    triggered_workflows.append(workflow_instance)
+                    logger.info(
+                        f"Manually triggered workflow '{rule.workflow_template.name}' "
+                        f"for document {document.id}"
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to trigger workflow: {e}", exc_info=True)
+
+                if rule.stop_processing:
+                    break
+
+        return triggered_workflows
+
+    except ImportError:
+        logger.debug("Workflows app not available")
+        return []
+    except Exception as e:
+        logger.error(f"Failed to check auto-trigger rules: {e}", exc_info=True)
+        return []

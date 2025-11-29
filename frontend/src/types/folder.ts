@@ -74,7 +74,16 @@ export interface FolderTreeNode {
 /**
  * Folder operation types
  */
-export type FolderOperation = 'create' | 'rename' | 'move' | 'delete' | 'properties' | 'share' | 'lock' | 'unlock' | 'favorite'
+export type FolderOperation =
+  | 'create'
+  | 'rename'
+  | 'move'
+  | 'delete'
+  | 'properties'
+  | 'share'
+  | 'lock'
+  | 'unlock'
+  | 'favorite'
 
 /**
  * Context menu item

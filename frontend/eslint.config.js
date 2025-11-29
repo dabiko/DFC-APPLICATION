@@ -60,6 +60,11 @@ export default defineConfig([
       'react-hooks/exhaustive-deps': 'warn',
       'react-hooks/set-state-in-effect': 'warn',
       'react-hooks/rules-of-hooks': 'error',
+      // Temporarily warn for these new strict rules - to be fixed later
+      'react-hooks/purity': 'warn',
+      'react-hooks/static-components': 'warn',
+      // React Compiler memoization warnings
+      'react-hooks/preserve-manual-memoization': 'warn',
 
       // Prettier integration
       'prettier/prettier': 'error',

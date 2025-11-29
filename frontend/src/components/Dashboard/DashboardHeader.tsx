@@ -1,11 +1,23 @@
 import { useState, useRef, useEffect } from 'react'
-import { Bell, User, Settings, Users, LogOut, Sun, Moon, Monitor } from 'lucide-react'
+import {
+  Bell,
+  User,
+  Settings,
+  Users,
+  LogOut,
+  Sun,
+  Moon,
+  Monitor,
+  Wifi,
+  WifiOff,
+} from 'lucide-react'
 import { TopNavigationBar } from '@components/Navigation/TopNavigationBar'
 import { useTheme } from '@hooks/useTheme'
+import { useNetworkStatus } from '@/contexts/NetworkStatusContext'
 import { cn } from '@utils/cn'
 
 interface DashboardHeaderProps {
-  user: {
+  user?: {
     firstName: string
     lastName: string
     email: string
@@ -21,8 +33,19 @@ interface DashboardHeaderProps {
   onLogout?: () => void
 }
 
-export function DashboardHeader({ user, notifications = [], onLogout }: DashboardHeaderProps) {
+const DEFAULT_USER = {
+  firstName: 'User',
+  lastName: '',
+  email: '',
+}
+
+export function DashboardHeader({
+  user = DEFAULT_USER,
+  notifications = [],
+  onLogout,
+}: DashboardHeaderProps) {
   const { theme, setTheme } = useTheme()
+  const { isOnline, isSlow } = useNetworkStatus()
   const [showNotifications, setShowNotifications] = useState(false)
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [showThemeMenu, setShowThemeMenu] = useState(false)
@@ -34,7 +57,8 @@ export function DashboardHeader({ user, notifications = [], onLogout }: Dashboar
   const unreadCount = notifications.filter((n) => !n.read).length
 
   // Get user initials
-  const initials = `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase()
+  const initials =
+    `${user.firstName?.charAt(0) || ''}${user.lastName?.charAt(0) || ''}`.toUpperCase() || 'U'
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -192,17 +216,31 @@ export function DashboardHeader({ user, notifications = [], onLogout }: Dashboar
             className="flex items-center gap-3 p-1 pr-3 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
             aria-label="Profile menu"
           >
-            {user.avatar ? (
-              <img
-                src={user.avatar}
-                alt={`${user.firstName} ${user.lastName}`}
-                className="w-8 h-8 rounded-full"
+            <div className="relative">
+              {user.avatar ? (
+                <img
+                  src={user.avatar}
+                  alt={`${user.firstName} ${user.lastName}`}
+                  className="w-8 h-8 rounded-full"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center text-white font-semibold text-sm">
+                  {initials}
+                </div>
+              )}
+              {/* Session Status Indicator */}
+              <span
+                className={cn(
+                  'absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white dark:border-gray-900',
+                  isOnline
+                    ? isSlow
+                      ? 'bg-yellow-500' // Slow connection
+                      : 'bg-green-500' // Active/Online
+                    : 'bg-gray-400' // Offline
+                )}
+                title={isOnline ? (isSlow ? 'Slow connection' : 'Active') : 'Offline'}
               />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center text-white font-semibold text-sm">
-                {initials}
-              </div>
-            )}
+            </div>
             <span className="hidden md:block text-sm font-medium text-gray-700 dark:text-gray-300">
               {user.firstName} {user.lastName}
             </span>
@@ -215,6 +253,31 @@ export function DashboardHeader({ user, notifications = [], onLogout }: Dashboar
                   {user.firstName} {user.lastName}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">{user.email}</p>
+                {/* Session Status */}
+                <div className="flex items-center gap-2 mt-2">
+                  {isOnline ? (
+                    <>
+                      <Wifi
+                        className={cn('w-3 h-3', isSlow ? 'text-yellow-500' : 'text-green-500')}
+                      />
+                      <span
+                        className={cn(
+                          'text-xs',
+                          isSlow
+                            ? 'text-yellow-600 dark:text-yellow-400'
+                            : 'text-green-600 dark:text-green-400'
+                        )}
+                      >
+                        {isSlow ? 'Slow connection' : 'Active session'}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <WifiOff className="w-3 h-3 text-gray-400" />
+                      <span className="text-xs text-gray-500 dark:text-gray-400">Offline</span>
+                    </>
+                  )}
+                </div>
               </div>
 
               <button

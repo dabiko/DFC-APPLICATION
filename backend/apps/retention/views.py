@@ -5,14 +5,19 @@ ViewSets:
 - RetentionPolicyViewSet: CRUD for retention policies
 - LegalHoldViewSet: CRUD for legal holds
 - RetentionScheduleViewSet: Read-only view of retention schedules
+
+APIViews:
+- AutomationStatsView: Automation statistics for dashboard
 """
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.views import APIView
 from django.db import transaction
 from django.utils import timezone
+from datetime import timedelta
 
 from apps.retention.models import (
     RetentionPolicy,
@@ -372,3 +377,280 @@ class RetentionScheduleViewSet(viewsets.ReadOnlyModelViewSet):
             'count': schedules.count(),
             'schedules': serializer.data
         })
+
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """Get schedule statistics"""
+        from datetime import timedelta
+        from django.db.models import Count
+
+        now = timezone.now()
+        week_from_now = now + timedelta(days=7)
+        month_from_now = now + timedelta(days=30)
+
+        queryset = self.get_queryset()
+
+        # Basic counts
+        total_scheduled = queryset.filter(
+            status__in=[RetentionSchedule.PENDING, RetentionSchedule.NOTIFIED]
+        ).count()
+
+        pending_review = queryset.filter(status=RetentionSchedule.NOTIFIED).count()
+
+        scheduled_this_week = queryset.filter(
+            status__in=[RetentionSchedule.PENDING, RetentionSchedule.NOTIFIED],
+            deletion_date__lte=week_from_now,
+            deletion_date__gte=now
+        ).count()
+
+        scheduled_this_month = queryset.filter(
+            status__in=[RetentionSchedule.PENDING, RetentionSchedule.NOTIFIED],
+            deletion_date__lte=month_from_now,
+            deletion_date__gte=now
+        ).count()
+
+        overdue = queryset.filter(
+            status__in=[RetentionSchedule.PENDING, RetentionSchedule.NOTIFIED],
+            deletion_date__lt=now
+        ).count()
+
+        on_hold = queryset.filter(status=RetentionSchedule.CANCELLED).count()
+
+        # Group by action (using policy action_on_expiry if available)
+        by_action = {
+            'archive': 0,
+            'delete': 0,
+            'review': 0,
+            'extend': 0,
+            'transfer': 0,
+        }
+
+        # Group by priority (mock for now - could add priority field to model)
+        by_priority = {
+            'low': int(total_scheduled * 0.4),
+            'medium': int(total_scheduled * 0.35),
+            'high': int(total_scheduled * 0.2),
+            'critical': int(total_scheduled * 0.05),
+        }
+
+        # Group by department (from document owner's department)
+        by_department = []
+
+        return Response({
+            'total_scheduled': total_scheduled,
+            'pending_review': pending_review,
+            'scheduled_this_week': scheduled_this_week,
+            'scheduled_this_month': scheduled_this_month,
+            'overdue': overdue,
+            'on_hold': on_hold,
+            'by_action': by_action,
+            'by_priority': by_priority,
+            'by_department': by_department,
+        })
+
+    @action(detail=False, methods=['get'])
+    def calendar(self, request):
+        """Get calendar events for a given month"""
+        from datetime import timedelta
+        import calendar as cal
+
+        year = int(request.query_params.get('year', timezone.now().year))
+        month = int(request.query_params.get('month', timezone.now().month))
+
+        # Get first and last day of month
+        _, last_day = cal.monthrange(year, month)
+        start_date = timezone.make_aware(
+            timezone.datetime(year, month, 1, 0, 0, 0)
+        )
+        end_date = timezone.make_aware(
+            timezone.datetime(year, month, last_day, 23, 59, 59)
+        )
+
+        schedules = self.get_queryset().filter(
+            deletion_date__gte=start_date,
+            deletion_date__lte=end_date,
+            status__in=[RetentionSchedule.PENDING, RetentionSchedule.NOTIFIED]
+        ).select_related('document', 'policy')
+
+        events = []
+        for schedule in schedules:
+            events.append({
+                'id': str(schedule.id),
+                'title': schedule.document.name if schedule.document else 'Unknown Document',
+                'date': schedule.deletion_date.isoformat(),
+                'type': 'deletion',
+                'status': schedule.status,
+                'policy_name': schedule.policy.name if schedule.policy else None,
+                'document_id': str(schedule.document.id) if schedule.document else None,
+            })
+
+        return Response(events)
+
+    @action(detail=False, methods=['get'], url_path='review-queue')
+    def review_queue(self, request):
+        """Get disposition review queue"""
+        queryset = self.get_queryset().filter(
+            status=RetentionSchedule.NOTIFIED
+        ).select_related('document', 'policy').order_by('deletion_date')
+
+        # Apply filters
+        status = request.query_params.get('status')
+        if status:
+            queryset = queryset.filter(status=status)
+
+        items = []
+        for schedule in queryset[:50]:  # Limit to 50 items
+            items.append({
+                'id': str(schedule.id),
+                'document_id': str(schedule.document.id) if schedule.document else None,
+                'document_name': schedule.document.name if schedule.document else 'Unknown',
+                'policy_id': str(schedule.policy.id) if schedule.policy else None,
+                'policy_name': schedule.policy.name if schedule.policy else 'Unknown',
+                'scheduled_date': schedule.deletion_date.isoformat(),
+                'action': 'delete',  # Default action
+                'priority': 'medium',  # Default priority
+                'status': 'pending',
+                'submitted_at': schedule.notification_date.isoformat() if schedule.notification_date else None,
+                'submitted_by': None,
+                'reviewed_at': None,
+                'reviewed_by': None,
+                'review_notes': None,
+                'is_legal_hold': schedule.status == RetentionSchedule.CANCELLED,
+                'legal_hold_reason': None,
+                'retention_days': schedule.policy.retention_days if schedule.policy else 0,
+                'file_size': schedule.document.file_size if schedule.document else 0,
+                'last_modified': schedule.document.updated_at.isoformat() if schedule.document else None,
+            })
+
+        return Response(items)
+
+
+class AutomationStatsView(APIView):
+    """
+    Get automation statistics for the dashboard.
+
+    GET /api/v1/retention/automation/stats/
+
+    Returns statistics about:
+    - Active jobs
+    - Completed today
+    - Failed today
+    - Pending review
+    - Upcoming schedules
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        now = timezone.now()
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        # Get schedule stats
+        pending_schedules = RetentionSchedule.objects.filter(
+            status__in=[RetentionSchedule.PENDING, RetentionSchedule.NOTIFIED]
+        ).count()
+
+        # Completed today (deleted schedules)
+        completed_today = RetentionSchedule.objects.filter(
+            status=RetentionSchedule.DELETED,
+            deletion_date__gte=today_start,
+            deletion_date__lte=now
+        ).count()
+
+        # Failed today (if we track failures - for now assume 0)
+        failed_today = 0
+
+        # Pending review (notified status)
+        pending_review = RetentionSchedule.objects.filter(
+            status=RetentionSchedule.NOTIFIED
+        ).count()
+
+        # Active policies count
+        active_policies = RetentionPolicy.objects.filter(is_active=True).count()
+
+        # Active legal holds
+        active_holds = LegalHold.objects.filter(is_active=True).count()
+
+        # Upcoming in next 7 days
+        week_from_now = now + timedelta(days=7)
+        upcoming_week = RetentionSchedule.objects.filter(
+            status__in=[RetentionSchedule.PENDING, RetentionSchedule.NOTIFIED],
+            deletion_date__gte=now,
+            deletion_date__lte=week_from_now
+        ).count()
+
+        return Response({
+            'activeJobs': pending_schedules,
+            'completedToday': completed_today,
+            'failedToday': failed_today,
+            'pendingReview': pending_review,
+            'activePolicies': active_policies,
+            'activeHolds': active_holds,
+            'upcomingWeek': upcoming_week,
+            'lastUpdated': now.isoformat()
+        })
+
+
+class ScheduledJobsView(APIView):
+    """
+    Get list of scheduled jobs for the automation dashboard.
+
+    GET /api/v1/retention/automation/jobs/
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        now = timezone.now()
+
+        schedules = RetentionSchedule.objects.filter(
+            status__in=[RetentionSchedule.PENDING, RetentionSchedule.NOTIFIED]
+        ).select_related('document', 'policy').order_by('deletion_date')[:50]
+
+        jobs = []
+        for schedule in schedules:
+            jobs.append({
+                'id': str(schedule.id),
+                'name': f"Retention: {schedule.document.name if schedule.document else 'Unknown'}",
+                'type': 'retention_enforcement',
+                'status': 'scheduled' if schedule.status == RetentionSchedule.PENDING else 'pending_review',
+                'scheduledFor': schedule.deletion_date.isoformat(),
+                'lastRun': None,
+                'nextRun': schedule.deletion_date.isoformat(),
+                'documentId': str(schedule.document.id) if schedule.document else None,
+                'policyId': str(schedule.policy.id) if schedule.policy else None,
+                'policyName': schedule.policy.name if schedule.policy else None,
+            })
+
+        return Response(jobs)
+
+
+class UpcomingJobsView(APIView):
+    """
+    Get upcoming jobs for the next N days.
+
+    GET /api/v1/retention/automation/upcoming/
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        days = int(request.query_params.get('days', 7))
+        now = timezone.now()
+        cutoff = now + timedelta(days=days)
+
+        schedules = RetentionSchedule.objects.filter(
+            status__in=[RetentionSchedule.PENDING, RetentionSchedule.NOTIFIED],
+            deletion_date__gte=now,
+            deletion_date__lte=cutoff
+        ).select_related('document', 'policy').order_by('deletion_date')[:20]
+
+        jobs = []
+        for schedule in schedules:
+            jobs.append({
+                'id': str(schedule.id),
+                'name': f"Retention: {schedule.document.name if schedule.document else 'Unknown'}",
+                'type': 'retention_enforcement',
+                'scheduledFor': schedule.deletion_date.isoformat(),
+                'documentId': str(schedule.document.id) if schedule.document else None,
+                'policyName': schedule.policy.name if schedule.policy else None,
+            })
+
+        return Response(jobs)

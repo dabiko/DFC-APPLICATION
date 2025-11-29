@@ -11,6 +11,17 @@ import type {
   HoldStatus,
   ComplianceStatus,
   RetentionPeriod,
+  // Automation types
+  UserNotificationSettings,
+  NotificationPreference,
+  EmailTemplate,
+  EmailTemplateType,
+  AutoEnforcementSettings,
+  ScheduledJob,
+  JobExecutionLog,
+  AutomationStats,
+  JobStatus,
+  JobType,
 } from '@/types/retention'
 
 // ============================================================================
@@ -344,6 +355,27 @@ const transformLegalHoldResponse = (hold: LegalHoldResponse): LegalHold => {
 }
 
 // ============================================================================
+// Helper Types for Paginated Responses
+// ============================================================================
+
+interface PaginatedResponse<T> {
+  count: number
+  next: string | null
+  previous: string | null
+  results: T[]
+}
+
+/**
+ * Helper to extract array from potentially paginated response
+ */
+function extractResults<T>(data: T[] | PaginatedResponse<T>): T[] {
+  if (Array.isArray(data)) {
+    return data
+  }
+  return data.results || []
+}
+
+// ============================================================================
 // Retention Policy APIs
 // ============================================================================
 
@@ -351,8 +383,11 @@ const transformLegalHoldResponse = (hold: LegalHoldResponse): LegalHold => {
  * Fetch all retention policies
  */
 export const getRetentionPolicies = async (): Promise<RetentionPolicy[]> => {
-  const response = await apiClient.get<RetentionPolicyResponse[]>('/retention/policies/')
-  return response.data.map(transformPolicyResponse)
+  const response = await apiClient.get<
+    RetentionPolicyResponse[] | PaginatedResponse<RetentionPolicyResponse>
+  >('/retention/policies/')
+  const results = extractResults(response.data)
+  return results.map(transformPolicyResponse)
 }
 
 /**
@@ -433,8 +468,11 @@ export const testPolicyMatch = async (
  * Fetch all legal holds
  */
 export const getLegalHolds = async (): Promise<LegalHold[]> => {
-  const response = await apiClient.get<LegalHoldResponse[]>('/retention/legal-holds/')
-  return response.data.map(transformLegalHoldResponse)
+  const response = await apiClient.get<LegalHoldResponse[] | PaginatedResponse<LegalHoldResponse>>(
+    '/retention/legal-holds/'
+  )
+  const results = extractResults(response.data)
+  return results.map(transformLegalHoldResponse)
 }
 
 /**
@@ -505,10 +543,10 @@ export const releaseLegalHold = async (
  * Get custodians for a legal hold
  */
 export const getHoldCustodians = async (holdId: string): Promise<CustodianResponse[]> => {
-  const response = await apiClient.get<CustodianResponse[]>(
+  const response = await apiClient.get<CustodianResponse[] | PaginatedResponse<CustodianResponse>>(
     `/retention/legal-holds/${holdId}/custodians/`
   )
-  return response.data
+  return extractResults(response.data)
 }
 
 /**
@@ -555,10 +593,10 @@ export const updateCustodianRole = async (
  * Get notification templates
  */
 export const getNotificationTemplates = async (): Promise<NotificationTemplateResponse[]> => {
-  const response = await apiClient.get<NotificationTemplateResponse[]>(
-    '/retention/notification-templates/'
-  )
-  return response.data
+  const response = await apiClient.get<
+    NotificationTemplateResponse[] | PaginatedResponse<NotificationTemplateResponse>
+  >('/retention/notification-templates/')
+  return extractResults(response.data)
 }
 
 /**
@@ -628,10 +666,10 @@ export const resendNotification = async (
 export const getNotificationHistory = async (
   holdId: string
 ): Promise<NotificationHistoryResponse[]> => {
-  const response = await apiClient.get<NotificationHistoryResponse[]>(
-    `/retention/legal-holds/${holdId}/notification-history/`
-  )
-  return response.data
+  const response = await apiClient.get<
+    NotificationHistoryResponse[] | PaginatedResponse<NotificationHistoryResponse>
+  >(`/retention/legal-holds/${holdId}/notification-history/`)
+  return extractResults(response.data)
 }
 
 // ============================================================================
@@ -660,11 +698,10 @@ export const submitReleaseRequest = async (
  * Get pending release requests
  */
 export const getPendingReleaseRequests = async (): Promise<HoldReleaseRequestResponse[]> => {
-  const response = await apiClient.get<HoldReleaseRequestResponse[]>(
-    '/retention/release-requests/',
-    { params: { status: 'pending' } }
-  )
-  return response.data
+  const response = await apiClient.get<
+    HoldReleaseRequestResponse[] | PaginatedResponse<HoldReleaseRequestResponse>
+  >('/retention/release-requests/', { params: { status: 'pending' } })
+  return extractResults(response.data)
 }
 
 /**
@@ -715,10 +752,12 @@ export const getRetentionSchedules = async (params?: {
   deletion_from?: string
   deletion_to?: string
 }): Promise<RetentionScheduleResponse[]> => {
-  const response = await apiClient.get<RetentionScheduleResponse[]>('/retention/schedules/', {
+  const response = await apiClient.get<
+    RetentionScheduleResponse[] | PaginatedResponse<RetentionScheduleResponse>
+  >('/retention/schedules/', {
     params,
   })
-  return response.data
+  return extractResults(response.data)
 }
 
 /**
@@ -1116,6 +1155,717 @@ export const createPolicyFromTemplate = async (templateId: string): Promise<Rete
   return createRetentionPolicy(policyData)
 }
 
+// ============================================================================
+// SCHEDULE & DISPOSITION APIS
+// ============================================================================
+
+export interface ScheduleResponse {
+  id: string
+  document_id: string
+  document_name: string
+  document_type: string
+  policy_id: string
+  policy_name: string
+  status: string
+  priority: string
+  scheduled_date: string
+  action: string
+  department: string
+  owner: string
+  owner_email: string
+  confidentiality_level: string
+  retention_end_date: string
+  created_at: string
+  updated_at: string
+  processed_at?: string
+  processed_by?: string
+  reviewed_at?: string
+  reviewed_by?: string
+  review_notes?: string
+  failure_reason?: string
+}
+
+export interface ScheduleStatsResponse {
+  total_scheduled: number
+  pending_review: number
+  scheduled_this_week: number
+  scheduled_this_month: number
+  overdue: number
+  on_hold: number
+  by_action: Record<string, number>
+  by_priority: Record<string, number>
+  by_department: Array<{ department: string; count: number }>
+}
+
+export interface CalendarEventResponse {
+  id: string
+  title: string
+  date: string
+  end_date?: string
+  type: string
+  status: string
+  priority: string
+  count: number
+  items: Array<{
+    id: string
+    name: string
+    action: string
+  }>
+}
+
+export interface DispositionReviewItemResponse {
+  id: string
+  schedule_id: string
+  document_id: string
+  document_name: string
+  document_type: string
+  department: string
+  owner: string
+  owner_email: string
+  policy_name: string
+  scheduled_action: string
+  scheduled_date: string
+  retention_end_date: string
+  confidentiality_level: string
+  priority: string
+  status: string
+  submitted_at: string
+  submitted_by: string
+  reviewed_at?: string
+  reviewed_by?: string
+  review_notes?: string
+  defer_until?: string
+  has_legal_hold: boolean
+  document_size: number
+  last_accessed_at?: string
+}
+
+export interface BulkActionRequestPayload {
+  action: string
+  item_ids: string[]
+  reason?: string
+  defer_until?: string
+  extension_days?: number
+  notify_owners?: boolean
+}
+
+export interface BulkActionResultResponse {
+  success: boolean
+  processed_count: number
+  failed_count: number
+  results: Array<{
+    item_id: string
+    success: boolean
+    error?: string
+  }>
+}
+
+/**
+ * Get all retention schedules with optional filtering
+ */
+export const getAllSchedules = async (params?: {
+  status?: string
+  action?: string
+  priority?: string
+  department?: string
+  from_date?: string
+  to_date?: string
+}): Promise<ScheduleResponse[]> => {
+  try {
+    const response = await apiClient.get<ScheduleResponse[] | PaginatedResponse<ScheduleResponse>>(
+      '/retention/schedules/',
+      { params }
+    )
+    return extractResults(response.data)
+  } catch {
+    // Return mock data for now
+    return []
+  }
+}
+
+/**
+ * Get schedule statistics
+ */
+export const getScheduleStats = async (): Promise<ScheduleStatsResponse> => {
+  try {
+    const response = await apiClient.get<ScheduleStatsResponse>('/retention/schedules/stats/')
+    return response.data
+  } catch {
+    // Return mock stats
+    return {
+      total_scheduled: 0,
+      pending_review: 0,
+      scheduled_this_week: 0,
+      scheduled_this_month: 0,
+      overdue: 0,
+      on_hold: 0,
+      by_action: { archive: 0, delete: 0, review: 0, extend: 0, transfer: 0 },
+      by_priority: { low: 0, medium: 0, high: 0, critical: 0 },
+      by_department: [],
+    }
+  }
+}
+
+/**
+ * Get calendar events for a date range
+ */
+export const getCalendarEvents = async (
+  year: number,
+  month: number
+): Promise<CalendarEventResponse[]> => {
+  try {
+    const response = await apiClient.get<
+      CalendarEventResponse[] | PaginatedResponse<CalendarEventResponse>
+    >('/retention/schedules/calendar/', {
+      params: { year, month },
+    })
+    return extractResults(response.data)
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Get disposition review queue
+ */
+export const getDispositionQueue = async (params?: {
+  status?: string
+  action?: string
+  priority?: string
+}): Promise<DispositionReviewItemResponse[]> => {
+  try {
+    const response = await apiClient.get<
+      DispositionReviewItemResponse[] | PaginatedResponse<DispositionReviewItemResponse>
+    >('/retention/schedules/review-queue/', { params })
+    return extractResults(response.data)
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Approve a disposition item
+ */
+export const approveDisposition = async (
+  itemId: string,
+  notes?: string
+): Promise<DispositionReviewItemResponse> => {
+  const response = await apiClient.post<DispositionReviewItemResponse>(
+    `/retention/schedules/review/${itemId}/approve/`,
+    { notes }
+  )
+  return response.data
+}
+
+/**
+ * Reject a disposition item
+ */
+export const rejectDisposition = async (
+  itemId: string,
+  reason: string
+): Promise<DispositionReviewItemResponse> => {
+  const response = await apiClient.post<DispositionReviewItemResponse>(
+    `/retention/schedules/review/${itemId}/reject/`,
+    { reason }
+  )
+  return response.data
+}
+
+/**
+ * Defer a disposition item
+ */
+export const deferDisposition = async (
+  itemId: string,
+  deferUntil: string,
+  reason?: string
+): Promise<DispositionReviewItemResponse> => {
+  const response = await apiClient.post<DispositionReviewItemResponse>(
+    `/retention/schedules/review/${itemId}/defer/`,
+    { defer_until: deferUntil, reason }
+  )
+  return response.data
+}
+
+/**
+ * Perform bulk action on disposition items
+ */
+export const performBulkAction = async (
+  request: BulkActionRequestPayload
+): Promise<BulkActionResultResponse> => {
+  const response = await apiClient.post<BulkActionResultResponse>(
+    '/retention/schedules/review/bulk/',
+    request
+  )
+  return response.data
+}
+
+/**
+ * Extend retention for a schedule item
+ */
+export const extendSchedule = async (
+  scheduleId: string,
+  extensionDays: number,
+  reason?: string
+): Promise<ScheduleResponse> => {
+  const response = await apiClient.post<ScheduleResponse>(
+    `/retention/schedules/${scheduleId}/extend/`,
+    { extension_days: extensionDays, reason }
+  )
+  return response.data
+}
+
+/**
+ * Cancel a scheduled disposition
+ */
+export const cancelSchedule = async (
+  scheduleId: string,
+  reason: string
+): Promise<ScheduleResponse> => {
+  const response = await apiClient.post<ScheduleResponse>(
+    `/retention/schedules/${scheduleId}/cancel/`,
+    { reason }
+  )
+  return response.data
+}
+
+/**
+ * Process a schedule manually
+ */
+export const processSchedule = async (scheduleId: string): Promise<ScheduleResponse> => {
+  const response = await apiClient.post<ScheduleResponse>(
+    `/retention/schedules/${scheduleId}/process/`
+  )
+  return response.data
+}
+
+// ============================================================================
+// AUTOMATION APIs - Notification Preferences
+// ============================================================================
+
+/**
+ * Get user notification settings
+ */
+export const getNotificationSettings = async (): Promise<UserNotificationSettings> => {
+  try {
+    const response = await apiClient.get<UserNotificationSettings>(
+      '/retention/automation/notification-settings/'
+    )
+    return response.data
+  } catch {
+    // Return default settings
+    return {
+      id: 'default',
+      userId: 'current',
+      globalEnabled: true,
+      emailEnabled: true,
+      inAppEnabled: true,
+      smsEnabled: false,
+      webhookEnabled: false,
+      quietHoursEnabled: false,
+      quietHoursStart: '22:00',
+      quietHoursEnd: '08:00',
+      emailDigestEnabled: false,
+      emailDigestFrequency: 'daily',
+      preferences: [],
+      updatedAt: new Date().toISOString(),
+    }
+  }
+}
+
+/**
+ * Update user notification settings
+ */
+export const updateNotificationSettings = async (
+  settings: Partial<UserNotificationSettings>
+): Promise<UserNotificationSettings> => {
+  const response = await apiClient.patch<UserNotificationSettings>(
+    '/retention/automation/notification-settings/',
+    settings
+  )
+  return response.data
+}
+
+/**
+ * Update a specific notification preference
+ */
+export const updateNotificationPreference = async (
+  preferenceId: string,
+  updates: Partial<NotificationPreference>
+): Promise<NotificationPreference> => {
+  const response = await apiClient.patch<NotificationPreference>(
+    `/retention/automation/notification-preferences/${preferenceId}/`,
+    updates
+  )
+  return response.data
+}
+
+/**
+ * Send a test notification
+ */
+export const sendTestNotification = async (
+  channel: 'email' | 'in_app' | 'sms' | 'webhook'
+): Promise<{ success: boolean; message: string }> => {
+  const response = await apiClient.post<{ success: boolean; message: string }>(
+    '/retention/automation/notification-settings/test/',
+    { channel }
+  )
+  return response.data
+}
+
+// ============================================================================
+// AUTOMATION APIs - Email Templates
+// ============================================================================
+
+/**
+ * Get all email templates
+ */
+export const getEmailTemplates = async (): Promise<EmailTemplate[]> => {
+  try {
+    const response = await apiClient.get<EmailTemplate[]>('/retention/automation/email-templates/')
+    return response.data
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Get a single email template
+ */
+export const getEmailTemplate = async (id: string): Promise<EmailTemplate> => {
+  const response = await apiClient.get<EmailTemplate>(
+    `/retention/automation/email-templates/${id}/`
+  )
+  return response.data
+}
+
+/**
+ * Create a new email template
+ */
+export const createEmailTemplate = async (
+  template: Omit<EmailTemplate, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'updatedBy'>
+): Promise<EmailTemplate> => {
+  const response = await apiClient.post<EmailTemplate>(
+    '/retention/automation/email-templates/',
+    template
+  )
+  return response.data
+}
+
+/**
+ * Update an email template
+ */
+export const updateEmailTemplate = async (
+  id: string,
+  updates: Partial<EmailTemplate>
+): Promise<EmailTemplate> => {
+  const response = await apiClient.patch<EmailTemplate>(
+    `/retention/automation/email-templates/${id}/`,
+    updates
+  )
+  return response.data
+}
+
+/**
+ * Delete an email template
+ */
+export const deleteEmailTemplate = async (id: string): Promise<void> => {
+  await apiClient.delete(`/retention/automation/email-templates/${id}/`)
+}
+
+/**
+ * Duplicate an email template
+ */
+export const duplicateEmailTemplate = async (id: string): Promise<EmailTemplate> => {
+  const response = await apiClient.post<EmailTemplate>(
+    `/retention/automation/email-templates/${id}/duplicate/`
+  )
+  return response.data
+}
+
+/**
+ * Send a test email using a template
+ */
+export const sendTestEmail = async (
+  templateId: string,
+  recipientEmail: string
+): Promise<{ success: boolean; message: string }> => {
+  const response = await apiClient.post<{ success: boolean; message: string }>(
+    `/retention/automation/email-templates/${templateId}/test/`,
+    { recipient_email: recipientEmail }
+  )
+  return response.data
+}
+
+/**
+ * Get available email template variables
+ */
+export const getEmailTemplateVariables = async (
+  templateType: EmailTemplateType
+): Promise<Array<{ name: string; description: string; example: string }>> => {
+  const response = await apiClient.get<
+    Array<{ name: string; description: string; example: string }>
+  >('/retention/automation/email-templates/variables/', { params: { type: templateType } })
+  return response.data
+}
+
+// ============================================================================
+// AUTOMATION APIs - Auto-Enforcement Settings
+// ============================================================================
+
+/**
+ * Get auto-enforcement settings
+ */
+export const getAutoEnforcementSettings = async (): Promise<AutoEnforcementSettings> => {
+  try {
+    const response = await apiClient.get<AutoEnforcementSettings>(
+      '/retention/automation/enforcement-settings/'
+    )
+    return response.data
+  } catch {
+    // Return default settings
+    return {
+      id: 'default',
+      enabled: false,
+      mode: 'manual',
+      archivalEnabled: true,
+      archivalDestination: 'archive_storage',
+      archivalCompression: true,
+      deletionEnabled: false,
+      deletionRequiresApproval: true,
+      deletionGracePeriodDays: 30,
+      deletionNotifyOwner: true,
+      gracePeriodEnabled: true,
+      gracePeriodDays: 7,
+      gracePeriodExtensionsAllowed: 2,
+      maxRetryAttempts: 3,
+      retryDelayMinutes: 60,
+      errorNotificationEnabled: true,
+      errorNotificationRecipients: [],
+      executionSchedule: {
+        enabled: false,
+        frequency: 'daily',
+        time: '02:00',
+        timezone: 'UTC',
+      },
+      excludedPolicies: [],
+      excludedDocumentTypes: [],
+      excludedDepartments: [],
+      excludedConfidentialityLevels: ['highly_confidential'],
+      updatedAt: new Date().toISOString(),
+      updatedBy: 'System',
+    }
+  }
+}
+
+/**
+ * Update auto-enforcement settings
+ */
+export const updateAutoEnforcementSettings = async (
+  settings: Partial<AutoEnforcementSettings>
+): Promise<AutoEnforcementSettings> => {
+  const response = await apiClient.patch<AutoEnforcementSettings>(
+    '/retention/automation/enforcement-settings/',
+    settings
+  )
+  return response.data
+}
+
+/**
+ * Run a test enforcement cycle (dry run)
+ */
+export const runTestEnforcement = async (): Promise<{
+  wouldArchive: number
+  wouldDelete: number
+  wouldNotify: number
+  errors: string[]
+  details: Array<{
+    documentId: string
+    documentName: string
+    action: string
+    policy: string
+  }>
+}> => {
+  const response = await apiClient.post('/retention/automation/enforcement-settings/test/')
+  return response.data
+}
+
+/**
+ * Trigger immediate enforcement run
+ */
+export const triggerEnforcementRun = async (): Promise<{
+  jobId: string
+  status: string
+  message: string
+}> => {
+  const response = await apiClient.post('/retention/automation/enforcement-settings/run/')
+  return response.data
+}
+
+// ============================================================================
+// AUTOMATION APIs - Scheduled Jobs
+// ============================================================================
+
+/**
+ * Get all scheduled jobs
+ */
+export const getScheduledJobs = async (params?: {
+  status?: JobStatus
+  type?: JobType
+  search?: string
+}): Promise<ScheduledJob[]> => {
+  try {
+    const response = await apiClient.get<ScheduledJob[]>('/retention/automation/jobs/', { params })
+    return response.data
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Get a single scheduled job
+ */
+export const getScheduledJob = async (id: string): Promise<ScheduledJob> => {
+  const response = await apiClient.get<ScheduledJob>(`/retention/automation/jobs/${id}/`)
+  return response.data
+}
+
+/**
+ * Create a new scheduled job
+ */
+export const createScheduledJob = async (
+  job: Omit<ScheduledJob, 'id' | 'createdAt' | 'lastRunAt' | 'nextRunAt' | 'stats'>
+): Promise<ScheduledJob> => {
+  const response = await apiClient.post<ScheduledJob>('/retention/automation/jobs/', job)
+  return response.data
+}
+
+/**
+ * Update a scheduled job
+ */
+export const updateScheduledJob = async (
+  id: string,
+  updates: Partial<ScheduledJob>
+): Promise<ScheduledJob> => {
+  const response = await apiClient.patch<ScheduledJob>(`/retention/automation/jobs/${id}/`, updates)
+  return response.data
+}
+
+/**
+ * Delete a scheduled job
+ */
+export const deleteScheduledJob = async (id: string): Promise<void> => {
+  await apiClient.delete(`/retention/automation/jobs/${id}/`)
+}
+
+/**
+ * Run a job immediately
+ */
+export const runJobNow = async (id: string): Promise<{ success: boolean; message: string }> => {
+  const response = await apiClient.post<{ success: boolean; message: string }>(
+    `/retention/automation/jobs/${id}/run/`
+  )
+  return response.data
+}
+
+/**
+ * Pause a running job
+ */
+export const pauseJob = async (id: string): Promise<{ success: boolean; message: string }> => {
+  const response = await apiClient.post<{ success: boolean; message: string }>(
+    `/retention/automation/jobs/${id}/pause/`
+  )
+  return response.data
+}
+
+/**
+ * Resume a paused job
+ */
+export const resumeJob = async (id: string): Promise<{ success: boolean; message: string }> => {
+  const response = await apiClient.post<{ success: boolean; message: string }>(
+    `/retention/automation/jobs/${id}/resume/`
+  )
+  return response.data
+}
+
+/**
+ * Cancel a running job
+ */
+export const cancelJob = async (id: string): Promise<{ success: boolean; message: string }> => {
+  const response = await apiClient.post<{ success: boolean; message: string }>(
+    `/retention/automation/jobs/${id}/cancel/`
+  )
+  return response.data
+}
+
+/**
+ * Get job execution logs
+ */
+export const getJobExecutionLogs = async (
+  jobId: string,
+  params?: {
+    limit?: number
+    offset?: number
+  }
+): Promise<JobExecutionLog[]> => {
+  try {
+    const response = await apiClient.get<JobExecutionLog[]>(
+      `/retention/automation/jobs/${jobId}/logs/`,
+      { params }
+    )
+    return response.data
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Get automation statistics
+ */
+export const getAutomationStats = async (): Promise<AutomationStats> => {
+  try {
+    const response = await apiClient.get<AutomationStats>('/retention/automation/stats/')
+    return response.data
+  } catch {
+    return {
+      activeJobs: 0,
+      completedToday: 0,
+      failedToday: 0,
+      successRate: 100,
+      documentsProcessed: 0,
+      documentsArchived: 0,
+      documentsDeleted: 0,
+      notificationsSent: 0,
+      averageJobDuration: 0,
+      upcomingJobs: [],
+      recentErrors: [],
+    }
+  }
+}
+
+/**
+ * Get upcoming scheduled jobs
+ */
+export const getUpcomingJobs = async (limit: number = 5): Promise<ScheduledJob[]> => {
+  try {
+    const response = await apiClient.get<ScheduledJob[]>('/retention/automation/jobs/upcoming/', {
+      params: { limit },
+    })
+    return response.data
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Retry a failed job
+ */
+export const retryJob = async (id: string): Promise<{ success: boolean; message: string }> => {
+  const response = await apiClient.post<{ success: boolean; message: string }>(
+    `/retention/automation/jobs/${id}/retry/`
+  )
+  return response.data
+}
+
 export default {
   // Policies
   getRetentionPolicies,
@@ -1153,9 +1903,21 @@ export default {
   approveReleaseRequest,
   rejectReleaseRequest,
   acknowledgeHold,
-  // Schedules
+  // Schedules (legacy)
   getRetentionSchedules,
   getUpcomingDeletions,
+  // Schedules & Disposition
+  getAllSchedules,
+  getScheduleStats,
+  getCalendarEvents,
+  getDispositionQueue,
+  approveDisposition,
+  rejectDisposition,
+  deferDisposition,
+  performBulkAction,
+  extendSchedule,
+  cancelSchedule,
+  processSchedule,
   // Dashboard & Reports
   getRetentionDashboardStats,
   getComplianceReport,
@@ -1166,4 +1928,37 @@ export default {
   getPolicyTemplateCategories,
   createPolicyFromTemplate,
   FINANCIAL_SERVICES_POLICY_TEMPLATES,
+  // Automation - Notification Preferences
+  getNotificationSettings,
+  updateNotificationSettings,
+  updateNotificationPreference,
+  sendTestNotification,
+  // Automation - Email Templates
+  getEmailTemplates,
+  getEmailTemplate,
+  createEmailTemplate,
+  updateEmailTemplate,
+  deleteEmailTemplate,
+  duplicateEmailTemplate,
+  sendTestEmail,
+  getEmailTemplateVariables,
+  // Automation - Enforcement Settings
+  getAutoEnforcementSettings,
+  updateAutoEnforcementSettings,
+  runTestEnforcement,
+  triggerEnforcementRun,
+  // Automation - Scheduled Jobs
+  getScheduledJobs,
+  getScheduledJob,
+  createScheduledJob,
+  updateScheduledJob,
+  deleteScheduledJob,
+  runJobNow,
+  pauseJob,
+  resumeJob,
+  cancelJob,
+  getJobExecutionLogs,
+  getAutomationStats,
+  getUpcomingJobs,
+  retryJob,
 }

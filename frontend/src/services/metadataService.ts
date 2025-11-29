@@ -3,7 +3,7 @@
  * API service for document metadata operations
  */
 
-import api from './api'
+import apiClient from './apiClient'
 import type {
   DocumentMetadata,
   CreateDocumentMetadata,
@@ -17,7 +17,7 @@ import type {
  * Get metadata for a document
  */
 export const getDocumentMetadata = async (documentId: string): Promise<DocumentMetadata> => {
-  const response = await api.get(`/api/v1/documents/${documentId}/metadata`)
+  const response = await apiClient.get(`/api/v1/documents/${documentId}/metadata`)
   return response.data.data
 }
 
@@ -28,7 +28,7 @@ export const createDocumentMetadata = async (
   documentId: string,
   metadata: CreateDocumentMetadata
 ): Promise<DocumentMetadata> => {
-  const response = await api.post(`/api/v1/documents/${documentId}/metadata`, metadata)
+  const response = await apiClient.post(`/api/v1/documents/${documentId}/metadata`, metadata)
   return response.data.data
 }
 
@@ -39,7 +39,7 @@ export const updateDocumentMetadata = async (
   documentId: string,
   metadata: UpdateDocumentMetadata
 ): Promise<DocumentMetadata> => {
-  const response = await api.put(`/api/v1/documents/${documentId}/metadata`, metadata)
+  const response = await apiClient.put(`/api/v1/documents/${documentId}/metadata`, metadata)
   return response.data.data
 }
 
@@ -50,7 +50,7 @@ export const patchDocumentMetadata = async (
   documentId: string,
   updates: Partial<DocumentMetadata>
 ): Promise<DocumentMetadata> => {
-  const response = await api.patch(`/api/v1/documents/${documentId}/metadata`, updates)
+  const response = await apiClient.patch(`/api/v1/documents/${documentId}/metadata`, updates)
   return response.data.data
 }
 
@@ -58,7 +58,7 @@ export const patchDocumentMetadata = async (
  * Get metadata history for a document
  */
 export const getMetadataHistory = async (documentId: string): Promise<MetadataHistoryEntry[]> => {
-  const response = await api.get(`/api/v1/documents/${documentId}/metadata/history`)
+  const response = await apiClient.get(`/api/v1/documents/${documentId}/metadata/history`)
   return response.data.data
 }
 
@@ -69,7 +69,7 @@ export const getMetadataTemplates = async (params?: {
   documentType?: string
   department?: string
 }): Promise<MetadataTemplate[]> => {
-  const response = await api.get('/api/v1/metadata/templates', { params })
+  const response = await apiClient.get('/api/v1/metadata/templates', { params })
   return response.data.data
 }
 
@@ -77,7 +77,7 @@ export const getMetadataTemplates = async (params?: {
  * Get a specific metadata template
  */
 export const getMetadataTemplate = async (templateId: string): Promise<MetadataTemplate> => {
-  const response = await api.get(`/api/v1/metadata/templates/${templateId}`)
+  const response = await apiClient.get(`/api/v1/metadata/templates/${templateId}`)
   return response.data.data
 }
 
@@ -87,7 +87,7 @@ export const getMetadataTemplate = async (templateId: string): Promise<MetadataT
 export const createMetadataTemplate = async (
   template: Omit<MetadataTemplate, 'id'>
 ): Promise<MetadataTemplate> => {
-  const response = await api.post('/api/v1/metadata/templates', template)
+  const response = await apiClient.post('/api/v1/metadata/templates', template)
   return response.data.data
 }
 
@@ -99,7 +99,7 @@ export const getTagSuggestions = async (params?: {
   documentType?: string
   limit?: number
 }): Promise<TagSuggestion[]> => {
-  const response = await api.get('/api/v1/metadata/tags/suggestions', { params })
+  const response = await apiClient.get('/api/v1/metadata/tags/suggestions', { params })
   return response.data.data
 }
 
@@ -107,7 +107,7 @@ export const getTagSuggestions = async (params?: {
  * Get popular tags
  */
 export const getPopularTags = async (limit: number = 20): Promise<TagSuggestion[]> => {
-  const response = await api.get('/api/v1/metadata/tags/popular', { params: { limit } })
+  const response = await apiClient.get('/api/v1/metadata/tags/popular', { params: { limit } })
   return response.data.data
 }
 
@@ -117,7 +117,7 @@ export const getPopularTags = async (limit: number = 20): Promise<TagSuggestion[
 export const validateMetadata = async (
   metadata: Partial<DocumentMetadata>
 ): Promise<{ isValid: boolean; errors: Array<{ field: string; message: string }> }> => {
-  const response = await api.post('/api/v1/metadata/validate', metadata)
+  const response = await apiClient.post('/api/v1/metadata/validate', metadata)
   return response.data.data
 }
 
@@ -132,7 +132,7 @@ export const bulkUpdateMetadata = async (
   failed: number
   errors: Array<{ documentId: string; error: string }>
 }> => {
-  const response = await api.post('/api/v1/metadata/bulk-update', {
+  const response = await apiClient.post('/api/v1/metadata/bulk-update', {
     documentIds,
     updates,
   })
@@ -143,7 +143,7 @@ export const bulkUpdateMetadata = async (
  * Export metadata as CSV
  */
 export const exportMetadataCSV = async (documentIds: string[]): Promise<Blob> => {
-  const response = await api.post(
+  const response = await apiClient.post(
     '/api/v1/metadata/export/csv',
     { documentIds },
     { responseType: 'blob' }
@@ -155,7 +155,7 @@ export const exportMetadataCSV = async (documentIds: string[]): Promise<Blob> =>
  * Export metadata as JSON
  */
 export const exportMetadataJSON = async (documentIds: string[]): Promise<Blob> => {
-  const response = await api.post(
+  const response = await apiClient.post(
     '/api/v1/metadata/export/json',
     { documentIds },
     { responseType: 'blob' }
@@ -176,7 +176,7 @@ export const importMetadataCSV = async (
   const formData = new FormData()
   formData.append('file', file)
 
-  const response = await api.post('/api/v1/metadata/import/csv', formData, {
+  const response = await apiClient.post('/api/v1/metadata/import/csv', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
@@ -198,7 +198,7 @@ export const getMetadataStats = async (params?: {
   byConfidentiality: Record<string, number>
   topTags: TagSuggestion[]
 }> => {
-  const response = await api.get('/api/v1/metadata/stats', { params })
+  const response = await apiClient.get('/api/v1/metadata/stats', { params })
   return response.data.data
 }
 

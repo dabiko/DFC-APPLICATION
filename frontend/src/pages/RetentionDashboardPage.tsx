@@ -2,10 +2,10 @@
  * RetentionDashboardPage Component
  *
  * Enterprise-grade retention management dashboard with tabs for:
- * - Dashboard (KPIs, compliance health, quick actions)
+ * - Dashboard (KPIs, quick actions, policy statistics)
  * - Policies (retention policy management)
  * - Legal Holds (litigation hold management)
- * - Compliance (compliance reporting)
+ * - Schedules (calendar & disposition queue)
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -14,6 +14,7 @@ import {
   Clock,
   Shield,
   FileText,
+  FileCheck,
   AlertTriangle,
   CheckCircle,
   TrendingUp,
@@ -22,13 +23,13 @@ import {
   Plus,
   LayoutDashboard,
   Scale,
-  FileCheck,
   Loader2,
   ArrowRight,
   AlertCircle,
   Archive,
   Trash2,
   Bell,
+  CalendarClock,
 } from 'lucide-react'
 import { ThreePanelLayout } from '@/components/Layout/ThreePanelLayout'
 import { DashboardHeader } from '@/components/Dashboard/DashboardHeader'
@@ -36,7 +37,6 @@ import { DashboardSidebar } from '@/components/Dashboard/DashboardSidebar'
 import { RetentionPolicyList } from '@/components/Retention/RetentionPolicyList'
 import { RetentionPolicyEditor } from '@/components/Retention/RetentionPolicyEditor'
 import { LegalHoldManager } from '@/components/Retention/LegalHoldManager'
-import { PolicyComplianceReport } from '@/components/Retention/PolicyComplianceReport'
 import {
   LegalHoldWizard,
   CustodianManagement,
@@ -48,12 +48,17 @@ import type {
   NotificationTemplate,
   NotificationHistoryEntry,
 } from '@/components/LegalHold'
+import {
+  RetentionScheduleOverview,
+  RetentionCalendarView,
+  DispositionReviewQueue,
+  BulkActionPanel,
+} from '@/components/Schedule'
 import { authService } from '@/services/auth.service'
 import {
   getRetentionDashboardStats,
   getRetentionPolicies,
   getLegalHolds,
-  getComplianceReport,
   createRetentionPolicy,
   updateRetentionPolicy,
   deleteRetentionPolicy,
@@ -72,21 +77,43 @@ import {
   getNotificationHistory,
   submitReleaseRequest,
   FINANCIAL_SERVICES_POLICY_TEMPLATES,
+  // Schedule APIs
+  getAllSchedules,
+  getScheduleStats,
+  getCalendarEvents,
+  getDispositionQueue,
+  approveDisposition,
+  rejectDisposition,
+  deferDisposition,
+  performBulkAction,
   type RetentionDashboardStats,
   type RetentionPolicy,
   type LegalHold,
-  type ComplianceReport,
   type CustodianResponse,
   type NotificationTemplateResponse,
   type NotificationHistoryResponse,
+  // Schedule types
+  type ScheduleResponse,
+  type ScheduleStatsResponse,
+  type CalendarEventResponse,
+  type DispositionReviewItemResponse,
 } from '@/services/retentionService'
+import type {
+  RetentionSchedule,
+  ScheduleStats,
+  ScheduleCalendarEvent,
+  DispositionReviewItem,
+  BulkActionType,
+  DispositionAction,
+  SchedulePriority,
+} from '@/types/retention'
 import { cn } from '@/utils/cn'
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-type TabId = 'dashboard' | 'policies' | 'legal-holds' | 'compliance'
+type TabId = 'dashboard' | 'policies' | 'legal-holds' | 'schedules'
 
 interface Tab {
   id: TabId
@@ -102,7 +129,7 @@ const TABS: Tab[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'policies', label: 'Policies', icon: Clock },
   { id: 'legal-holds', label: 'Legal Holds', icon: Scale },
-  { id: 'compliance', label: 'Compliance', icon: FileCheck },
+  { id: 'schedules', label: 'Schedules', icon: CalendarClock },
 ]
 
 // ============================================================================
@@ -259,13 +286,11 @@ export function RetentionDashboardPage() {
   const [stats, setStats] = useState<RetentionDashboardStats | null>(null)
   const [policies, setPolicies] = useState<RetentionPolicy[]>([])
   const [legalHolds, setLegalHolds] = useState<LegalHold[]>([])
-  const [complianceReport, setComplianceReport] = useState<ComplianceReport | null>(null)
 
   // Loading states
   const [isLoading, setIsLoading] = useState(true)
   const [isPoliciesLoading, setIsPoliciesLoading] = useState(false)
   const [isHoldsLoading, setIsHoldsLoading] = useState(false)
-  const [isReportLoading, setIsReportLoading] = useState(false)
 
   // Editor states
   const [showPolicyEditor, setShowPolicyEditor] = useState(false)
@@ -286,6 +311,26 @@ export function RetentionDashboardPage() {
 
   // Error state
   const [error, setError] = useState<string | null>(null)
+
+  // Schedule states
+  const [schedules, setSchedules] = useState<RetentionSchedule[]>([])
+  const [scheduleStats, setScheduleStats] = useState<ScheduleStats | null>(null)
+  const [calendarEvents, setCalendarEvents] = useState<ScheduleCalendarEvent[]>([])
+  const [reviewQueue, setReviewQueue] = useState<DispositionReviewItem[]>([])
+  const [isSchedulesLoading, setIsSchedulesLoading] = useState(false)
+  const [isCalendarLoading, setIsCalendarLoading] = useState(false)
+  const [isQueueLoading, setIsQueueLoading] = useState(false)
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const now = new Date()
+    return { year: now.getFullYear(), month: now.getMonth() }
+  })
+  const [selectedScheduleItems, setSelectedScheduleItems] = useState<DispositionReviewItem[]>([])
+  const [showBulkPanel, setShowBulkPanel] = useState(false)
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false)
+  const [scheduleSubTab, setScheduleSubTab] = useState<'overview' | 'calendar' | 'review-queue'>(
+    'overview'
+  )
 
   // Update URL when tab changes
   const handleTabChange = useCallback(
@@ -332,18 +377,149 @@ export function RetentionDashboardPage() {
     }
   }, [])
 
-  // Fetch compliance report
-  const fetchComplianceReport = useCallback(async (period?: { from: string; to: string }) => {
-    setIsReportLoading(true)
+  // Schedule mapper functions
+  const mapScheduleResponse = useCallback(
+    (response: ScheduleResponse): RetentionSchedule => ({
+      id: response.id,
+      documentId: response.document_id,
+      documentName: response.document_name,
+      documentType: response.document_type,
+      policyId: response.policy_id,
+      policyName: response.policy_name,
+      status: response.status,
+      priority: response.priority,
+      scheduledDate: response.scheduled_date,
+      action: response.action,
+      department: response.department,
+      owner: response.owner,
+      ownerEmail: response.owner_email,
+      createdAt: response.created_at,
+      updatedAt: response.updated_at,
+      processedAt: response.processed_at,
+      processedBy: response.processed_by,
+      notes: response.notes,
+      isLegalHold: response.is_legal_hold,
+      legalHoldId: response.legal_hold_id,
+      retentionDays: response.retention_days,
+      extensionCount: response.extension_count,
+      maxExtensions: response.max_extensions,
+    }),
+    []
+  )
+
+  const mapCalendarEventResponse = useCallback(
+    (response: CalendarEventResponse): ScheduleCalendarEvent => ({
+      id: response.id,
+      date: response.date,
+      type: response.type,
+      title: response.title,
+      count: response.count,
+      status: response.status,
+      items: response.items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        action: item.action,
+      })),
+    }),
+    []
+  )
+
+  const mapDispositionReviewResponse = useCallback(
+    (response: DispositionReviewItemResponse): DispositionReviewItem => ({
+      id: response.id,
+      documentId: response.document_id,
+      documentName: response.document_name,
+      documentType: response.document_type,
+      documentPath: response.document_path,
+      scheduledAction: response.scheduled_action,
+      scheduledDate: response.scheduled_date,
+      policyId: response.policy_id,
+      policyName: response.policy_name,
+      department: response.department,
+      owner: response.owner,
+      ownerEmail: response.owner_email,
+      priority: response.priority,
+      status: response.status,
+      submittedAt: response.submitted_at,
+      submittedBy: response.submitted_by,
+      reviewedAt: response.reviewed_at,
+      reviewedBy: response.reviewed_by,
+      reviewNotes: response.review_notes,
+      isLegalHold: response.is_legal_hold,
+      legalHoldReason: response.legal_hold_reason,
+      retentionDays: response.retention_days,
+      fileSize: response.file_size,
+      lastModified: response.last_modified,
+    }),
+    []
+  )
+
+  const mapStatsResponse = useCallback(
+    (response: ScheduleStatsResponse): ScheduleStats => ({
+      totalScheduled: response.total_scheduled,
+      pendingReview: response.pending_review,
+      scheduledThisWeek: response.scheduled_this_week,
+      scheduledThisMonth: response.scheduled_this_month,
+      overdue: response.overdue,
+      onHold: response.on_hold,
+      byAction: response.by_action as Record<DispositionAction, number>,
+      byPriority: response.by_priority as Record<SchedulePriority, number>,
+      byDepartment: response.by_department,
+    }),
+    []
+  )
+
+  // Fetch schedules
+  const fetchSchedules = useCallback(async () => {
+    setIsSchedulesLoading(true)
     try {
-      const data = await getComplianceReport(period)
-      setComplianceReport(data)
+      const data = await getAllSchedules()
+      setSchedules(data.map(mapScheduleResponse))
     } catch (err) {
-      console.error('Failed to fetch compliance report:', err)
+      console.error('Failed to fetch schedules:', err)
     } finally {
-      setIsReportLoading(false)
+      setIsSchedulesLoading(false)
     }
-  }, [])
+  }, [mapScheduleResponse])
+
+  // Fetch schedule stats
+  const fetchScheduleStats = useCallback(async () => {
+    try {
+      const data = await getScheduleStats()
+      setScheduleStats(mapStatsResponse(data))
+    } catch (err) {
+      console.error('Failed to fetch schedule stats:', err)
+    }
+  }, [mapStatsResponse])
+
+  // Fetch calendar events
+  const fetchCalendarEvents = useCallback(
+    async (year: number, month: number) => {
+      setIsCalendarLoading(true)
+      try {
+        const data = await getCalendarEvents(year, month)
+        setCalendarEvents(data.map(mapCalendarEventResponse))
+      } catch (err) {
+        console.error('Failed to fetch calendar events:', err)
+      } finally {
+        setIsCalendarLoading(false)
+      }
+    },
+    [mapCalendarEventResponse]
+  )
+
+  // Fetch review queue
+  const fetchReviewQueue = useCallback(async () => {
+    setIsQueueLoading(true)
+    try {
+      const data = await getDispositionQueue()
+      setReviewQueue(data.map(mapDispositionReviewResponse))
+    } catch (err) {
+      console.error('Failed to fetch review queue:', err)
+    } finally {
+      setIsQueueLoading(false)
+    }
+  }, [mapDispositionReviewResponse])
 
   // Initial data fetch
   useEffect(() => {
@@ -363,25 +539,55 @@ export function RetentionDashboardPage() {
     fetchInitialData()
   }, [fetchStats, fetchPolicies, fetchLegalHolds])
 
-  // Fetch compliance report when tab changes to compliance
+  // Fetch schedule data when tab is active
   useEffect(() => {
-    if (activeTab === 'compliance' && !complianceReport) {
-      fetchComplianceReport()
+    if (activeTab === 'schedules') {
+      fetchSchedules()
+      fetchScheduleStats()
+      fetchReviewQueue()
+      fetchCalendarEvents(calendarMonth.year, calendarMonth.month)
     }
-  }, [activeTab, complianceReport, fetchComplianceReport])
+  }, [
+    activeTab,
+    fetchSchedules,
+    fetchScheduleStats,
+    fetchReviewQueue,
+    fetchCalendarEvents,
+    calendarMonth,
+  ])
+
+  // Update bulk panel visibility based on selection
+  useEffect(() => {
+    setShowBulkPanel(selectedScheduleItems.length > 0)
+  }, [selectedScheduleItems])
 
   // Refresh all data
   const handleRefresh = useCallback(async () => {
     setIsLoading(true)
     try {
       await Promise.all([fetchStats(), fetchPolicies(), fetchLegalHolds()])
-      if (activeTab === 'compliance') {
-        await fetchComplianceReport()
+      if (activeTab === 'schedules') {
+        await Promise.all([
+          fetchSchedules(),
+          fetchScheduleStats(),
+          fetchReviewQueue(),
+          fetchCalendarEvents(calendarMonth.year, calendarMonth.month),
+        ])
       }
     } finally {
       setIsLoading(false)
     }
-  }, [fetchStats, fetchPolicies, fetchLegalHolds, fetchComplianceReport, activeTab])
+  }, [
+    fetchStats,
+    fetchPolicies,
+    fetchLegalHolds,
+    fetchSchedules,
+    fetchScheduleStats,
+    fetchReviewQueue,
+    fetchCalendarEvents,
+    activeTab,
+    calendarMonth,
+  ])
 
   // Policy handlers
   const handleCreatePolicy = useCallback(() => {
@@ -1098,34 +1304,229 @@ export function RetentionDashboardPage() {
     />
   )
 
-  // Render compliance tab content
-  const renderComplianceTab = () => {
-    if (!complianceReport) {
-      return (
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-4" />
-            <p className="text-gray-500 dark:text-gray-400">Loading compliance report...</p>
-          </div>
-        </div>
-      )
-    }
+  // Schedule handlers
+  const handleScheduleClick = useCallback((_scheduleId: string) => {
+    // TODO: Navigate to document or show details
+  }, [])
+
+  const handleScheduleAction = useCallback(
+    async (scheduleId: string, action: 'approve' | 'defer' | 'view') => {
+      if (action === 'view') return
+
+      if (action === 'approve') {
+        try {
+          await approveDisposition(scheduleId)
+          await fetchSchedules()
+          await fetchScheduleStats()
+        } catch (err) {
+          console.error('Failed to approve schedule:', err)
+        }
+      }
+
+      if (action === 'defer') {
+        const deferDate = new Date()
+        deferDate.setDate(deferDate.getDate() + 30)
+        try {
+          await deferDisposition(scheduleId, deferDate.toISOString())
+          await fetchSchedules()
+          await fetchScheduleStats()
+        } catch (err) {
+          console.error('Failed to defer schedule:', err)
+        }
+      }
+    },
+    [fetchSchedules, fetchScheduleStats]
+  )
+
+  const handleMonthChange = useCallback((year: number, month: number) => {
+    setCalendarMonth({ year, month })
+  }, [])
+
+  const handleEventClick = useCallback((_event: ScheduleCalendarEvent) => {
+    // TODO: Navigate to detail view or open modal
+  }, [])
+
+  const handleDateSelect = useCallback((date: Date) => {
+    setSelectedDate(date)
+  }, [])
+
+  const handleItemAction = useCallback(
+    async (
+      itemId: string,
+      action: 'approve' | 'reject' | 'defer',
+      data?: { reason?: string; deferUntil?: string; notes?: string }
+    ) => {
+      try {
+        if (action === 'approve') {
+          await approveDisposition(itemId, data?.notes)
+        } else if (action === 'reject') {
+          await rejectDisposition(itemId, data?.reason || 'Rejected')
+        } else if (action === 'defer') {
+          await deferDisposition(itemId, data?.deferUntil || '', data?.reason)
+        }
+        await fetchReviewQueue()
+        await fetchScheduleStats()
+      } catch (err) {
+        console.error(`Failed to ${action} item:`, err)
+      }
+    },
+    [fetchReviewQueue, fetchScheduleStats]
+  )
+
+  const handleItemSelect = useCallback((item: DispositionReviewItem, selected: boolean) => {
+    setSelectedScheduleItems((prev) => {
+      if (selected) {
+        return [...prev, item]
+      } else {
+        return prev.filter((i) => i.id !== item.id)
+      }
+    })
+  }, [])
+
+  const handleSelectAll = useCallback(
+    (selected: boolean) => {
+      if (selected) {
+        setSelectedScheduleItems(reviewQueue.filter((item) => item.status === 'pending'))
+      } else {
+        setSelectedScheduleItems([])
+      }
+    },
+    [reviewQueue]
+  )
+
+  const handleBulkAction = useCallback(
+    async (
+      action: BulkActionType,
+      data?: { reason?: string; deferUntil?: string; extensionDays?: number }
+    ) => {
+      setIsBulkProcessing(true)
+      try {
+        await performBulkAction({
+          action,
+          item_ids: selectedScheduleItems.map((item) => item.id),
+          reason: data?.reason,
+          defer_until: data?.deferUntil,
+          extension_days: data?.extensionDays,
+        })
+        setSelectedScheduleItems([])
+        await fetchReviewQueue()
+        await fetchScheduleStats()
+      } catch (err) {
+        console.error('Failed to perform bulk action:', err)
+      } finally {
+        setIsBulkProcessing(false)
+      }
+    },
+    [selectedScheduleItems, fetchReviewQueue, fetchScheduleStats]
+  )
+
+  // Render schedules tab content
+  const renderSchedulesTab = () => {
+    const bulkPanelItems = selectedScheduleItems.map((item) => ({
+      id: item.id,
+      name: item.documentName,
+      type: item.documentType,
+      action: item.scheduledAction,
+      priority: item.priority,
+    }))
 
     return (
-      <PolicyComplianceReport
-        report={{
-          ...complianceReport,
-          violations: complianceReport.violations || [],
-          topViolationTypes: complianceReport.topViolationTypes || [],
-          complianceTrend: complianceReport.complianceTrend || [],
-        }}
-        loading={isReportLoading}
-        onGenerateReport={fetchComplianceReport}
-        onExport={(format) => {
-          console.log('Exporting report as:', format)
-          // TODO: Implement export functionality
-        }}
-      />
+      <div className="space-y-4">
+        {/* Sub-tabs for schedules */}
+        <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700 pb-2">
+          <button
+            onClick={() => setScheduleSubTab('overview')}
+            className={cn(
+              'px-3 py-1.5 text-sm font-medium rounded-lg transition-colors',
+              scheduleSubTab === 'overview'
+                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+            )}
+          >
+            Overview
+          </button>
+          <button
+            onClick={() => setScheduleSubTab('calendar')}
+            className={cn(
+              'px-3 py-1.5 text-sm font-medium rounded-lg transition-colors',
+              scheduleSubTab === 'calendar'
+                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+            )}
+          >
+            Calendar
+          </button>
+          <button
+            onClick={() => setScheduleSubTab('review-queue')}
+            className={cn(
+              'px-3 py-1.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-2',
+              scheduleSubTab === 'review-queue'
+                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+            )}
+          >
+            Review Queue
+            {scheduleStats?.pendingReview !== undefined && (
+              <span
+                className={cn(
+                  'px-1.5 py-0.5 text-xs font-medium rounded-full',
+                  scheduleStats.pendingReview > 0
+                    ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                    : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                )}
+              >
+                {scheduleStats.pendingReview}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Sub-tab content */}
+        {scheduleSubTab === 'overview' && (
+          <RetentionScheduleOverview
+            schedules={schedules}
+            stats={scheduleStats}
+            loading={isSchedulesLoading}
+            onScheduleSelect={handleScheduleClick}
+            onRefresh={handleRefresh}
+            onViewCalendar={() => setScheduleSubTab('calendar')}
+            onViewQueue={() => setScheduleSubTab('review-queue')}
+          />
+        )}
+
+        {scheduleSubTab === 'calendar' && (
+          <RetentionCalendarView
+            events={calendarEvents}
+            selectedDate={selectedDate}
+            onDateSelect={handleDateSelect}
+            onEventClick={handleEventClick}
+            onMonthChange={handleMonthChange}
+            loading={isCalendarLoading}
+          />
+        )}
+
+        {scheduleSubTab === 'review-queue' && (
+          <div className="space-y-4">
+            <DispositionReviewQueue
+              items={reviewQueue}
+              selectedItems={selectedScheduleItems}
+              onItemAction={handleItemAction}
+              onItemSelect={handleItemSelect}
+              onSelectAll={handleSelectAll}
+              loading={isQueueLoading}
+            />
+
+            {showBulkPanel && (
+              <BulkActionPanel
+                selectedItems={bulkPanelItems}
+                onBulkAction={handleBulkAction}
+                onClearSelection={() => setSelectedScheduleItems([])}
+                processing={isBulkProcessing}
+              />
+            )}
+          </div>
+        )}
+      </div>
     )
   }
 
@@ -1141,7 +1542,7 @@ export function RetentionDashboardPage() {
                 Retention Management
               </h1>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                Manage document retention policies, legal holds, and compliance
+                Manage document retention policies, legal holds, and schedules
               </p>
             </div>
             <button
@@ -1208,7 +1609,7 @@ export function RetentionDashboardPage() {
             {activeTab === 'dashboard' && renderDashboardTab()}
             {activeTab === 'policies' && renderPoliciesTab()}
             {activeTab === 'legal-holds' && renderLegalHoldsTab()}
-            {activeTab === 'compliance' && renderComplianceTab()}
+            {activeTab === 'schedules' && renderSchedulesTab()}
           </>
         )}
       </div>

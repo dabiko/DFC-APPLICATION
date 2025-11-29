@@ -21,6 +21,15 @@ import SmartFolderResultsPage from './pages/SmartFolderResultsPage'
 import { AuditLogPage } from './pages/AuditLogPage'
 import { UsersRolesPage } from './pages/UsersRolesPage'
 import { RetentionDashboardPage } from './pages/RetentionDashboardPage'
+import { WorkflowCenterPage } from './pages/WorkflowCenterPage'
+import { WorkflowDesignerPage } from './pages/WorkflowDesignerPage'
+import { AutomationPage } from './pages/AutomationPage'
+import { ComplianceCenterPage } from './pages/ComplianceCenterPage'
+import { SettingsPage } from './pages/SettingsPage'
+import { OrganizationSettingsPage } from './pages/OrganizationSettingsPage'
+import { IntegrationsPage } from './pages/IntegrationsPage'
+import { SystemSettingsPage } from './pages/SystemSettingsPage'
+import { Navigate } from 'react-router-dom'
 
 function App() {
   return (
@@ -174,8 +183,106 @@ function App() {
               }
             />
 
-            {/* Billing Dashboard */}
-            <Route path="/billing" element={<BillingDashboard />} />
+            {/* Schedules - Redirect to Retention tab for backwards compatibility */}
+            <Route path="/schedules" element={<Navigate to="/retention?tab=schedules" replace />} />
+
+            {/* Workflows - Protected Route */}
+            <Route
+              path="/workflows"
+              element={
+                <ProtectedRoute>
+                  <WorkflowCenterPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Workflow Designer - Protected Route */}
+            <Route
+              path="/workflows/designer"
+              element={
+                <ProtectedRoute>
+                  <WorkflowDesignerPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/workflows/designer/:templateId"
+              element={
+                <ProtectedRoute>
+                  <WorkflowDesignerPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Automation Center - Protected Route */}
+            <Route
+              path="/automation"
+              element={
+                <ProtectedRoute>
+                  <AutomationPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Compliance Center - Protected Route */}
+            <Route
+              path="/compliance"
+              element={
+                <ProtectedRoute>
+                  <ComplianceCenterPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Settings - Protected Route */}
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <SettingsPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Organization Settings - Protected Route */}
+            <Route
+              path="/organization-settings"
+              element={
+                <ProtectedRoute>
+                  <OrganizationSettingsPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Integrations - Protected Route */}
+            <Route
+              path="/integrations"
+              element={
+                <ProtectedRoute>
+                  <IntegrationsPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* System Settings (Super Admin) - Protected Route */}
+            <Route
+              path="/admin/system"
+              element={
+                <ProtectedRoute>
+                  <SystemSettingsPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Billing Dashboard - Protected Route */}
+            <Route
+              path="/billing"
+              element={
+                <ProtectedRoute>
+                  <BillingDashboard />
+                </ProtectedRoute>
+              }
+            />
 
             {/* Other pages */}
             <Route path="/demo" element={<div className="p-8">Demo page (coming soon)</div>} />

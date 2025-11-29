@@ -51,7 +51,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
   const listRef = useListRef()
 
   // Update selected folder when prop changes
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+
   useEffect(() => {
     setState((prev) => ({ ...prev, selectedFolderId }))
   }, [selectedFolderId])
@@ -72,7 +72,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
   }, [folders, searchQuery])
 
   // Auto-expand all folders when searching
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+
   useEffect(() => {
     if (searchQuery.trim()) {
       const allIds = new Set<string>()
@@ -249,7 +249,7 @@ export const FolderTree: FC<FolderTreeProps> = ({
   }, [state.contextMenuPosition, closeContextMenu])
 
   // Keyboard navigation
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
       if (!state.selectedFolderId) return

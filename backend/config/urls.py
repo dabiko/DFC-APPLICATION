@@ -64,8 +64,29 @@ urlpatterns = [
     # API v1 - Sharing & Collaboration
     path('api/v1/', include('apps.sharing.urls')),
 
+    # API v1 - Compliance Center
+    path('api/v1/compliance/', include('apps.compliance.urls')),
+
+    # API v1 - Workflows (Document Approvals & Reviews)
+    path('api/v1/workflows/', include('apps.workflows.urls', namespace='workflows')),
+
+    # API v1 - Document Intelligence (NLP, Table Extraction)
+    path('api/v1/intelligence/', include('apps.intelligence.urls')),
+
     # API v1 - Billing & Subscriptions
-    path('api/billing/', include('apps.billing.urls', namespace='billing')),
+    path('api/v1/billing/', include('apps.billing.urls', namespace='billing')),
+
+    # API v1 - User Settings & Preferences
+    path('api/v1/settings/', include('apps.users.settings_urls', namespace='settings')),
+
+    # API v1 - Organization Settings
+    path('api/v1/org-settings/', include('apps.organizations.settings_urls', namespace='org_settings')),
+
+    # API v1 - Integrations (API Keys, Webhooks, Third-party)
+    path('api/v1/integrations/', include('apps.integrations.urls', namespace='integrations')),
+
+    # API v1 - System Administration (Super Admin)
+    path('api/v1/system/', include('apps.system.urls', namespace='system')),
 
     # API Documentation (publicly accessible for testing)
     path('api/schema/', SpectacularAPIView.as_view(permission_classes=[]), name='schema'),

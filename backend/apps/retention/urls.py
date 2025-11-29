@@ -5,6 +5,7 @@ Provides REST API endpoints for:
 - Retention policies
 - Legal holds
 - Retention schedules
+- Automation stats and jobs
 """
 
 from django.urls import path, include
@@ -13,6 +14,9 @@ from apps.retention.views import (
     RetentionPolicyViewSet,
     LegalHoldViewSet,
     RetentionScheduleViewSet,
+    AutomationStatsView,
+    ScheduledJobsView,
+    UpcomingJobsView,
 )
 
 router = DefaultRouter()
@@ -22,4 +26,8 @@ router.register(r'schedules', RetentionScheduleViewSet, basename='retention-sche
 
 urlpatterns = [
     path('', include(router.urls)),
+    # Automation endpoints
+    path('automation/stats/', AutomationStatsView.as_view(), name='automation-stats'),
+    path('automation/jobs/', ScheduledJobsView.as_view(), name='scheduled-jobs'),
+    path('automation/jobs/upcoming/', UpcomingJobsView.as_view(), name='upcoming-jobs'),
 ]

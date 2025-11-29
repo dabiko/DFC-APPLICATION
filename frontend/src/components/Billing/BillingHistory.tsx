@@ -108,13 +108,15 @@ export const BillingHistory: React.FC<BillingHistoryProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-xl font-bold text-gray-900">Billing History</h3>
-          <p className="mt-1 text-sm text-gray-600">View and download your past invoices</p>
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Billing History</h3>
+          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+            View and download your past invoices
+          </p>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+      <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-4">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <Select
             label="Status"
@@ -154,16 +156,16 @@ export const BillingHistory: React.FC<BillingHistoryProps> = ({
       </div>
 
       {/* Invoice Table */}
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
         {loading && invoices.length === 0 ? (
           <div className="p-12 text-center">
-            <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600" />
-            <p className="mt-4 text-sm text-gray-600">Loading invoices...</p>
+            <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-gray-200 dark:border-gray-700 border-t-green-600" />
+            <p className="mt-4 text-sm text-gray-600 dark:text-gray-400">Loading invoices...</p>
           </div>
         ) : invoices.length === 0 ? (
           <div className="p-12 text-center">
             <svg
-              className="mx-auto h-12 w-12 text-gray-400"
+              className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -175,8 +177,8 @@ export const BillingHistory: React.FC<BillingHistoryProps> = ({
                 d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
               />
             </svg>
-            <h3 className="mt-4 text-sm font-medium text-gray-900">No invoices</h3>
-            <p className="mt-2 text-sm text-gray-600">
+            <h3 className="mt-4 text-sm font-medium text-gray-900 dark:text-white">No invoices</h3>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
               {hasActiveFilters
                 ? 'No invoices match your filters.'
                 : "You don't have any invoices yet."}
@@ -186,47 +188,47 @@ export const BillingHistory: React.FC<BillingHistoryProps> = ({
           <>
             {/* Desktop Table */}
             <div className="hidden md:block">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-900">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                       Invoice
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                       Date
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                       Amount
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                       Status
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+                    <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
                   {invoices.map((invoice) => (
-                    <tr key={invoice.id} className="hover:bg-gray-50">
+                    <tr key={invoice.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                       <td className="whitespace-nowrap px-6 py-4">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">
                           {invoice.invoiceNumber}
                         </div>
                         {invoice.items.length > 0 && (
-                          <div className="text-sm text-gray-500">
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
                             {invoice.items[0].description}
                           </div>
                         )}
                       </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
+                      <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
                         {new Date(invoice.createdAt).toLocaleDateString('en-US', {
                           year: 'numeric',
                           month: 'short',
                           day: 'numeric',
                         })}
                       </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
+                      <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">
                         {formatPrice(invoice.amount, invoice.currency)}
                       </td>
                       <td className="whitespace-nowrap px-6 py-4">
@@ -265,22 +267,22 @@ export const BillingHistory: React.FC<BillingHistoryProps> = ({
             </div>
 
             {/* Mobile Cards */}
-            <div className="divide-y divide-gray-200 md:hidden">
+            <div className="divide-y divide-gray-200 dark:divide-gray-700 md:hidden">
               {invoices.map((invoice) => (
                 <div key={invoice.id} className="p-4">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <div className="text-sm font-medium text-gray-900">
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">
                         {invoice.invoiceNumber}
                       </div>
-                      <div className="mt-1 text-sm text-gray-600">
+                      <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                         {new Date(invoice.createdAt).toLocaleDateString('en-US', {
                           year: 'numeric',
                           month: 'short',
                           day: 'numeric',
                         })}
                       </div>
-                      <div className="mt-2 text-lg font-bold text-gray-900">
+                      <div className="mt-2 text-lg font-bold text-gray-900 dark:text-white">
                         {formatPrice(invoice.amount, invoice.currency)}
                       </div>
                     </div>

@@ -44,10 +44,11 @@ export const PlanCard: React.FC<PlanCardProps> = ({
   return (
     <div
       className={cn(
-        'relative flex flex-col rounded-lg border bg-white shadow-sm transition-all duration-200',
+        'relative flex flex-col rounded-lg border bg-white dark:bg-gray-800 shadow-sm transition-all duration-200',
         {
-          'border-blue-500 ring-2 ring-blue-500 ring-opacity-50': isCurrentPlan || isRecommended,
-          'border-gray-200 hover:border-gray-300 hover:shadow-md': !isCurrentPlan && !isRecommended,
+          'border-green-500 ring-2 ring-green-500 ring-opacity-50': isCurrentPlan || isRecommended,
+          'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-md':
+            !isCurrentPlan && !isRecommended,
           'opacity-60': disabled,
         },
         className
@@ -81,26 +82,28 @@ export const PlanCard: React.FC<PlanCardProps> = ({
 
       <div className="flex flex-1 flex-col p-6">
         {/* Plan Name */}
-        <h3 className="text-xl font-bold text-gray-900">{plan.name}</h3>
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white">{plan.name}</h3>
 
         {/* Description */}
-        <p className="mt-2 text-sm text-gray-600">{plan.description}</p>
+        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{plan.description}</p>
 
         {/* Pricing */}
         <div className="mt-6">
           <div className="flex items-baseline">
-            <span className="text-4xl font-extrabold text-gray-900">
+            <span className="text-4xl font-extrabold text-gray-900 dark:text-white">
               {formatPrice(price, plan.price.currency)}
             </span>
-            <span className="ml-1 text-lg text-gray-600">/mo</span>
+            <span className="ml-1 text-lg text-gray-600 dark:text-gray-400">/mo</span>
           </div>
           {billingCycle === 'annual' && (
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               {formatPrice(totalPrice, plan.price.currency)} billed annually
             </p>
           )}
           {plan.price.custom && (
-            <p className="mt-1 text-sm font-medium text-blue-600">Custom pricing available</p>
+            <p className="mt-1 text-sm font-medium text-green-600 dark:text-green-400">
+              Custom pricing available
+            </p>
           )}
         </div>
 
@@ -133,14 +136,14 @@ export const PlanCard: React.FC<PlanCardProps> = ({
 
         {/* Features List */}
         <div className="mt-6 flex-1">
-          <p className="text-sm font-semibold text-gray-900">
+          <p className="text-sm font-semibold text-gray-900 dark:text-white">
             {plan.trial ? 'Trial includes:' : 'Features:'}
           </p>
           <ul className="mt-4 space-y-3" role="list">
             {plan.features.map((feature, index) => (
               <li key={index} className="flex items-start">
                 <svg
-                  className="mr-3 h-5 w-5 flex-shrink-0 text-green-500"
+                  className="mr-3 h-5 w-5 flex-shrink-0 text-green-500 dark:text-green-400"
                   fill="currentColor"
                   viewBox="0 0 20 20"
                   aria-hidden="true"
@@ -151,7 +154,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
                     clipRule="evenodd"
                   />
                 </svg>
-                <span className="text-sm text-gray-700">{feature}</span>
+                <span className="text-sm text-gray-700 dark:text-gray-300">{feature}</span>
               </li>
             ))}
           </ul>

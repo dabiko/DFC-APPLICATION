@@ -96,16 +96,17 @@ const initialState: BillingState = {
  */
 
 // Fetch subscription
-export const fetchSubscription = createAsyncThunk<Subscription, void, { rejectValue: string }>(
-  'billing/fetchSubscription',
-  async (_, { rejectWithValue }) => {
-    try {
-      return await billingService.subscription.getSubscription()
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch subscription')
-    }
+export const fetchSubscription = createAsyncThunk<
+  Subscription | null,
+  void,
+  { rejectValue: string }
+>('billing/fetchSubscription', async (_, { rejectWithValue }) => {
+  try {
+    return await billingService.subscription.getSubscription()
+  } catch (error: any) {
+    return rejectWithValue(error.response?.data?.message || 'Failed to fetch subscription')
   }
-)
+})
 
 // Fetch plans
 export const fetchPlans = createAsyncThunk<Plan[], void, { rejectValue: string }>(
@@ -288,16 +289,17 @@ export const retryPayment = createAsyncThunk<Invoice, string, { rejectValue: str
 )
 
 // Fetch usage metrics
-export const fetchUsageMetrics = createAsyncThunk<UsageMetrics, void, { rejectValue: string }>(
-  'billing/fetchUsageMetrics',
-  async (_, { rejectWithValue }) => {
-    try {
-      return await billingService.usage.getUsageMetrics()
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch usage metrics')
-    }
+export const fetchUsageMetrics = createAsyncThunk<
+  UsageMetrics | null,
+  void,
+  { rejectValue: string }
+>('billing/fetchUsageMetrics', async (_, { rejectWithValue }) => {
+  try {
+    return await billingService.usage.getUsageMetrics()
+  } catch (error: any) {
+    return rejectWithValue(error.response?.data?.message || 'Failed to fetch usage metrics')
   }
-)
+})
 
 // Fetch usage alerts
 export const fetchUsageAlerts = createAsyncThunk<UsageAlert[], void, { rejectValue: string }>(
@@ -386,7 +388,9 @@ const billingSlice = createSlice({
       .addCase(fetchSubscription.fulfilled, (state, action) => {
         state.subscriptionLoading = false
         state.subscription = action.payload
-        state.usage = action.payload.usage
+        if (action.payload?.usage) {
+          state.usage = action.payload.usage
+        }
       })
       .addCase(fetchSubscription.rejected, (state, action) => {
         state.subscriptionLoading = false
@@ -417,7 +421,9 @@ const billingSlice = createSlice({
       .addCase(upgradeSubscription.fulfilled, (state, action) => {
         state.subscriptionLoading = false
         state.subscription = action.payload
-        state.usage = action.payload.usage
+        if (action.payload?.usage) {
+          state.usage = action.payload.usage
+        }
         state.activeModal = null
       })
       .addCase(upgradeSubscription.rejected, (state, action) => {
@@ -434,7 +440,9 @@ const billingSlice = createSlice({
       .addCase(downgradeSubscription.fulfilled, (state, action) => {
         state.subscriptionLoading = false
         state.subscription = action.payload
-        state.usage = action.payload.usage
+        if (action.payload?.usage) {
+          state.usage = action.payload.usage
+        }
         state.activeModal = null
       })
       .addCase(downgradeSubscription.rejected, (state, action) => {
@@ -593,7 +601,9 @@ const billingSlice = createSlice({
       })
       .addCase(fetchUsageMetrics.fulfilled, (state, action) => {
         state.usageLoading = false
-        state.usage = action.payload
+        if (action.payload) {
+          state.usage = action.payload
+        }
       })
       .addCase(fetchUsageMetrics.rejected, (state, action) => {
         state.usageLoading = false

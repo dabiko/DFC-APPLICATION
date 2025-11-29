@@ -47,6 +47,11 @@ INSTALLED_APPS = [
     'apps.retention',
     'apps.classification',
     'apps.sharing',
+    'apps.compliance',  # Compliance management center
+    'apps.intelligence',  # Document intelligence (NLP, table extraction)
+    'apps.events',  # Event-driven architecture (RabbitMQ)
+    'apps.integrations',  # API keys, webhooks, and third-party integrations
+    'apps.system',  # System administration (super admin)
 ]
 
 MIDDLEWARE = [
@@ -63,6 +68,7 @@ MIDDLEWARE = [
     'apps.users.mfa_middleware.MFAEnforcementMiddleware',  # MFA enforcement for admin
     'apps.users.mfa_middleware.MFASessionMiddleware',  # MFA session management
     'apps.audit.middleware.AuditContextMiddleware',  # Audit context tracking
+    'apps.events.middleware.EventContextMiddleware',  # Event-driven architecture context
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'apps.documents.middleware.StorageQuotaMiddleware',

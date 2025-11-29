@@ -475,18 +475,51 @@ class UsageViewSet(viewsets.ViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # Get usage limits check
-        limits_check = check_usage_limits(organization, subscription)
+        plan = subscription.plan
 
-        # Build response
-        data = {
-            'within_limits': limits_check['within_limits'],
-            'metrics': SubscriptionSerializer(subscription).data['usage'],
-            'exceeded': limits_check['exceeded'],
-            'warnings': limits_check['warnings'],
+        # Get latest usage records
+        latest_usage = {}
+        for metric_type in ['users', 'storage', 'documents', 'folders', 'api_calls']:
+            record = UsageRecord.objects.filter(
+                organization=organization,
+                metric_type=metric_type
+            ).order_by('-recorded_at').first()
+            latest_usage[metric_type] = float(record.value) if record else 0
+
+        # Calculate percentages
+        def calc_percentage(current, limit):
+            if limit <= 0 or limit == -1:  # -1 means unlimited
+                return 0
+            return min(100, round((current / limit) * 100, 1))
+
+        # Build response matching frontend UsageMetrics type
+        usage_data = {
+            'users': {
+                'current': int(latest_usage.get('users', 0)),
+                'limit': plan.max_users,
+            },
+            'storage': {
+                'currentGB': latest_usage.get('storage', 0),
+                'limitGB': plan.max_storage_gb,
+                'percentage': calc_percentage(latest_usage.get('storage', 0), plan.max_storage_gb),
+            },
+            'documents': {
+                'current': int(latest_usage.get('documents', 0)),
+                'limit': plan.max_documents,
+                'percentage': calc_percentage(latest_usage.get('documents', 0), plan.max_documents),
+            },
+            'folders': {
+                'current': int(latest_usage.get('folders', 0)),
+                'limit': plan.max_folders,
+            },
+            'apiCalls': {
+                'currentMonth': int(latest_usage.get('api_calls', 0)),
+                'limit': plan.max_api_calls_per_month,
+                'percentage': calc_percentage(latest_usage.get('api_calls', 0), plan.max_api_calls_per_month),
+            },
         }
 
-        return Response(data)
+        return Response(usage_data)
 
     @action(detail=False, methods=['get'], url_path='alerts')
     def alerts(self, request):
@@ -496,35 +529,73 @@ class UsageViewSet(viewsets.ViewSet):
         try:
             subscription = organization.subscription
         except Subscription.DoesNotExist:
-            return Response(
-                {'error': 'No active subscription found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            return Response([])  # Return empty array if no subscription
 
-        limits_check = check_usage_limits(organization, subscription)
+        plan = subscription.plan
 
+        # Get latest usage records
+        latest_usage = {}
+        for metric_type in ['users', 'storage', 'documents', 'folders', 'api_calls']:
+            record = UsageRecord.objects.filter(
+                organization=organization,
+                metric_type=metric_type
+            ).order_by('-recorded_at').first()
+            latest_usage[metric_type] = float(record.value) if record else 0
+
+        # Calculate percentages and generate alerts
         alerts = []
-        for warning in limits_check['warnings']:
-            alerts.append({
-                'id': f"warning_{warning['metric']}",
-                'type': warning['metric'],
-                'severity': 'warning',
-                'message': f"{warning['metric'].title()} usage at {warning['percentage']}%",
-                'current_value': warning['current'],
-                'limit_value': warning['limit'],
-                'percentage': warning['percentage'],
-            })
 
-        for exceeded in limits_check['exceeded']:
-            alerts.append({
-                'id': f"exceeded_{exceeded['metric']}",
-                'type': exceeded['metric'],
-                'severity': 'critical',
-                'message': f"{exceeded['metric'].title()} limit exceeded",
-                'current_value': exceeded['current'],
-                'limit_value': exceeded['limit'],
-                'percentage': 100,
-            })
+        # Check storage
+        if plan.max_storage_gb > 0:
+            storage_pct = (latest_usage.get('storage', 0) / plan.max_storage_gb) * 100
+            if storage_pct >= 95:
+                alerts.append({
+                    'id': 'exceeded_storage',
+                    'type': 'storage',
+                    'severity': 'critical',
+                    'message': 'Storage limit almost reached',
+                    'currentValue': latest_usage.get('storage', 0),
+                    'limitValue': plan.max_storage_gb,
+                    'percentage': min(100, round(storage_pct, 1)),
+                    'dismissed': False,
+                })
+            elif storage_pct >= 80:
+                alerts.append({
+                    'id': 'warning_storage',
+                    'type': 'storage',
+                    'severity': 'warning',
+                    'message': f'Storage usage at {round(storage_pct)}%',
+                    'currentValue': latest_usage.get('storage', 0),
+                    'limitValue': plan.max_storage_gb,
+                    'percentage': round(storage_pct, 1),
+                    'dismissed': False,
+                })
+
+        # Check documents
+        if plan.max_documents > 0:
+            docs_pct = (latest_usage.get('documents', 0) / plan.max_documents) * 100
+            if docs_pct >= 95:
+                alerts.append({
+                    'id': 'exceeded_documents',
+                    'type': 'documents',
+                    'severity': 'critical',
+                    'message': 'Document limit almost reached',
+                    'currentValue': int(latest_usage.get('documents', 0)),
+                    'limitValue': plan.max_documents,
+                    'percentage': min(100, round(docs_pct, 1)),
+                    'dismissed': False,
+                })
+            elif docs_pct >= 80:
+                alerts.append({
+                    'id': 'warning_documents',
+                    'type': 'documents',
+                    'severity': 'warning',
+                    'message': f'Document usage at {round(docs_pct)}%',
+                    'currentValue': int(latest_usage.get('documents', 0)),
+                    'limitValue': plan.max_documents,
+                    'percentage': round(docs_pct, 1),
+                    'dismissed': False,
+                })
 
         return Response(alerts)
 

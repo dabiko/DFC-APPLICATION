@@ -57,8 +57,10 @@ export const UsageMetrics: React.FC<UsageMetricsProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-xl font-bold text-gray-900">Usage Overview</h3>
-          <p className="mt-1 text-sm text-gray-600">Track your current usage against plan limits</p>
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Usage Overview</h3>
+          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+            Track your current usage against plan limits
+          </p>
         </div>
       </div>
 
@@ -96,9 +98,9 @@ export const UsageMetrics: React.FC<UsageMetricsProps> = ({
       {/* Usage Metrics Grid */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {/* Storage Usage */}
-        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 shadow-sm">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-gray-900">Storage</h4>
+            <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Storage</h4>
             <Badge variant={getUsageStatus(usage.storage.percentage).variant}>
               {getUsageStatus(usage.storage.percentage).text}
             </Badge>
@@ -106,10 +108,10 @@ export const UsageMetrics: React.FC<UsageMetricsProps> = ({
 
           <div className="mt-4">
             <div className="flex items-baseline justify-between">
-              <span className="text-2xl font-bold text-gray-900">
+              <span className="text-2xl font-bold text-gray-900 dark:text-white">
                 {usage.storage.currentGB.toFixed(2)} GB
               </span>
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-gray-600 dark:text-gray-400">
                 / {formatLimit(usage.storage.limitGB, 'GB')}
               </span>
             </div>
@@ -119,14 +121,14 @@ export const UsageMetrics: React.FC<UsageMetricsProps> = ({
               size="md"
               className="mt-3"
             />
-            <p className="mt-2 text-xs text-gray-600">
+            <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
               {usage.storage.percentage.toFixed(1)}% used
             </p>
           </div>
 
           {usage.storage.percentage >= 80 && (
-            <div className="mt-4 rounded-lg bg-yellow-50 p-3">
-              <p className="text-xs text-yellow-800">
+            <div className="mt-4 rounded-lg bg-yellow-50 dark:bg-yellow-900/30 p-3">
+              <p className="text-xs text-yellow-800 dark:text-yellow-300">
                 You're running low on storage. Consider upgrading your plan or removing unused
                 files.
               </p>
@@ -135,9 +137,9 @@ export const UsageMetrics: React.FC<UsageMetricsProps> = ({
         </div>
 
         {/* Documents Usage */}
-        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 shadow-sm">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-gray-900">Documents</h4>
+            <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Documents</h4>
             {!isUnlimited(usage.documents.limit) && (
               <Badge variant={getUsageStatus(usage.documents.percentage).variant}>
                 {getUsageStatus(usage.documents.percentage).text}
@@ -147,10 +149,12 @@ export const UsageMetrics: React.FC<UsageMetricsProps> = ({
 
           <div className="mt-4">
             <div className="flex items-baseline justify-between">
-              <span className="text-2xl font-bold text-gray-900">
+              <span className="text-2xl font-bold text-gray-900 dark:text-white">
                 {usage.documents.current.toLocaleString()}
               </span>
-              <span className="text-sm text-gray-600">/ {formatLimit(usage.documents.limit)}</span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                / {formatLimit(usage.documents.limit)}
+              </span>
             </div>
             {!isUnlimited(usage.documents.limit) && (
               <>
@@ -160,7 +164,7 @@ export const UsageMetrics: React.FC<UsageMetricsProps> = ({
                   size="md"
                   className="mt-3"
                 />
-                <p className="mt-2 text-xs text-gray-600">
+                <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
                   {usage.documents.percentage.toFixed(1)}% used
                 </p>
               </>
@@ -168,8 +172,8 @@ export const UsageMetrics: React.FC<UsageMetricsProps> = ({
           </div>
 
           {!isUnlimited(usage.documents.limit) && usage.documents.percentage >= 80 && (
-            <div className="mt-4 rounded-lg bg-yellow-50 p-3">
-              <p className="text-xs text-yellow-800">
+            <div className="mt-4 rounded-lg bg-yellow-50 dark:bg-yellow-900/30 p-3">
+              <p className="text-xs text-yellow-800 dark:text-yellow-300">
                 You're approaching your document limit. Upgrade for unlimited documents.
               </p>
             </div>
@@ -177,9 +181,9 @@ export const UsageMetrics: React.FC<UsageMetricsProps> = ({
         </div>
 
         {/* Users Usage */}
-        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 shadow-sm">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-gray-900">Team Members</h4>
+            <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Team Members</h4>
             {!isUnlimited(usage.users.limit) && (
               <Badge
                 variant={getUsageStatus((usage.users.current / usage.users.limit) * 100).variant}
@@ -191,8 +195,12 @@ export const UsageMetrics: React.FC<UsageMetricsProps> = ({
 
           <div className="mt-4">
             <div className="flex items-baseline justify-between">
-              <span className="text-2xl font-bold text-gray-900">{usage.users.current}</span>
-              <span className="text-sm text-gray-600">/ {formatLimit(usage.users.limit)}</span>
+              <span className="text-2xl font-bold text-gray-900 dark:text-white">
+                {usage.users.current}
+              </span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                / {formatLimit(usage.users.limit)}
+              </span>
             </div>
             {!isUnlimited(usage.users.limit) && (
               <>
@@ -202,7 +210,7 @@ export const UsageMetrics: React.FC<UsageMetricsProps> = ({
                   size="md"
                   className="mt-3"
                 />
-                <p className="mt-2 text-xs text-gray-600">
+                <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
                   {((usage.users.current / usage.users.limit) * 100).toFixed(1)}% used
                 </p>
               </>
@@ -211,9 +219,9 @@ export const UsageMetrics: React.FC<UsageMetricsProps> = ({
         </div>
 
         {/* API Calls Usage */}
-        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 shadow-sm">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-gray-900">API Calls</h4>
+            <h4 className="text-sm font-semibold text-gray-900 dark:text-white">API Calls</h4>
             {!isUnlimited(usage.apiCalls.limit) && (
               <Badge variant={getUsageStatus(usage.apiCalls.percentage).variant}>
                 {getUsageStatus(usage.apiCalls.percentage).text}
@@ -223,10 +231,12 @@ export const UsageMetrics: React.FC<UsageMetricsProps> = ({
 
           <div className="mt-4">
             <div className="flex items-baseline justify-between">
-              <span className="text-2xl font-bold text-gray-900">
+              <span className="text-2xl font-bold text-gray-900 dark:text-white">
                 {usage.apiCalls.currentMonth.toLocaleString()}
               </span>
-              <span className="text-sm text-gray-600">/ {formatLimit(usage.apiCalls.limit)}</span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                / {formatLimit(usage.apiCalls.limit)}
+              </span>
             </div>
             {!isUnlimited(usage.apiCalls.limit) && (
               <>
@@ -236,7 +246,7 @@ export const UsageMetrics: React.FC<UsageMetricsProps> = ({
                   size="md"
                   className="mt-3"
                 />
-                <p className="mt-2 text-xs text-gray-600">
+                <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
                   {usage.apiCalls.percentage.toFixed(1)}% used this month
                 </p>
               </>
@@ -247,11 +257,13 @@ export const UsageMetrics: React.FC<UsageMetricsProps> = ({
 
       {/* Upgrade Prompt */}
       {showUpgradePrompt && hasHighUsage && onUpgrade && (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-6">
+        <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/30 p-6">
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <h4 className="text-sm font-semibold text-blue-900">Need More Resources?</h4>
-              <p className="mt-2 text-sm text-blue-800">
+              <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-300">
+                Need More Resources?
+              </h4>
+              <p className="mt-2 text-sm text-blue-800 dark:text-blue-400">
                 You're using{' '}
                 {usage.storage.percentage >= 80 ? 'a lot of storage' : 'many resources'}. Upgrade
                 your plan to get more capacity and avoid service interruptions.
@@ -265,8 +277,8 @@ export const UsageMetrics: React.FC<UsageMetricsProps> = ({
       )}
 
       {/* Additional Info */}
-      <div className="rounded-lg bg-gray-50 p-4">
-        <p className="text-xs text-gray-600">
+      <div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-4">
+        <p className="text-xs text-gray-600 dark:text-gray-400">
           Usage statistics are updated hourly. Limits reset at the beginning of each billing period.
         </p>
       </div>

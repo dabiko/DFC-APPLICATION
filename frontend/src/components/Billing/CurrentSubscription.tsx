@@ -78,30 +78,39 @@ export const CurrentSubscription: React.FC<CurrentSubscriptionProps> = ({
       : subscription.plan.price.annual / 12
 
   return (
-    <div className={cn('rounded-lg border border-gray-200 bg-white p-6 shadow-sm', className)}>
+    <div
+      className={cn(
+        'rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 shadow-sm',
+        className
+      )}
+    >
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center space-x-3">
-            <h3 className="text-xl font-bold text-gray-900">{subscription.plan.name}</h3>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+              {subscription.plan.name}
+            </h3>
             {getStatusBadge()}
           </div>
-          <p className="mt-1 text-sm text-gray-600">{subscription.plan.description}</p>
+          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+            {subscription.plan.description}
+          </p>
         </div>
       </div>
 
       {/* Pricing */}
       <div className="mt-6">
         <div className="flex items-baseline space-x-2">
-          <span className="text-3xl font-bold text-gray-900">
+          <span className="text-3xl font-bold text-gray-900 dark:text-white">
             {formatPrice(monthlyPrice, subscription.plan.price.currency)}
           </span>
-          <span className="text-gray-600">/month</span>
+          <span className="text-gray-600 dark:text-gray-400">/month</span>
         </div>
-        <p className="mt-1 text-sm text-gray-600">
+        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
           Billed {subscription.billingCycle === 'monthly' ? 'monthly' : 'annually'}
           {subscription.billingCycle === 'annual' && (
-            <span className="ml-1 text-green-600">
+            <span className="ml-1 text-green-600 dark:text-green-400">
               ({formatPrice(subscription.plan.price.annual, subscription.plan.price.currency)}/year)
             </span>
           )}
@@ -110,11 +119,11 @@ export const CurrentSubscription: React.FC<CurrentSubscriptionProps> = ({
 
       {/* Next Billing */}
       {isActive && !isCancelled && (
-        <div className="mt-4 rounded-lg bg-gray-50 p-4">
+        <div className="mt-4 rounded-lg bg-gray-50 dark:bg-gray-700/50 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-900">Next Billing Date</p>
-              <p className="mt-1 text-sm text-gray-600">
+              <p className="text-sm font-medium text-gray-900 dark:text-white">Next Billing Date</p>
+              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                 {nextBillingDate.toLocaleDateString('en-US', {
                   year: 'numeric',
                   month: 'long',
@@ -123,9 +132,13 @@ export const CurrentSubscription: React.FC<CurrentSubscriptionProps> = ({
               </p>
             </div>
             <div className="text-right">
-              <p className="text-sm text-gray-600">{daysUntilBilling} days remaining</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {daysUntilBilling} days remaining
+              </p>
               {subscription.autoRenew && (
-                <p className="mt-1 text-xs text-green-600">Auto-renewal enabled</p>
+                <p className="mt-1 text-xs text-green-600 dark:text-green-400">
+                  Auto-renewal enabled
+                </p>
               )}
             </div>
           </div>
@@ -134,9 +147,9 @@ export const CurrentSubscription: React.FC<CurrentSubscriptionProps> = ({
 
       {/* Trial Info */}
       {isTrial && subscription.trialEnd && (
-        <div className="mt-4 rounded-lg bg-blue-50 p-4">
-          <p className="text-sm font-medium text-blue-900">Trial Period</p>
-          <p className="mt-1 text-sm text-blue-700">
+        <div className="mt-4 rounded-lg bg-blue-50 dark:bg-blue-900/30 p-4">
+          <p className="text-sm font-medium text-blue-900 dark:text-blue-300">Trial Period</p>
+          <p className="mt-1 text-sm text-blue-700 dark:text-blue-400">
             Your trial ends on{' '}
             {new Date(subscription.trialEnd).toLocaleDateString('en-US', {
               year: 'numeric',
@@ -144,7 +157,7 @@ export const CurrentSubscription: React.FC<CurrentSubscriptionProps> = ({
               day: 'numeric',
             })}
           </p>
-          <p className="mt-2 text-xs text-blue-600">
+          <p className="mt-2 text-xs text-blue-600 dark:text-blue-500">
             Upgrade now to continue using all features after your trial ends.
           </p>
         </div>
@@ -152,9 +165,11 @@ export const CurrentSubscription: React.FC<CurrentSubscriptionProps> = ({
 
       {/* Cancellation Notice */}
       {isCancelled && (
-        <div className="mt-4 rounded-lg bg-yellow-50 p-4">
-          <p className="text-sm font-medium text-yellow-900">Subscription Cancelled</p>
-          <p className="mt-1 text-sm text-yellow-700">
+        <div className="mt-4 rounded-lg bg-yellow-50 dark:bg-yellow-900/30 p-4">
+          <p className="text-sm font-medium text-yellow-900 dark:text-yellow-300">
+            Subscription Cancelled
+          </p>
+          <p className="mt-1 text-sm text-yellow-700 dark:text-yellow-400">
             Your subscription will remain active until {nextBillingDate.toLocaleDateString()}.
             Reactivate anytime before this date to continue service.
           </p>
@@ -164,13 +179,13 @@ export const CurrentSubscription: React.FC<CurrentSubscriptionProps> = ({
       {/* Usage Summary */}
       {subscription.usage && (
         <div className="mt-6 space-y-4">
-          <h4 className="text-sm font-semibold text-gray-900">Usage Summary</h4>
+          <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Usage Summary</h4>
 
           {/* Storage */}
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-sm text-gray-700">Storage</span>
-              <span className="text-sm font-medium text-gray-900">
+              <span className="text-sm text-gray-700 dark:text-gray-300">Storage</span>
+              <span className="text-sm font-medium text-gray-900 dark:text-white">
                 {subscription.usage.storage.currentGB.toFixed(2)} GB /{' '}
                 {subscription.usage.storage.limitGB} GB
               </span>
@@ -185,8 +200,8 @@ export const CurrentSubscription: React.FC<CurrentSubscriptionProps> = ({
           {/* Documents */}
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-sm text-gray-700">Documents</span>
-              <span className="text-sm font-medium text-gray-900">
+              <span className="text-sm text-gray-700 dark:text-gray-300">Documents</span>
+              <span className="text-sm font-medium text-gray-900 dark:text-white">
                 {subscription.usage.documents.current.toLocaleString()} /{' '}
                 {subscription.usage.documents.limit === -1
                   ? 'Unlimited'
@@ -205,8 +220,8 @@ export const CurrentSubscription: React.FC<CurrentSubscriptionProps> = ({
           {/* Users */}
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-sm text-gray-700">Users</span>
-              <span className="text-sm font-medium text-gray-900">
+              <span className="text-sm text-gray-700 dark:text-gray-300">Users</span>
+              <span className="text-sm font-medium text-gray-900 dark:text-white">
                 {subscription.usage.users.current} /{' '}
                 {subscription.usage.users.limit === -1
                   ? 'Unlimited'
@@ -276,7 +291,7 @@ export const CurrentSubscription: React.FC<CurrentSubscriptionProps> = ({
             fullWidth
             onClick={onCancel}
             disabled={loading}
-            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+            className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30"
           >
             Cancel Subscription
           </Button>

@@ -130,33 +130,48 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         ]
 
     def get_usage(self, obj):
-        """Get current usage metrics"""
+        """Get current usage metrics from UsageRecord"""
         org = obj.organization
+        plan = obj.plan
 
-        # Get current usage from organization
+        # Get latest usage records
+        latest_usage = {}
+        for metric_type in ['users', 'storage', 'documents', 'folders', 'api_calls']:
+            record = UsageRecord.objects.filter(
+                organization=org,
+                metric_type=metric_type
+            ).order_by('-recorded_at').first()
+            latest_usage[metric_type] = float(record.value) if record else 0
+
+        # Calculate percentages
+        def calc_percentage(current, limit):
+            if limit <= 0 or limit == -1:  # -1 means unlimited
+                return 0
+            return min(100, round((current / limit) * 100, 1))
+
         return {
             'users': {
-                'current': org.current_user_count,
-                'limit': obj.plan.max_users,
+                'current': int(latest_usage.get('users', 0)),
+                'limit': plan.max_users,
             },
             'storage': {
-                'currentGB': 0,  # TODO: Calculate from documents
-                'limitGB': obj.plan.max_storage_gb,
-                'percentage': 0,
+                'currentGB': latest_usage.get('storage', 0),
+                'limitGB': plan.max_storage_gb,
+                'percentage': calc_percentage(latest_usage.get('storage', 0), plan.max_storage_gb),
             },
             'documents': {
-                'current': 0,  # TODO: Count from documents
-                'limit': obj.plan.max_documents,
-                'percentage': 0,
+                'current': int(latest_usage.get('documents', 0)),
+                'limit': plan.max_documents,
+                'percentage': calc_percentage(latest_usage.get('documents', 0), plan.max_documents),
             },
             'folders': {
-                'current': 0,  # TODO: Count from folders
-                'limit': obj.plan.max_folders,
+                'current': int(latest_usage.get('folders', 0)),
+                'limit': plan.max_folders,
             },
             'apiCalls': {
-                'currentMonth': 0,  # TODO: Count from API usage
-                'limit': obj.plan.max_api_calls_per_month,
-                'percentage': 0,
+                'currentMonth': int(latest_usage.get('api_calls', 0)),
+                'limit': plan.max_api_calls_per_month,
+                'percentage': calc_percentage(latest_usage.get('api_calls', 0), plan.max_api_calls_per_month),
             },
         }
 

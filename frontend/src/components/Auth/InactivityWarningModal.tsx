@@ -34,7 +34,6 @@ export function InactivityWarningModal({
 }: InactivityWarningModalProps) {
   const [secondsRemaining, setSecondsRemaining] = useState(countdownSeconds)
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     if (!isOpen) {
       setSecondsRemaining(countdownSeconds)

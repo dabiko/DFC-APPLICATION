@@ -16,7 +16,8 @@ apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     // Check both localStorage and sessionStorage for tokens
     // (auth.service.ts stores them based on "Remember Me" checkbox)
-    const accessToken = localStorage.getItem('access_token') || sessionStorage.getItem('access_token')
+    const accessToken =
+      localStorage.getItem('access_token') || sessionStorage.getItem('access_token')
 
     if (accessToken && config.headers) {
       config.headers.Authorization = `Bearer ${accessToken}`
@@ -41,7 +42,8 @@ apiClient.interceptors.response.use(
 
       try {
         // Get refresh token from storage (check both localStorage and sessionStorage)
-        const refreshToken = localStorage.getItem('refresh_token') || sessionStorage.getItem('refresh_token')
+        const refreshToken =
+          localStorage.getItem('refresh_token') || sessionStorage.getItem('refresh_token')
 
         if (!refreshToken) {
           throw new Error('No refresh token available')

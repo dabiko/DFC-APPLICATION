@@ -10,15 +10,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import {
-  WifiOff,
-  Wifi,
-  CheckCircle,
-  RefreshCw,
-  X,
-  Loader2,
-  SignalLow,
-} from 'lucide-react'
+import { WifiOff, Wifi, CheckCircle, RefreshCw, X, Loader2, SignalLow } from 'lucide-react'
 import { useNetworkStatus } from '@/contexts/NetworkStatusContext'
 import { cn } from '@/utils/cn'
 

@@ -116,8 +116,8 @@ export const uploadDocument = async ({
   if (metadata.comments) formData.append('comments', metadata.comments)
 
   // Track upload progress
-  let startTime = Date.now()
-  let uploadedBytes = 0
+  const startTime = Date.now()
+  const uploadedBytes = 0
 
   const response = await apiClient.post<UploadDocumentResponse>('/documents/upload/', formData, {
     headers: {
@@ -558,9 +558,7 @@ export const handleDocumentError = (error: unknown): string => {
       const fieldErrors: string[] = []
       for (const [field, errors] of Object.entries(data)) {
         if (Array.isArray(errors)) {
-          const errorMessages = errors
-            .filter((e) => typeof e === 'string')
-            .join(', ')
+          const errorMessages = errors.filter((e) => typeof e === 'string').join(', ')
           if (errorMessages) {
             // Convert snake_case to readable format
             const readableField = field.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
@@ -685,9 +683,7 @@ export const getShortcutsInFolder = async (
   >('/documents/shortcuts/list/', { params })
 
   // Handle both paginated and direct array response
-  const shortcuts = Array.isArray(response.data)
-    ? response.data
-    : response.data.results || []
+  const shortcuts = Array.isArray(response.data) ? response.data : response.data.results || []
 
   return shortcuts.map(transformShortcutListItem)
 }

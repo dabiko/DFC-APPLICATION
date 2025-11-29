@@ -476,3 +476,11 @@ class OrganizationInvitation(models.Model):
         )
 
         return invitation
+
+
+# Import settings models for Django discovery
+from .settings_models import (
+    OrganizationSettings,
+    OrganizationSecurityPolicy,
+    OrganizationFeatureFlags,
+)

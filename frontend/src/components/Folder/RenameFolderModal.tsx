@@ -10,15 +10,27 @@ import type { Folder, ConfidentialityLevel } from '@/types/folder'
 const CONFIDENTIALITY_OPTIONS: { value: ConfidentialityLevel; label: string; color: string }[] = [
   { value: 'public', label: 'Public', color: 'text-gray-600 bg-gray-100 dark:bg-gray-700' },
   { value: 'internal', label: 'Internal', color: 'text-blue-600 bg-blue-100 dark:bg-blue-900/30' },
-  { value: 'confidential', label: 'Confidential', color: 'text-orange-600 bg-orange-100 dark:bg-orange-900/30' },
-  { value: 'highly_confidential', label: 'Highly Confidential', color: 'text-red-600 bg-red-100 dark:bg-red-900/30' },
+  {
+    value: 'confidential',
+    label: 'Confidential',
+    color: 'text-orange-600 bg-orange-100 dark:bg-orange-900/30',
+  },
+  {
+    value: 'highly_confidential',
+    label: 'Highly Confidential',
+    color: 'text-red-600 bg-red-100 dark:bg-red-900/30',
+  },
 ]
 
 export interface RenameFolderModalProps {
   isOpen: boolean
   folder: Folder | null
   onClose: () => void
-  onRename: (folderId: string, newName: string, confidentiality?: ConfidentialityLevel) => Promise<void>
+  onRename: (
+    folderId: string,
+    newName: string,
+    confidentiality?: ConfidentialityLevel
+  ) => Promise<void>
   existingFolderNames?: string[]
 }
 
@@ -88,7 +100,8 @@ export const RenameFolderModal: FC<RenameFolderModalProps> = ({
 
     try {
       // Pass confidentiality only if it changed
-      const newConfidentiality = confidentiality !== folder.confidentiality ? confidentiality : undefined
+      const newConfidentiality =
+        confidentiality !== folder.confidentiality ? confidentiality : undefined
       await onRename(folder.id, folderName.trim(), newConfidentiality)
       onClose()
     } catch (err) {

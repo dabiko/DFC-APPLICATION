@@ -1,5 +1,11 @@
 """
 API views for classification system.
+
+Includes:
+- Rule-based classification endpoints
+- ML classification endpoints (Phase 1)
+- Review queue management
+- Model training and management
 """
 from rest_framework import generics, status
 from rest_framework.views import APIView
@@ -7,16 +13,30 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from django.shortcuts import get_object_or_404
 
-from apps.classification.models import ClassificationRule, ClassificationLog
+from apps.classification.models import (
+    ClassificationRule,
+    ClassificationLog,
+    MLClassificationModel,
+    ClassificationPrediction,
+    TrainingFeedback,
+    ClassificationSettings
+)
 from apps.classification.serializers import (
     ClassificationRuleSerializer,
     ClassificationRuleListSerializer,
-    ClassificationLogSerializer
+    ClassificationLogSerializer,
+    MLClassificationModelSerializer,
+    MLClassificationModelListSerializer,
+    ClassificationPredictionSerializer,
+    ClassificationPredictionReviewSerializer,
+    TrainingFeedbackSerializer,
+    ClassificationSettingsSerializer,
+    TrainModelRequestSerializer,
+    MLClassificationStatsSerializer
 )
 from apps.classification.engine import ClassificationEngine
 from apps.documents.models import Document
 from apps.documents.serializers import DocumentListSerializer
-from apps.workflows.tasks import apply_classification_rules, batch_classify_documents
 
 import logging
 
@@ -287,3 +307,418 @@ class ClassificationStatsView(APIView):
             },
             'by_trigger': {item['triggered_by']: item['count'] for item in trigger_stats}
         })
+
+
+# =============================================================================
+# ML Classification Views (Phase 1)
+# =============================================================================
+
+class MLModelListView(generics.ListAPIView):
+    """
+    List all ML classification models.
+
+    GET /api/v1/classification/ml/models/
+
+    Query Parameters:
+        model_type (str): Filter by model type (document_type, confidentiality, department)
+        status (str): Filter by status (training, ready, active, deprecated, failed)
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = MLClassificationModelListSerializer
+
+    def get_queryset(self):
+        queryset = MLClassificationModel.objects.all()
+
+        model_type = self.request.query_params.get('model_type')
+        if model_type:
+            queryset = queryset.filter(model_type=model_type)
+
+        model_status = self.request.query_params.get('status')
+        if model_status:
+            queryset = queryset.filter(status=model_status)
+
+        return queryset
+
+
+class MLModelDetailView(generics.RetrieveAPIView):
+    """
+    Get ML model details.
+
+    GET /api/v1/classification/ml/models/{id}/
+    """
+    permission_classes = [IsAuthenticated]
+    queryset = MLClassificationModel.objects.all()
+    serializer_class = MLClassificationModelSerializer
+
+
+class MLModelActivateView(APIView):
+    """
+    Activate an ML model for production use.
+
+    POST /api/v1/classification/ml/models/{id}/activate/
+
+    Makes this model the active model for its type,
+    deactivating any previously active model.
+    """
+    permission_classes = [IsAdminUser]
+
+    def post(self, request, pk):
+        model = get_object_or_404(MLClassificationModel, pk=pk)
+
+        if model.status == MLClassificationModel.ModelStatus.TRAINING:
+            return Response(
+                {'error': 'Cannot activate a model that is still training'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if model.status == MLClassificationModel.ModelStatus.FAILED:
+            return Response(
+                {'error': 'Cannot activate a failed model'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        model.activate()
+
+        return Response({
+            'message': f'Model {model.name} v{model.version} is now active',
+            'model': MLClassificationModelSerializer(model).data
+        })
+
+
+class TrainModelView(APIView):
+    """
+    Train a new ML classification model.
+
+    POST /api/v1/classification/ml/train/
+
+    Body:
+        {
+            "classification_target": "document_type",
+            "algorithm": "multinomial_nb",
+            "max_features": 5000,
+            "ngram_range": [1, 2]
+        }
+
+    Returns task ID for tracking training progress.
+    """
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        serializer = TrainModelRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        from apps.classification.tasks import train_model_task
+
+        # Trigger training task
+        task = train_model_task.delay(
+            classification_target=serializer.validated_data['classification_target'],
+            algorithm=serializer.validated_data['algorithm'],
+            user_id=request.user.id,
+            max_features=serializer.validated_data.get('max_features', 5000),
+            ngram_range=serializer.validated_data.get('ngram_range', [1, 2])
+        )
+
+        return Response({
+            'message': 'Model training started',
+            'task_id': task.id,
+            'classification_target': serializer.validated_data['classification_target'],
+            'algorithm': serializer.validated_data['algorithm']
+        }, status=status.HTTP_202_ACCEPTED)
+
+
+class ReviewQueueView(generics.ListAPIView):
+    """
+    Get predictions pending review.
+
+    GET /api/v1/classification/ml/review-queue/
+
+    Query Parameters:
+        confidence_level (str): Filter by confidence (high, medium, low)
+        model_type (str): Filter by model type
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = ClassificationPredictionSerializer
+
+    def get_queryset(self):
+        queryset = ClassificationPrediction.objects.filter(
+            review_status=ClassificationPrediction.ReviewStatus.PENDING
+        ).select_related('document', 'model')
+
+        # Non-admin users only see their own documents
+        if not self.request.user.is_staff:
+            queryset = queryset.filter(document__owner=self.request.user)
+
+        confidence_level = self.request.query_params.get('confidence_level')
+        if confidence_level:
+            queryset = queryset.filter(confidence_level=confidence_level)
+
+        model_type = self.request.query_params.get('model_type')
+        if model_type:
+            queryset = queryset.filter(model__model_type=model_type)
+
+        return queryset.order_by('-created_at')
+
+
+class ReviewPredictionView(APIView):
+    """
+    Review a classification prediction.
+
+    POST /api/v1/classification/ml/predictions/{id}/review/
+
+    Body:
+        {
+            "action": "confirm" | "correct" | "reject",
+            "correction": "INVOICE"  // required if action is "correct"
+        }
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        prediction = get_object_or_404(
+            ClassificationPrediction.objects.select_related('document'),
+            pk=pk
+        )
+
+        # Check permissions
+        if not request.user.is_staff:
+            if prediction.document.owner != request.user:
+                return Response(
+                    {'error': 'Permission denied'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+        serializer = ClassificationPredictionReviewSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        action = serializer.validated_data['action']
+
+        if action == 'confirm':
+            prediction.confirm(request.user)
+            message = 'Prediction confirmed'
+        elif action == 'correct':
+            correction = serializer.validated_data['correction']
+            prediction.correct(request.user, correction)
+            message = f'Prediction corrected to: {correction}'
+        elif action == 'reject':
+            prediction.reject(request.user)
+            message = 'Prediction rejected'
+
+        return Response({
+            'message': message,
+            'prediction': ClassificationPredictionSerializer(prediction).data
+        })
+
+
+class ClassifyDocumentMLView(APIView):
+    """
+    Classify a document using ML.
+
+    POST /api/v1/documents/{id}/classify-ml/
+
+    Body (optional):
+        {
+            "classification_target": "document_type",
+            "auto_apply": true
+        }
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        document = get_object_or_404(Document, pk=pk, is_deleted=False)
+
+        # Check permissions
+        if not request.user.is_staff:
+            if document.owner != request.user:
+                return Response(
+                    {'error': 'Permission denied'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+        classification_target = request.data.get('classification_target', 'document_type')
+        auto_apply = request.data.get('auto_apply', True)
+
+        from apps.classification.tasks import classify_document_task
+
+        # Trigger classification task
+        task = classify_document_task.delay(
+            document_id=str(document.id),
+            classification_target=classification_target,
+            auto_apply=auto_apply
+        )
+
+        return Response({
+            'message': 'ML classification started',
+            'task_id': task.id,
+            'document_id': str(document.id),
+            'classification_target': classification_target
+        }, status=status.HTTP_202_ACCEPTED)
+
+
+class BatchClassifyMLView(APIView):
+    """
+    Classify multiple documents using ML.
+
+    POST /api/v1/classification/ml/batch-classify/
+
+    Body:
+        {
+            "document_ids": ["uuid1", "uuid2", ...],
+            "classification_target": "document_type",
+            "auto_apply": true
+        }
+    """
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        document_ids = request.data.get('document_ids', [])
+        classification_target = request.data.get('classification_target', 'document_type')
+        auto_apply = request.data.get('auto_apply', True)
+
+        if not document_ids:
+            return Response(
+                {'error': 'document_ids is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validate documents exist
+        existing_count = Document.objects.filter(
+            id__in=document_ids,
+            is_deleted=False
+        ).count()
+
+        if existing_count == 0:
+            return Response(
+                {'error': 'No valid documents found'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        from apps.classification.tasks import batch_classify_documents
+
+        task = batch_classify_documents.delay(
+            document_ids=document_ids,
+            classification_target=classification_target,
+            auto_apply=auto_apply
+        )
+
+        return Response({
+            'message': 'Batch ML classification started',
+            'task_id': task.id,
+            'total_documents': len(document_ids),
+            'valid_documents': existing_count,
+            'classification_target': classification_target
+        }, status=status.HTTP_202_ACCEPTED)
+
+
+class MLClassificationStatsView(APIView):
+    """
+    Get ML classification statistics.
+
+    GET /api/v1/classification/ml/stats/
+
+    Returns comprehensive statistics about:
+    - Models (active, total)
+    - Predictions (by status, by confidence)
+    - Accuracy metrics
+    - Pending review counts
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            from apps.classification.ml_engine import get_ml_engine
+            engine = get_ml_engine()
+            stats = engine.get_classification_stats()
+
+            return Response(stats)
+
+        except RuntimeError as e:
+            # ML not available (scikit-learn not installed)
+            return Response({
+                'error': str(e),
+                'ml_available': False
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+
+class ClassificationSettingsView(APIView):
+    """
+    Get or update classification settings.
+
+    GET /api/v1/classification/settings/
+    PUT /api/v1/classification/settings/
+    """
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        settings = ClassificationSettings.get_settings()
+        serializer = ClassificationSettingsSerializer(settings)
+        return Response(serializer.data)
+
+    def put(self, request):
+        settings = ClassificationSettings.get_settings()
+        serializer = ClassificationSettingsSerializer(
+            settings,
+            data=request.data,
+            partial=True,
+            context={'request': request}
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response({
+            'message': 'Settings updated',
+            'settings': serializer.data
+        })
+
+
+class TrainingFeedbackListView(generics.ListAPIView):
+    """
+    List training feedback entries.
+
+    GET /api/v1/classification/ml/feedback/
+
+    Query Parameters:
+        used_in_training (bool): Filter by training status
+        classification_target (str): Filter by target type
+    """
+    permission_classes = [IsAdminUser]
+    serializer_class = TrainingFeedbackSerializer
+
+    def get_queryset(self):
+        queryset = TrainingFeedback.objects.select_related(
+            'document', 'provided_by', 'trained_model'
+        )
+
+        used = self.request.query_params.get('used_in_training')
+        if used is not None:
+            queryset = queryset.filter(used_in_training=used.lower() == 'true')
+
+        target = self.request.query_params.get('classification_target')
+        if target:
+            queryset = queryset.filter(classification_target=target)
+
+        return queryset.order_by('-created_at')
+
+
+class PredictionHistoryView(generics.ListAPIView):
+    """
+    Get prediction history for a document.
+
+    GET /api/v1/documents/{id}/predictions/
+
+    Returns all ML predictions made for this document.
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = ClassificationPredictionSerializer
+
+    def get_queryset(self):
+        document_id = self.kwargs['pk']
+        document = get_object_or_404(Document, pk=document_id, is_deleted=False)
+
+        # Check permissions
+        if not self.request.user.is_staff:
+            if document.owner != self.request.user:
+                return ClassificationPrediction.objects.none()
+
+        return ClassificationPrediction.objects.filter(
+            document=document
+        ).select_related('model').order_by('-created_at')

@@ -1045,3 +1045,418 @@ def reclassify_documents_for_rule(rule_id):
             'success': False,
             'message': str(e)
         }
+
+
+# ========================================
+# Workflow SLA Monitoring Tasks
+# ========================================
+
+@shared_task
+def run_sla_monitoring():
+    """
+    Run SLA monitoring cycle for all active workflow tasks.
+
+    This task should be scheduled to run periodically (e.g., every 15-30 minutes)
+    via Celery beat.
+
+    Actions performed:
+    - Send reminder notifications for tasks approaching deadline
+    - Send SLA warning notifications
+    - Mark overdue tasks and send notifications
+    - Trigger automatic escalation for breached SLAs
+
+    Returns:
+        dict: Summary of monitoring actions taken
+    """
+    from apps.workflows.sla import SLAMonitoringService
+
+    logger.info("Starting SLA monitoring cycle")
+
+    try:
+        results = SLAMonitoringService.run_monitoring_cycle()
+
+        logger.info(
+            f"SLA monitoring completed: "
+            f"{results['reminders_sent']} reminders, "
+            f"{results['warnings_sent']} warnings, "
+            f"{results['overdue_notifications']} overdue notifications, "
+            f"{results['escalations']} escalations"
+        )
+
+        return {
+            'success': True,
+            **results
+        }
+
+    except Exception as e:
+        logger.error(f"SLA monitoring failed: {e}", exc_info=True)
+        return {
+            'success': False,
+            'message': str(e)
+        }
+
+
+@shared_task
+def send_task_reminders():
+    """
+    Send reminder notifications for tasks with approaching deadlines.
+
+    Specifically checks for tasks at configured reminder intervals
+    (default: 24h, 8h, 2h before due).
+
+    Returns:
+        dict: Summary of reminders sent
+    """
+    from apps.workflows.sla import SLAService, SLAConfig
+    from apps.workflows.notifications import WorkflowNotificationService
+    from apps.workflows.models import WorkflowAuditLog
+    from datetime import timedelta
+
+    logger.info("Checking for tasks needing reminders")
+
+    results = {'sent': 0, 'failed': 0, 'skipped': 0}
+
+    try:
+        tasks_needing_reminder = SLAService.get_tasks_needing_reminder()
+
+        for task, hours_remaining in tasks_needing_reminder:
+            try:
+                # Check if reminder already sent for this time window
+                recent_reminder = WorkflowAuditLog.objects.filter(
+                    task=task,
+                    action='notification_task_reminder',
+                    timestamp__gte=timezone.now() - timedelta(hours=1)
+                ).exists()
+
+                if recent_reminder:
+                    results['skipped'] += 1
+                    continue
+
+                WorkflowNotificationService.notify_task_reminder(task, hours_remaining)
+                results['sent'] += 1
+
+                logger.debug(
+                    f"Reminder sent for task {task.id} ({hours_remaining}h remaining)"
+                )
+
+            except Exception as e:
+                logger.error(f"Failed to send reminder for task {task.id}: {e}")
+                results['failed'] += 1
+
+        logger.info(f"Task reminders completed: {results}")
+        return {
+            'success': True,
+            **results
+        }
+
+    except Exception as e:
+        logger.error(f"Task reminder check failed: {e}", exc_info=True)
+        return {
+            'success': False,
+            'message': str(e)
+        }
+
+
+@shared_task
+def process_overdue_tasks():
+    """
+    Process all overdue tasks - send notifications and escalate.
+
+    Called periodically to:
+    - Notify assignees about overdue tasks
+    - Trigger automatic escalation after delay period
+
+    Returns:
+        dict: Summary of overdue processing
+    """
+    from apps.workflows.sla import SLAService, EscalationService
+    from apps.workflows.notifications import WorkflowNotificationService
+    from apps.workflows.models import WorkflowAuditLog
+    from datetime import timedelta
+
+    logger.info("Processing overdue tasks")
+
+    results = {
+        'overdue_count': 0,
+        'notifications_sent': 0,
+        'escalations': 0,
+        'failed': 0
+    }
+
+    try:
+        overdue_tasks = SLAService.get_overdue_tasks()
+        results['overdue_count'] = len(overdue_tasks)
+
+        for task in overdue_tasks:
+            try:
+                # Check if we've notified about this in the last 12 hours
+                already_notified = WorkflowAuditLog.objects.filter(
+                    task=task,
+                    action='notification_task_overdue',
+                    timestamp__gte=timezone.now() - timedelta(hours=12)
+                ).exists()
+
+                if not already_notified:
+                    WorkflowNotificationService.notify_task_overdue(task)
+                    results['notifications_sent'] += 1
+
+                # Check if should escalate
+                if EscalationService.should_escalate(task):
+                    new_task = EscalationService.escalate_task(task, reason='SLA breach')
+                    if new_task:
+                        results['escalations'] += 1
+                        logger.info(f"Task {task.id} escalated to {new_task.assigned_to_id}")
+
+            except Exception as e:
+                logger.error(f"Failed to process overdue task {task.id}: {e}")
+                results['failed'] += 1
+
+        logger.info(f"Overdue task processing completed: {results}")
+        return {
+            'success': True,
+            **results
+        }
+
+    except Exception as e:
+        logger.error(f"Overdue task processing failed: {e}", exc_info=True)
+        return {
+            'success': False,
+            'message': str(e)
+        }
+
+
+@shared_task
+def escalate_task(task_id, reason='Manual escalation'):
+    """
+    Escalate a specific task to the next level.
+
+    Can be called manually or triggered by SLA monitoring.
+
+    Args:
+        task_id: UUID of task to escalate
+        reason: Reason for escalation
+
+    Returns:
+        dict: Escalation result
+    """
+    from apps.workflows.models import WorkflowTask
+    from apps.workflows.sla import EscalationService
+
+    logger.info(f"Escalating task {task_id}: {reason}")
+
+    try:
+        task = WorkflowTask.objects.get(id=task_id)
+
+        new_task = EscalationService.escalate_task(task, reason=reason)
+
+        if new_task:
+            return {
+                'success': True,
+                'original_task_id': str(task_id),
+                'new_task_id': str(new_task.id),
+                'escalated_to': new_task.assigned_to_id,
+                'message': f'Task escalated to {new_task.assigned_to.get_full_name()}'
+            }
+        else:
+            return {
+                'success': False,
+                'task_id': str(task_id),
+                'message': 'No escalation target available'
+            }
+
+    except WorkflowTask.DoesNotExist:
+        logger.error(f"Task {task_id} not found for escalation")
+        return {
+            'success': False,
+            'message': 'Task not found'
+        }
+    except Exception as e:
+        logger.error(f"Task escalation failed: {e}", exc_info=True)
+        return {
+            'success': False,
+            'message': str(e)
+        }
+
+
+@shared_task
+def send_workflow_daily_digest():
+    """
+    Send daily digest emails to users with pending tasks.
+
+    Includes:
+    - Summary of pending tasks
+    - Overdue tasks count
+    - Tasks approaching deadline
+
+    Should be scheduled to run once daily (e.g., 8:00 AM).
+
+    Returns:
+        dict: Summary of digests sent
+    """
+    from django.contrib.auth import get_user_model
+    from apps.workflows.models import WorkflowTask, WorkflowTaskStatus
+    from django.core.mail import send_mail
+    from django.conf import settings
+    from datetime import timedelta
+
+    User = get_user_model()
+    logger.info("Generating workflow daily digests")
+
+    results = {'sent': 0, 'skipped': 0, 'failed': 0}
+
+    try:
+        now = timezone.now()
+        tomorrow = now + timedelta(hours=24)
+
+        # Get all users with active tasks
+        users_with_tasks = User.objects.filter(
+            assigned_tasks__status__in=[
+                WorkflowTaskStatus.PENDING,
+                WorkflowTaskStatus.IN_PROGRESS
+            ]
+        ).distinct()
+
+        for user in users_with_tasks:
+            try:
+                # Get user's tasks
+                pending_tasks = WorkflowTask.objects.filter(
+                    assigned_to=user,
+                    status__in=[WorkflowTaskStatus.PENDING, WorkflowTaskStatus.IN_PROGRESS]
+                )
+
+                total_pending = pending_tasks.count()
+                if total_pending == 0:
+                    results['skipped'] += 1
+                    continue
+
+                overdue_count = pending_tasks.filter(
+                    due_date__lt=now,
+                    due_date__isnull=False
+                ).count()
+
+                due_soon_count = pending_tasks.filter(
+                    due_date__gte=now,
+                    due_date__lte=tomorrow,
+                    due_date__isnull=False
+                ).count()
+
+                # Build email content
+                subject = f"Workflow Daily Digest: {total_pending} pending task(s)"
+
+                message_lines = [
+                    f"Hello {user.get_full_name() or user.username},",
+                    "",
+                    "Here's your workflow task summary for today:",
+                    "",
+                    f"  - Total pending tasks: {total_pending}",
+                ]
+
+                if overdue_count > 0:
+                    message_lines.append(f"  - OVERDUE tasks: {overdue_count}")
+
+                if due_soon_count > 0:
+                    message_lines.append(f"  - Tasks due within 24h: {due_soon_count}")
+
+                message_lines.extend([
+                    "",
+                    f"View your tasks: {getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')}/workflows",
+                    "",
+                    "Best regards,",
+                    "The DFC Team"
+                ])
+
+                message = "\n".join(message_lines)
+
+                send_mail(
+                    subject=subject,
+                    message=message,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[user.email],
+                    fail_silently=False
+                )
+
+                results['sent'] += 1
+                logger.debug(f"Daily digest sent to {user.email}")
+
+            except Exception as e:
+                logger.error(f"Failed to send digest to {user.id}: {e}")
+                results['failed'] += 1
+
+        logger.info(f"Daily digest generation completed: {results}")
+        return {
+            'success': True,
+            **results
+        }
+
+    except Exception as e:
+        logger.error(f"Daily digest generation failed: {e}", exc_info=True)
+        return {
+            'success': False,
+            'message': str(e)
+        }
+
+
+@shared_task
+def generate_sla_compliance_report(organization_id=None, period_days=30):
+    """
+    Generate SLA compliance report for the specified period.
+
+    Args:
+        organization_id: Optional organization to filter by
+        period_days: Number of days to include in report
+
+    Returns:
+        dict: SLA compliance statistics
+    """
+    from apps.workflows.sla import SLAStatistics
+    from datetime import timedelta
+
+    logger.info(f"Generating SLA compliance report for last {period_days} days")
+
+    try:
+        end_date = timezone.now()
+        start_date = end_date - timedelta(days=period_days)
+
+        # Get organization if specified
+        organization = None
+        if organization_id:
+            from apps.organizations.models import Organization
+            organization = Organization.objects.get(id=organization_id)
+
+        # Get compliance statistics
+        compliance_stats = SLAStatistics.get_sla_compliance_rate(
+            organization=organization,
+            start_date=start_date,
+            end_date=end_date
+        )
+
+        # Get current status
+        current_status = SLAStatistics.get_current_sla_status(
+            organization=organization
+        )
+
+        report = {
+            'success': True,
+            'period': {
+                'start_date': start_date.isoformat(),
+                'end_date': end_date.isoformat(),
+                'days': period_days
+            },
+            'compliance': compliance_stats,
+            'current_status': current_status,
+            'generated_at': timezone.now().isoformat()
+        }
+
+        logger.info(
+            f"SLA report generated: {compliance_stats['compliance_rate']}% compliance, "
+            f"{current_status['overdue']} currently overdue"
+        )
+
+        return report
+
+    except Exception as e:
+        logger.error(f"SLA report generation failed: {e}", exc_info=True)
+        return {
+            'success': False,
+            'message': str(e)
+        }

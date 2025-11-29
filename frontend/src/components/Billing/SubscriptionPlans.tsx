@@ -49,16 +49,18 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
     <div className={cn('w-full', className)}>
       {/* Header */}
       <div className="mb-8 text-center">
-        <h2 className="text-3xl font-bold text-gray-900">Choose Your Plan</h2>
-        <p className="mt-2 text-lg text-gray-600">Select the perfect plan for your team's needs</p>
+        <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Choose Your Plan</h2>
+        <p className="mt-2 text-lg text-gray-600 dark:text-gray-400">
+          Select the perfect plan for your team's needs
+        </p>
       </div>
 
       {/* Billing Cycle Toggle */}
       <div className="mb-8 flex items-center justify-center space-x-4">
         <span
           className={cn('text-sm font-medium', {
-            'text-gray-900': billingCycle === BillingCycle.MONTHLY,
-            'text-gray-500': billingCycle === BillingCycle.ANNUAL,
+            'text-gray-900 dark:text-white': billingCycle === BillingCycle.MONTHLY,
+            'text-gray-500 dark:text-gray-400': billingCycle === BillingCycle.ANNUAL,
           })}
         >
           Monthly
@@ -70,12 +72,12 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
         />
         <span
           className={cn('text-sm font-medium', {
-            'text-gray-900': billingCycle === BillingCycle.ANNUAL,
-            'text-gray-500': billingCycle === BillingCycle.MONTHLY,
+            'text-gray-900 dark:text-white': billingCycle === BillingCycle.ANNUAL,
+            'text-gray-500 dark:text-gray-400': billingCycle === BillingCycle.MONTHLY,
           })}
         >
           Annual
-          <span className="ml-2 inline-block rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-800">
+          <span className="ml-2 inline-block rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-semibold text-green-800 dark:text-green-400">
             Save ~17%
           </span>
         </span>
@@ -103,10 +105,15 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
 
       {/* Additional Info */}
       <div className="mt-12 text-center">
-        <p className="text-sm text-gray-600">All plans include 14-day money-back guarantee</p>
-        <p className="mt-2 text-sm text-gray-600">
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          All plans include 14-day money-back guarantee
+        </p>
+        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
           Need a custom solution?{' '}
-          <a href="/contact-sales" className="font-medium text-blue-600 hover:text-blue-700">
+          <a
+            href="/contact-sales"
+            className="font-medium text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300"
+          >
             Contact our sales team
           </a>
         </p>

@@ -1,0 +1,101 @@
+{% extends "emails/base_enterprise.html" %}
+
+{% block title %}New Task Assigned - Digital Filing Cabinet{% endblock %}
+{% block preheader %}A new workflow task has been assigned to you{% endblock %}
+
+{% block content %}
+<tr>
+    <td style="padding: 24px 0 0 0;">
+        <!-- Task Icon -->
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+            <tr>
+                <td style="text-align: center; padding-bottom: 16px;">
+                    <div style="display: inline-block; width: 48px; height: 48px; background-color: #dbeafe; border-radius: 50%;">
+                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" height="100%">
+                            <tr>
+                                <td style="text-align: center; vertical-align: middle; color: #2563eb; font-size: 24px;">
+                                    &#128203;
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </td>
+            </tr>
+        </table>
+
+        <!-- Greeting -->
+        <h2 style="margin: 0 0 16px 0; font-size: 20px; line-height: 28px; color: #1f2937; font-weight: 600; font-family: Arial, sans-serif; text-align: center;">
+            New Task Assigned
+        </h2>
+
+        <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 24px; color: #4b5563; font-family: Arial, sans-serif;">
+            Hello {{ recipient_name }},
+        </p>
+
+        <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 24px; color: #4b5563; font-family: Arial, sans-serif;">
+            A new task has been assigned to you as part of a workflow.
+        </p>
+
+        <!-- Task Details Card -->
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f9fafb; border-radius: 8px; margin-bottom: 24px;">
+            <tr>
+                <td style="padding: 20px;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                        <tr>
+                            <td style="font-family: Arial, sans-serif; font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; padding-bottom: 8px;">
+                                Task Details
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="font-family: Arial, sans-serif; font-size: 18px; font-weight: 600; color: #1f2937; padding-bottom: 16px;">
+                                {{ task_name }}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="padding: 8px 0; border-top: 1px solid #e5e7eb;">
+                                            <span style="font-family: Arial, sans-serif; font-size: 14px; color: #6b7280;">Workflow:</span>
+                                            <span style="font-family: Arial, sans-serif; font-size: 14px; color: #1f2937; float: right;">{{ workflow_name }}</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 8px 0; border-top: 1px solid #e5e7eb;">
+                                            <span style="font-family: Arial, sans-serif; font-size: 14px; color: #6b7280;">Document:</span>
+                                            <span style="font-family: Arial, sans-serif; font-size: 14px; color: #1f2937; float: right;">{{ document_title }}</span>
+                                        </td>
+                                    </tr>
+                                    {% if task_due_date %}
+                                    <tr>
+                                        <td style="padding: 8px 0; border-top: 1px solid #e5e7eb;">
+                                            <span style="font-family: Arial, sans-serif; font-size: 14px; color: #6b7280;">Due Date:</span>
+                                            <span style="font-family: Arial, sans-serif; font-size: 14px; color: #dc2626; font-weight: 600; float: right;">{{ task_due_date|date:"M d, Y H:i" }}</span>
+                                        </td>
+                                    </tr>
+                                    {% endif %}
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+
+        <!-- CTA Button -->
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+            <tr>
+                <td style="text-align: center; padding-bottom: 24px;">
+                    <a href="{{ task_url }}" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: #ffffff; font-family: Arial, sans-serif; font-size: 16px; font-weight: 600; text-decoration: none; border-radius: 8px; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.3);">
+                        View Task
+                    </a>
+                </td>
+            </tr>
+        </table>
+
+        <p style="margin: 0; font-size: 14px; line-height: 20px; color: #6b7280; font-family: Arial, sans-serif; text-align: center;">
+            Please review and take action on this task at your earliest convenience.
+        </p>
+    </td>
+</tr>
+{% endblock %}

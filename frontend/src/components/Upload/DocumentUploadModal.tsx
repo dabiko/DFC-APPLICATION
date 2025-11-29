@@ -45,13 +45,15 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
   const [isDragging, setIsDragging] = useState(false)
   const [uploads, setUploads] = useState<FileUploadItem[]>([])
   const [metadata, setMetadata] = useState<Partial<CreateDocumentMetadata>>({
-    confidentialityLevel: 'INTERNAL',  // Backend expects UPPERCASE
+    confidentialityLevel: 'INTERNAL', // Backend expects UPPERCASE
     retentionPeriod: '5_years',
     tags: [],
     date: format(new Date(), 'yyyy-MM-dd'),
   })
   const [metadataErrors, setMetadataErrors] = useState<Record<string, string>>({})
-  const [currentStep, setCurrentStep] = useState<'select-files' | 'metadata' | 'uploading'>('select-files')
+  const [currentStep, setCurrentStep] = useState<'select-files' | 'metadata' | 'uploading'>(
+    'select-files'
+  )
   const [showAdvanced, setShowAdvanced] = useState(false)
 
   // Reset state when modal opens/closes
@@ -59,7 +61,7 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
     if (!isOpen) {
       setUploads([])
       setMetadata({
-        confidentialityLevel: 'INTERNAL',  // Backend expects UPPERCASE
+        confidentialityLevel: 'INTERNAL', // Backend expects UPPERCASE
         retentionPeriod: '5_years',
         tags: [],
         date: format(new Date(), 'yyyy-MM-dd'),
@@ -72,14 +74,14 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
 
   // Handle file selection
   const handleFilesSelected = useCallback((files: File[]) => {
-    const newUploads: FileUploadItem[] = files.map(file => ({
+    const newUploads: FileUploadItem[] = files.map((file) => ({
       id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       file,
       status: 'pending',
       progress: 0,
       previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
     }))
-    setUploads(prev => [...prev, ...newUploads])
+    setUploads((prev) => [...prev, ...newUploads])
   }, [])
 
   // Handle drag and drop
@@ -100,97 +102,104 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
     e.stopPropagation()
   }, [])
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragging(false)
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      setIsDragging(false)
 
-    const files = Array.from(e.dataTransfer.files)
-    if (files.length > 0) {
-      handleFilesSelected(files)
-    }
-  }, [handleFilesSelected])
+      const files = Array.from(e.dataTransfer.files)
+      if (files.length > 0) {
+        handleFilesSelected(files)
+      }
+    },
+    [handleFilesSelected]
+  )
 
   // Handle file input change
-  const handleFileInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (files && files.length > 0) {
-      handleFilesSelected(Array.from(files))
-    }
-    e.target.value = '' // Reset input
-  }, [handleFilesSelected])
+  const handleFileInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files
+      if (files && files.length > 0) {
+        handleFilesSelected(Array.from(files))
+      }
+      e.target.value = '' // Reset input
+    },
+    [handleFilesSelected]
+  )
 
   // Remove upload
   const handleRemoveUpload = useCallback((id: string) => {
-    setUploads(prev => prev.filter(upload => upload.id !== id))
+    setUploads((prev) => prev.filter((upload) => upload.id !== id))
   }, [])
 
   // Cancel upload
   const handleCancelUpload = useCallback((id: string) => {
-    setUploads(prev =>
-      prev.map(upload =>
+    setUploads((prev) =>
+      prev.map((upload) =>
         upload.id === id ? { ...upload, status: 'cancelled' as const } : upload
       )
     )
   }, [])
 
   // Retry upload
-  const handleRetryUpload = useCallback(async (id: string) => {
-    const upload = uploads.find(u => u.id === id)
-    if (!upload) return
+  const handleRetryUpload = useCallback(
+    async (id: string) => {
+      const upload = uploads.find((u) => u.id === id)
+      if (!upload) return
 
-    // Reset status to pending
-    setUploads(prev =>
-      prev.map(u =>
-        u.id === id ? { ...u, status: 'pending' as const, progress: 0, error: undefined } : u
-      )
-    )
-
-    // Start upload immediately
-    try {
-      setUploads(prev =>
-        prev.map(u => (u.id === id ? { ...u, status: 'uploading' as const, startedAt: new Date().toISOString() } : u))
+      // Reset status to pending
+      setUploads((prev) =>
+        prev.map((u) =>
+          u.id === id ? { ...u, status: 'pending' as const, progress: 0, error: undefined } : u
+        )
       )
 
-      const response = await documentService.uploadDocument({
-        file: upload.file,
-        folderId: folderId || null,
-        metadata: metadata as CreateDocumentMetadata,
-        onProgress: (progress, uploadSpeed, timeRemaining) => {
-          setUploads(prev =>
-            prev.map(u =>
-              u.id === id
-                ? { ...u, progress, uploadSpeed, timeRemaining }
-                : u
-            )
+      // Start upload immediately
+      try {
+        setUploads((prev) =>
+          prev.map((u) =>
+            u.id === id
+              ? { ...u, status: 'uploading' as const, startedAt: new Date().toISOString() }
+              : u
           )
-        },
-      })
+        )
 
-      setUploads(prev =>
-        prev.map(u =>
-          u.id === id
-            ? {
-                ...u,
-                status: 'completed' as const,
-                progress: 100,
-                documentId: response.id,
-                completedAt: new Date().toISOString(),
-              }
-            : u
+        const response = await documentService.uploadDocument({
+          file: upload.file,
+          folderId: folderId || null,
+          metadata: metadata as CreateDocumentMetadata,
+          onProgress: (progress, uploadSpeed, timeRemaining) => {
+            setUploads((prev) =>
+              prev.map((u) => (u.id === id ? { ...u, progress, uploadSpeed, timeRemaining } : u))
+            )
+          },
+        })
+
+        setUploads((prev) =>
+          prev.map((u) =>
+            u.id === id
+              ? {
+                  ...u,
+                  status: 'completed' as const,
+                  progress: 100,
+                  documentId: response.id,
+                  completedAt: new Date().toISOString(),
+                }
+              : u
+          )
         )
-      )
-    } catch (error) {
-      const errorMessage = documentService.handleDocumentError(error)
-      setUploads(prev =>
-        prev.map(u =>
-          u.id === id
-            ? { ...u, status: 'error' as const, error: errorMessage }
-            : u
+      } catch (error) {
+        const errorMessage = documentService.handleDocumentError(error)
+        setUploads((prev) =>
+          prev.map((u) =>
+            u.id === id ? { ...u, status: 'error' as const, error: errorMessage } : u
+          )
         )
-      )
-    }
-  }, [uploads, metadata, folderId])
+      }
+    },
+    [uploads, metadata, folderId]
+  )
 
   // Validate metadata
   const validateMetadata = (): boolean => {
@@ -203,7 +212,8 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
     if (!metadata.date) errors.date = 'Date is required'
     if (!metadata.creator?.trim()) errors.creator = 'Creator is required'
     if (!metadata.department) errors.department = 'Department is required'
-    if (!metadata.confidentialityLevel) errors.confidentialityLevel = 'Confidentiality level is required'
+    if (!metadata.confidentialityLevel)
+      errors.confidentialityLevel = 'Confidentiality level is required'
     if (!metadata.retentionPeriod) errors.retentionPeriod = 'Retention period is required'
 
     if (metadata.retentionPeriod === 'custom' && !metadata.customRetentionYears) {
@@ -241,8 +251,12 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
 
       try {
         // Update status to uploading
-        setUploads(prev =>
-          prev.map(u => (u.id === upload.id ? { ...u, status: 'uploading' as const, startedAt: new Date().toISOString() } : u))
+        setUploads((prev) =>
+          prev.map((u) =>
+            u.id === upload.id
+              ? { ...u, status: 'uploading' as const, startedAt: new Date().toISOString() }
+              : u
+          )
         )
 
         const response = await documentService.uploadDocument({
@@ -250,19 +264,17 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
           folderId: folderId || null,
           metadata: metadata as CreateDocumentMetadata,
           onProgress: (progress, uploadSpeed, timeRemaining) => {
-            setUploads(prev =>
-              prev.map(u =>
-                u.id === upload.id
-                  ? { ...u, progress, uploadSpeed, timeRemaining }
-                  : u
+            setUploads((prev) =>
+              prev.map((u) =>
+                u.id === upload.id ? { ...u, progress, uploadSpeed, timeRemaining } : u
               )
             )
           },
         })
 
         // Update status to completed
-        setUploads(prev =>
-          prev.map(u =>
+        setUploads((prev) =>
+          prev.map((u) =>
             u.id === upload.id
               ? {
                   ...u,
@@ -298,8 +310,8 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
             documentType: duplicateError.existingDocument.documentType,
           }
 
-          setUploads(prev =>
-            prev.map(u =>
+          setUploads((prev) =>
+            prev.map((u) =>
               u.id === upload.id
                 ? {
                     ...u,
@@ -321,11 +333,9 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
           const errorMessage = documentService.handleDocumentError(error)
 
           // Update status to error
-          setUploads(prev =>
-            prev.map(u =>
-              u.id === upload.id
-                ? { ...u, status: 'error' as const, error: errorMessage }
-                : u
+          setUploads((prev) =>
+            prev.map((u) =>
+              u.id === upload.id ? { ...u, status: 'error' as const, error: errorMessage } : u
             )
           )
 
@@ -352,7 +362,7 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
 
   // Update metadata field
   const handleMetadataChange = useCallback((field: keyof CreateDocumentMetadata, value: any) => {
-    setMetadata(prev => {
+    setMetadata((prev) => {
       const updated = { ...prev, [field]: value }
 
       // Auto-update retention period based on document type
@@ -369,7 +379,7 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
     })
 
     // Clear error for this field
-    setMetadataErrors(prev => {
+    setMetadataErrors((prev) => {
       const newErrors = { ...prev }
       delete newErrors[field]
       return newErrors
@@ -377,134 +387,150 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
   }, [])
 
   // Add tag
-  const handleAddTag = useCallback((tag: string) => {
-    if (tag.trim() && !metadata.tags?.includes(tag.trim())) {
-      setMetadata(prev => ({
-        ...prev,
-        tags: [...(prev.tags || []), tag.trim()],
-      }))
-    }
-  }, [metadata.tags])
+  const handleAddTag = useCallback(
+    (tag: string) => {
+      if (tag.trim() && !metadata.tags?.includes(tag.trim())) {
+        setMetadata((prev) => ({
+          ...prev,
+          tags: [...(prev.tags || []), tag.trim()],
+        }))
+      }
+    },
+    [metadata.tags]
+  )
 
   // Remove tag
   const handleRemoveTag = useCallback((tag: string) => {
-    setMetadata(prev => ({
+    setMetadata((prev) => ({
       ...prev,
-      tags: (prev.tags || []).filter(t => t !== tag),
+      tags: (prev.tags || []).filter((t) => t !== tag),
     }))
   }, [])
 
   // Create shortcut handler for duplicate files
-  const handleCreateShortcut = useCallback(async (uploadId: string, documentId: string) => {
-    if (!folderId) {
-      // Cannot create shortcut at root level
-      setUploads(prev =>
-        prev.map(u =>
-          u.id === uploadId
-            ? { ...u, status: 'error' as const, error: 'Cannot create shortcut at root level' }
-            : u
+  const handleCreateShortcut = useCallback(
+    async (uploadId: string, documentId: string) => {
+      if (!folderId) {
+        // Cannot create shortcut at root level
+        setUploads((prev) =>
+          prev.map((u) =>
+            u.id === uploadId
+              ? { ...u, status: 'error' as const, error: 'Cannot create shortcut at root level' }
+              : u
+          )
         )
-      )
-      return
-    }
-
-    try {
-      // Update status to show we're creating shortcut
-      setUploads(prev =>
-        prev.map(u =>
-          u.id === uploadId
-            ? { ...u, status: 'processing' as const, error: undefined }
-            : u
-        )
-      )
-
-      // Create the shortcut
-      await documentService.createShortcut(documentId, folderId)
-
-      // Mark as completed
-      setUploads(prev =>
-        prev.map(u =>
-          u.id === uploadId
-            ? {
-                ...u,
-                status: 'completed' as const,
-                documentId: documentId, // Reference to original document
-                completedAt: new Date().toISOString(),
-              }
-            : u
-        )
-      )
-
-      // Trigger refresh callback so parent component refreshes the folder
-      if (onUploadComplete) {
-        onUploadComplete({
-          total: 1,
-          successful: 1,
-          failed: 0,
-          results: [{
-            success: true,
-            documentId: documentId,
-            file: uploads.find(u => u.id === uploadId)?.file as File,
-          }],
-        })
+        return
       }
-    } catch (error) {
-      const errorMessage = documentService.handleDocumentError(error)
-      setUploads(prev =>
-        prev.map(u =>
-          u.id === uploadId
-            ? { ...u, status: 'error' as const, error: `Failed to create shortcut: ${errorMessage}` }
-            : u
+
+      try {
+        // Update status to show we're creating shortcut
+        setUploads((prev) =>
+          prev.map((u) =>
+            u.id === uploadId ? { ...u, status: 'processing' as const, error: undefined } : u
+          )
         )
-      )
-    }
-  }, [folderId, onUploadComplete, uploads])
+
+        // Create the shortcut
+        await documentService.createShortcut(documentId, folderId)
+
+        // Mark as completed
+        setUploads((prev) =>
+          prev.map((u) =>
+            u.id === uploadId
+              ? {
+                  ...u,
+                  status: 'completed' as const,
+                  documentId: documentId, // Reference to original document
+                  completedAt: new Date().toISOString(),
+                }
+              : u
+          )
+        )
+
+        // Trigger refresh callback so parent component refreshes the folder
+        if (onUploadComplete) {
+          onUploadComplete({
+            total: 1,
+            successful: 1,
+            failed: 0,
+            results: [
+              {
+                success: true,
+                documentId: documentId,
+                file: uploads.find((u) => u.id === uploadId)?.file as File,
+              },
+            ],
+          })
+        }
+      } catch (error) {
+        const errorMessage = documentService.handleDocumentError(error)
+        setUploads((prev) =>
+          prev.map((u) =>
+            u.id === uploadId
+              ? {
+                  ...u,
+                  status: 'error' as const,
+                  error: `Failed to create shortcut: ${errorMessage}`,
+                }
+              : u
+          )
+        )
+      }
+    },
+    [folderId, onUploadComplete, uploads]
+  )
 
   // Check if all uploads are complete
-  const allUploadsComplete = uploads.length > 0 && uploads.every(u =>
-    u.status === 'completed' || u.status === 'error' || u.status === 'cancelled' || u.status === 'duplicate'
-  )
-  const hasSuccessfulUploads = uploads.some(u => u.status === 'completed')
-  const hasErrors = uploads.some(u => u.status === 'error')
-  const hasDuplicates = uploads.some(u => u.status === 'duplicate')
-  const failedUploadsCount = uploads.filter(u => u.status === 'error').length
-  const duplicateUploadsCount = uploads.filter(u => u.status === 'duplicate').length
+  const allUploadsComplete =
+    uploads.length > 0 &&
+    uploads.every(
+      (u) =>
+        u.status === 'completed' ||
+        u.status === 'error' ||
+        u.status === 'cancelled' ||
+        u.status === 'duplicate'
+    )
+  const hasSuccessfulUploads = uploads.some((u) => u.status === 'completed')
+  const hasErrors = uploads.some((u) => u.status === 'error')
+  const hasDuplicates = uploads.some((u) => u.status === 'duplicate')
+  const failedUploadsCount = uploads.filter((u) => u.status === 'error').length
+  const duplicateUploadsCount = uploads.filter((u) => u.status === 'duplicate').length
 
   // Dismiss all failed uploads
   const handleDismissAllFailed = useCallback(() => {
-    setUploads(prev => prev.filter(u => u.status !== 'error'))
+    setUploads((prev) => prev.filter((u) => u.status !== 'error'))
   }, [])
 
   // Retry all failed uploads
   const handleRetryAllFailed = useCallback(async () => {
-    const failedUploads = uploads.filter(u => u.status === 'error')
+    const failedUploads = uploads.filter((u) => u.status === 'error')
     for (const upload of failedUploads) {
       await handleRetryUpload(upload.id)
     }
   }, [uploads, handleRetryUpload])
 
   // Prepare Select options for lists with 5+ options
-  const documentTypeOptions = DOCUMENT_TYPES.map(type => ({
+  const documentTypeOptions = DOCUMENT_TYPES.map((type) => ({
     value: type.value,
     label: `${type.icon} ${type.label}`,
   }))
 
-  const departmentOptions = DEPARTMENTS.map(dept => ({
+  const departmentOptions = DEPARTMENTS.map((dept) => ({
     value: dept.value,
     label: dept.label,
   }))
 
-  const identifierTypeOptions = IDENTIFIER_TYPES.map(type => ({
+  const identifierTypeOptions = IDENTIFIER_TYPES.map((type) => ({
     value: type.value,
     label: type.label,
   }))
 
-  const confidentialityOptions = CONFIDENTIALITY_LEVELS.map(level => ({
+  const confidentialityOptions = CONFIDENTIALITY_LEVELS.map((level) => ({
     value: level.value,
     label: level.label,
   }))
 
-  const retentionOptions = RETENTION_PERIODS.map(period => ({
+  const retentionOptions = RETENTION_PERIODS.map((period) => ({
     value: period.value,
     label: period.label,
   }))
@@ -563,10 +589,7 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
               Upload {uploads.length} {uploads.length === 1 ? 'File' : 'Files'}
             </Button>
           </>
-        ) : uploads.length === 0 ? (
-          // Empty state - no footer buttons needed, they're in the content area
-          null
-        ) : allUploadsComplete ? (
+        ) : uploads.length === 0 ? null : allUploadsComplete ? ( // Empty state - no footer buttons needed, they're in the content area
           <>
             <div className="flex-1" />
             <Button variant="primary" onClick={onClose}>
@@ -620,7 +643,8 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
 
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
                 Supported: PDF, Word, Excel, PowerPoint, Images, and more
-                {config?.maxFileSize && ` • Max size: ${documentService.formatFileSize(config.maxFileSize)}`}
+                {config?.maxFileSize &&
+                  ` • Max size: ${documentService.formatFileSize(config.maxFileSize)}`}
               </p>
             </div>
           </div>
@@ -631,7 +655,7 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
               <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Selected Files ({uploads.length})
               </h4>
-              {uploads.map(upload => (
+              {uploads.map((upload) => (
                 <FileUploadProgress
                   key={upload.id}
                   upload={upload}
@@ -646,15 +670,17 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
 
       {/* Step 2: Metadata - Fixed: Increased padding and themed scrollbar */}
       {currentStep === 'metadata' && (
-        <div className={cn(
-          "space-y-6 max-h-[600px] overflow-y-auto px-6 py-1",
-          // Custom scrollbar styling for dark/light theme
-          "[&::-webkit-scrollbar]:w-2",
-          "[&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-gray-800",
-          "[&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-600",
-          "[&::-webkit-scrollbar-thumb]:rounded-full",
-          "[&::-webkit-scrollbar-thumb]:hover:bg-gray-400 dark:[&::-webkit-scrollbar-thumb]:hover:bg-gray-500"
-        )}>
+        <div
+          className={cn(
+            'space-y-6 max-h-[600px] overflow-y-auto px-6 py-1',
+            // Custom scrollbar styling for dark/light theme
+            '[&::-webkit-scrollbar]:w-2',
+            '[&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-gray-800',
+            '[&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-600',
+            '[&::-webkit-scrollbar-thumb]:rounded-full',
+            '[&::-webkit-scrollbar-thumb]:hover:bg-gray-400 dark:[&::-webkit-scrollbar-thumb]:hover:bg-gray-500'
+          )}
+        >
           {/* Required Fields */}
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700 pb-2">
@@ -681,7 +707,9 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
                 placeholder="Enter document title"
               />
               {metadataErrors.title && (
-                <p className="text-xs text-error-600 dark:text-error-400 mt-1">{metadataErrors.title}</p>
+                <p className="text-xs text-error-600 dark:text-error-400 mt-1">
+                  {metadataErrors.title}
+                </p>
               )}
             </div>
 
@@ -709,7 +737,10 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
             </div>
             {metadata.confidentialityLevel && (
               <p className="text-xs text-gray-500 dark:text-gray-400 -mt-2">
-                {CONFIDENTIALITY_LEVELS.find(l => l.value === metadata.confidentialityLevel)?.description}
+                {
+                  CONFIDENTIALITY_LEVELS.find((l) => l.value === metadata.confidentialityLevel)
+                    ?.description
+                }
               </p>
             )}
 
@@ -745,7 +776,9 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
                   placeholder="e.g., INV-2024-001"
                 />
                 {metadataErrors.identifier && (
-                  <p className="text-xs text-error-600 dark:text-error-400 mt-1">{metadataErrors.identifier}</p>
+                  <p className="text-xs text-error-600 dark:text-error-400 mt-1">
+                    {metadataErrors.identifier}
+                  </p>
                 )}
               </div>
             </div>
@@ -756,7 +789,9 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
                 label="Date"
                 required
                 value={metadata.date ? new Date(metadata.date) : undefined}
-                onChange={(date) => handleMetadataChange('date', date ? format(date, 'yyyy-MM-dd') : '')}
+                onChange={(date) =>
+                  handleMetadataChange('date', date ? format(date, 'yyyy-MM-dd') : '')
+                }
                 error={metadataErrors.date}
                 dateFormat="yyyy-MM-dd"
               />
@@ -780,7 +815,9 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
                   placeholder="Creator name"
                 />
                 {metadataErrors.creator && (
-                  <p className="text-xs text-error-600 dark:text-error-400 mt-1">{metadataErrors.creator}</p>
+                  <p className="text-xs text-error-600 dark:text-error-400 mt-1">
+                    {metadataErrors.creator}
+                  </p>
                 )}
               </div>
 
@@ -816,7 +853,9 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
                     type="number"
                     min="1"
                     value={metadata.customRetentionYears || ''}
-                    onChange={(e) => handleMetadataChange('customRetentionYears', parseInt(e.target.value))}
+                    onChange={(e) =>
+                      handleMetadataChange('customRetentionYears', parseInt(e.target.value))
+                    }
                     className={cn(
                       'w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100',
                       'placeholder:text-gray-400 dark:placeholder:text-gray-500',
@@ -828,7 +867,9 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
                     placeholder="Years"
                   />
                   {metadataErrors.customRetentionYears && (
-                    <p className="text-xs text-error-600 dark:text-error-400 mt-1">{metadataErrors.customRetentionYears}</p>
+                    <p className="text-xs text-error-600 dark:text-error-400 mt-1">
+                      {metadataErrors.customRetentionYears}
+                    </p>
                   )}
                 </div>
               )}
@@ -855,7 +896,7 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
               </div>
               {metadata.tags && metadata.tags.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-2">
-                  {metadata.tags.map(tag => (
+                  {metadata.tags.map((tag) => (
                     <span
                       key={tag}
                       className="inline-flex items-center gap-1 px-2 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded text-xs"
@@ -948,10 +989,7 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
                 All files have been dismissed. You can upload new files or close this dialog.
               </p>
               <div className="flex items-center gap-3">
-                <Button
-                  variant="primary"
-                  onClick={() => setCurrentStep('select-files')}
-                >
+                <Button variant="primary" onClick={() => setCurrentStep('select-files')}>
                   Upload New Files
                 </Button>
                 <Button variant="ghost" onClick={onClose}>
@@ -965,12 +1003,14 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
           {uploads.length > 0 && (
             <>
               {allUploadsComplete && (
-                <div className={cn(
-                  'flex items-start gap-3 p-4 rounded-lg',
-                  hasErrors || hasDuplicates
-                    ? 'bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-800'
-                    : 'bg-success-50 dark:bg-success-900/20 border border-success-200 dark:border-success-800'
-                )}>
+                <div
+                  className={cn(
+                    'flex items-start gap-3 p-4 rounded-lg',
+                    hasErrors || hasDuplicates
+                      ? 'bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-800'
+                      : 'bg-success-50 dark:bg-success-900/20 border border-success-200 dark:border-success-800'
+                  )}
+                >
                   {hasErrors || hasDuplicates ? (
                     <>
                       <ExclamationTriangleIcon className="w-6 h-6 text-warning-600 dark:text-warning-400 flex-shrink-0 mt-0.5" />
@@ -981,9 +1021,10 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
                             : 'Upload completed with issues'}
                         </h4>
                         <p className="text-sm text-warning-700 dark:text-warning-300 mb-3">
-                          {uploads.filter(u => u.status === 'completed').length} succeeded
+                          {uploads.filter((u) => u.status === 'completed').length} succeeded
                           {failedUploadsCount > 0 && `, ${failedUploadsCount} failed`}
-                          {duplicateUploadsCount > 0 && `, ${duplicateUploadsCount} duplicate${duplicateUploadsCount > 1 ? 's' : ''}`}
+                          {duplicateUploadsCount > 0 &&
+                            `, ${duplicateUploadsCount} duplicate${duplicateUploadsCount > 1 ? 's' : ''}`}
                         </p>
                         {hasDuplicates && (
                           <p className="text-xs text-warning-600 dark:text-warning-400 mb-3">
@@ -1025,7 +1066,7 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
                 </div>
               )}
 
-              {uploads.map(upload => (
+              {uploads.map((upload) => (
                 <FileUploadProgress
                   key={upload.id}
                   upload={upload}

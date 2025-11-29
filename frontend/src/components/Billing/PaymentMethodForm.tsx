@@ -209,7 +209,7 @@ export const PaymentMethodForm: React.FC<PaymentMethodFormProps> = ({
           autoComplete="cc-number"
           icon={
             cardBrand !== 'unknown' ? (
-              <span className="text-xs font-medium text-gray-600">
+              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
                 {getCardBrandName(cardBrand)}
               </span>
             ) : undefined
@@ -266,8 +266,8 @@ export const PaymentMethodForm: React.FC<PaymentMethodFormProps> = ({
       </div>
 
       {/* Billing Address */}
-      <div className="space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
-        <h4 className="text-sm font-semibold text-gray-900">Billing Address</h4>
+      <div className="space-y-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-4">
+        <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Billing Address</h4>
 
         <Input
           label="Address Line 1"
@@ -332,7 +332,7 @@ export const PaymentMethodForm: React.FC<PaymentMethodFormProps> = ({
         </div>
 
         {touched.billingAddress && errors.billingAddress && (
-          <p className="text-sm text-red-600">{errors.billingAddress}</p>
+          <p className="text-sm text-red-600 dark:text-red-400">{errors.billingAddress}</p>
         )}
       </div>
 
