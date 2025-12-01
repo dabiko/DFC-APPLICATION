@@ -19,6 +19,11 @@ import { FileList } from '@components/FileManagement/FileList'
 import { SortFilterBar } from '@components/FileManagement/SortFilterBar'
 import { BulkActionToolbar } from '@components/FileManagement/BulkActionToolbar'
 import { FilePreviewModal } from '@components/FileManagement/FilePreviewModal'
+import {
+  FileDetailsDrawer,
+  type FileDetailsData,
+} from '@components/FileManagement/FileDetailsDrawer'
+import { FolderDetailsDrawer, type FolderDetailsData } from '@components/Folder/FolderDetailsDrawer'
 import { FolderContextMenu } from '@components/Folder/FolderContextMenu'
 import {
   DocumentContextMenu,
@@ -57,7 +62,16 @@ import {
   getDocumentPreview,
   createShortcut,
   renameDocument,
+  getDocumentVersions,
+  downloadDocumentVersion,
+  restoreDocumentVersion,
+  getDocumentAccess,
+  getDocumentActivity,
+  getFolderActivity,
   type DocumentFromBackend,
+  type DocumentVersionFromBackend,
+  type DocumentAccessFromBackend,
+  type ActivityFromBackend,
 } from '@/services/documentService'
 import {
   toggleFolderFavorite,
@@ -115,6 +129,14 @@ export const FolderContentView: FC = () => {
     null
   )
   const [documentToRename, setDocumentToRename] = useState<FileListItem | null>(null)
+
+  // File details drawer state
+  const [fileDetailsDrawerOpen, setFileDetailsDrawerOpen] = useState(false)
+  const [fileDetailsData, setFileDetailsData] = useState<FileDetailsData | null>(null)
+
+  // Folder details drawer state
+  const [folderDetailsDrawerOpen, setFolderDetailsDrawerOpen] = useState(false)
+  const [folderDetailsData, setFolderDetailsData] = useState<FolderDetailsData | null>(null)
 
   // Fetch folders on mount
   useEffect(() => {
@@ -368,13 +390,14 @@ export const FolderContentView: FC = () => {
     setActiveOperation(operation)
   }, [])
 
-  // Handle item click (single click) - open preview for files
-  const handleItemClick = useCallback(async (item: FileListItem) => {
-    // Only preview files, not folders
-    if (item.type === 'folder') {
-      return
-    }
+  // Handle item click (single click) - just for selection, no preview
+  const handleItemClick = useCallback((_item: FileListItem) => {
+    // Single click is handled by FileList for selection
+    // No action needed here - the selection is managed by onSelectionChange
+  }, [])
 
+  // Open file preview modal (called from drawer or context menu)
+  const openFilePreview = useCallback(async (item: FileListItem) => {
     // Get the document ID (for shortcuts, use the original document ID)
     const docId = item.isShortcut ? item.originalDocumentId : item.id
     if (!docId) return
@@ -391,17 +414,71 @@ export const FolderContentView: FC = () => {
     }
   }, [])
 
-  // Handle item double click (navigate into folder or open file preview)
+  // Convert FileListItem to FileDetailsData
+  const convertToFileDetailsData = useCallback(
+    (item: FileListItem): FileDetailsData => {
+      // Find the original document from documents array for additional data
+      const originalDoc = documents.find(
+        (doc) => doc.id === item.id || doc.id === item.originalDocumentId
+      )
+
+      // Map confidentiality level back to backend format
+      const confidentialityMap: Record<string, string> = {
+        Public: 'PUBLIC',
+        Internal: 'INTERNAL',
+        Confidential: 'CONFIDENTIAL',
+        'Highly Confidential': 'HIGHLY_CONFIDENTIAL',
+      }
+
+      return {
+        id: item.isShortcut ? item.originalDocumentId! : item.id,
+        title: item.name,
+        fileName: item.name,
+        fileSize: item.fileSize || 0,
+        fileType: item.mimeType || '',
+        documentType: originalDoc?.document_type || 'OTHER',
+        confidentialityLevel: confidentialityMap[item.confidentialityLevel] || 'INTERNAL',
+        folderId: folderId,
+        folderName: currentFolder?.name || 'Root',
+        folderPath: currentFolder?.path || '/',
+        department: currentFolder?.departmentName || null,
+        description: originalDoc?.description || undefined,
+        keywords: item.tags,
+        identifier: originalDoc?.identifier || undefined,
+        versionNumber: item.currentVersion || 1,
+        createdAt: item.createdAt,
+        createdBy: item.createdBy,
+        modifiedAt: item.modifiedAt,
+        modifiedBy: item.modifiedBy,
+        isLocked: item.isLocked,
+        isFavorite: item.isFavorite,
+        isShared: item.isShared,
+        hasVersions: item.hasVersions,
+        // Permissions
+        canView: item.permissions.canView,
+        canEdit: item.permissions.canEdit,
+        canDelete: item.permissions.canDelete,
+        canDownload: item.permissions.canDownload,
+        canShare: item.permissions.canShare,
+      }
+    },
+    [documents, folderId, currentFolder]
+  )
+
+  // Handle item double click (navigate into folder or open file details drawer)
   const handleItemDoubleClick = useCallback(
     (item: FileListItem) => {
       if (item.type === 'folder') {
+        // Double-click on folder navigates into it
         navigate(`/dashboard?folder=${item.id}`)
       } else {
-        // Open file preview for documents
-        handleItemClick(item)
+        // Double-click on file opens the details drawer
+        const fileDetails = convertToFileDetailsData(item)
+        setFileDetailsData(fileDetails)
+        setFileDetailsDrawerOpen(true)
       }
     },
-    [navigate, handleItemClick]
+    [navigate, convertToFileDetailsData]
   )
 
   // Handle selection change
@@ -499,12 +576,51 @@ export const FolderContentView: FC = () => {
           console.error('Failed to toggle folder favorite:', error)
           toast.error('Failed to update favorites. Please try again.')
         }
+      } else if (operation === 'properties' && contextMenuFolder) {
+        // Open folder details drawer
+        const folderDetails: FolderDetailsData = {
+          id: contextMenuFolder.id,
+          name: contextMenuFolder.name,
+          path: contextMenuFolder.path,
+          description: contextMenuFolder.description,
+          confidentiality:
+            contextMenuFolder.confidentiality.toLowerCase() as FolderDetailsData['confidentiality'],
+          parentId: contextMenuFolder.parentId,
+          parentName: allFolders.find((f) => f.id === contextMenuFolder.parentId)?.name || null,
+          department: contextMenuFolder.departmentName || null,
+          isLocked: contextMenuFolder.isLocked,
+          isFavorite: favoriteFolderIds.has(contextMenuFolder.id),
+          isShared: false,
+          childrenCount: contextMenuFolder.childrenCount || 0,
+          documentCount: contextMenuFolder.documentCount || 0,
+          createdAt: contextMenuFolder.createdAt,
+          createdBy: contextMenuFolder.createdBy,
+          modifiedAt: contextMenuFolder.modifiedAt,
+          modifiedBy: contextMenuFolder.modifiedBy,
+          permissions: {
+            canView: contextMenuFolder.permissions.canView,
+            canEdit: contextMenuFolder.permissions.canEdit,
+            canDelete: contextMenuFolder.permissions.canDelete,
+            canManage: contextMenuFolder.permissions.canManage,
+            canCreateSubfolder: contextMenuFolder.permissions.canEdit,
+            canUploadDocuments: contextMenuFolder.permissions.canEdit,
+          },
+        }
+        setFolderDetailsData(folderDetails)
+        setFolderDetailsDrawerOpen(true)
       } else if (contextMenuFolder) {
         handleFolderOperation(operation, contextMenuFolder)
       }
       closeContextMenu()
     },
-    [contextMenuFolder, handleFolderOperation, closeContextMenu, dispatch]
+    [
+      contextMenuFolder,
+      handleFolderOperation,
+      closeContextMenu,
+      dispatch,
+      allFolders,
+      favoriteFolderIds,
+    ]
   )
 
   // Handle document context menu action
@@ -533,7 +649,7 @@ export const FolderContentView: FC = () => {
 
         case 'preview':
           // Open preview modal
-          handleItemClick(item)
+          openFilePreview(item)
           break
 
         case 'download':
@@ -626,7 +742,7 @@ export const FolderContentView: FC = () => {
           break
       }
     },
-    [navigate, handleItemClick, closeContextMenu]
+    [navigate, openFilePreview, closeContextMenu]
   )
 
   // Close context menu on outside click
@@ -1243,6 +1359,148 @@ export const FolderContentView: FC = () => {
         }}
       />
 
+      {/* Folder Details Drawer */}
+      <FolderDetailsDrawer
+        open={folderDetailsDrawerOpen}
+        onClose={() => {
+          setFolderDetailsDrawerOpen(false)
+          setFolderDetailsData(null)
+        }}
+        folder={folderDetailsData}
+        onOpen={(folderId) => {
+          // Navigate to folder
+          navigate(`/dashboard?folder=${folderId}`)
+        }}
+        onShare={(folderId) => {
+          // Close drawer and open share modal
+          const folder = allFolders.find((f) => f.id === folderId)
+          if (folder) {
+            setFolderDetailsDrawerOpen(false)
+            setFolderToShare(folder)
+          }
+        }}
+        onRename={(folderId) => {
+          // Close drawer and open rename modal
+          const folder = allFolders.find((f) => f.id === folderId)
+          if (folder) {
+            setFolderDetailsDrawerOpen(false)
+            setOperationFolder(folder)
+            setActiveOperation('rename')
+          }
+        }}
+        onMove={(folderId) => {
+          // Close drawer and open move modal
+          const folder = allFolders.find((f) => f.id === folderId)
+          if (folder) {
+            setFolderDetailsDrawerOpen(false)
+            setOperationFolder(folder)
+            setActiveOperation('move')
+          }
+        }}
+        onDelete={(folderId) => {
+          // Close drawer and open delete modal
+          const folder = allFolders.find((f) => f.id === folderId)
+          if (folder) {
+            setFolderDetailsDrawerOpen(false)
+            setOperationFolder(folder)
+            setActiveOperation('delete')
+          }
+        }}
+        onToggleFavorite={async (folderId) => {
+          // Toggle folder favorite status
+          try {
+            const result = await toggleFolderFavorite(folderId)
+            setFavoriteFolderIds((prev) => {
+              const newSet = new Set(prev)
+              if (result.is_favorite) {
+                newSet.add(folderId)
+              } else {
+                newSet.delete(folderId)
+              }
+              return newSet
+            })
+            // Update the drawer data
+            if (folderDetailsData) {
+              setFolderDetailsData({ ...folderDetailsData, isFavorite: result.is_favorite })
+            }
+            if (result.is_favorite) {
+              toast.success('Added to favorites')
+            } else {
+              toast.success('Removed from favorites')
+            }
+          } catch (error) {
+            console.error('Failed to toggle favorite:', error)
+            toast.error('Failed to update favorites. Please try again.')
+          }
+        }}
+        onToggleLock={async (folderId) => {
+          // Toggle folder lock status
+          try {
+            if (folderDetailsData?.isLocked) {
+              await folderService.unlockFolder(folderId)
+              if (folderDetailsData) {
+                setFolderDetailsData({ ...folderDetailsData, isLocked: false })
+              }
+              toast.success('Folder unlocked')
+            } else {
+              await folderService.lockFolder(folderId)
+              if (folderDetailsData) {
+                setFolderDetailsData({ ...folderDetailsData, isLocked: true })
+              }
+              toast.success('Folder locked')
+            }
+            // Refresh folders
+            await dispatch(fetchFolders({})).unwrap()
+          } catch (error) {
+            console.error('Failed to toggle lock:', error)
+            toast.error('Failed to update lock status. Please try again.')
+          }
+        }}
+        onCreateSubfolder={(folderId) => {
+          // Close drawer and open create folder modal
+          const folder = allFolders.find((f) => f.id === folderId)
+          if (folder) {
+            setFolderDetailsDrawerOpen(false)
+            setOperationFolder(folder)
+            setShowCreateFolder(true)
+          }
+        }}
+        onUploadDocuments={() => {
+          // Close drawer and open upload modal
+          setFolderDetailsDrawerOpen(false)
+          setShowUploadModal(true)
+        }}
+        onLoadAccess={async (folderId) => {
+          // Load folder access/permissions from API
+          // Note: Folders may use the same or similar permissions endpoint
+          try {
+            // For now, return empty as folder-specific permissions may need backend work
+            // The folder permissions are typically inherited or set at creation
+            return []
+          } catch (error) {
+            console.error('Failed to load folder access:', error)
+            return []
+          }
+        }}
+        onLoadActivity={async (folderId) => {
+          // Load folder activity/audit logs from API
+          try {
+            const activities = await getFolderActivity(folderId)
+            return activities.map((a) => ({
+              id: a.id,
+              action: a.action,
+              performedBy: a.user || 'System',
+              performedAt: a.timestamp,
+              details: a.details || a.error_message,
+            }))
+          } catch (error) {
+            console.error('Failed to load folder activity:', error)
+            toast.error('Failed to load activity history')
+            return []
+          }
+        }}
+      />
+
       {/* Share Folder Modal */}
       <ShareFolderModal
         isOpen={!!folderToShare}
@@ -1300,6 +1558,16 @@ export const FolderContentView: FC = () => {
         onClose={() => setShowUploadModal(false)}
         onUploadComplete={handleUploadComplete}
         folderId={folderId}
+        folderInfo={
+          currentFolder
+            ? {
+                name: currentFolder.name,
+                departmentId: currentFolder.departmentId || '',
+                departmentName: currentFolder.departmentName || '',
+                path: currentFolder.path,
+              }
+            : undefined
+        }
         requireMetadata={true}
       />
 
@@ -1336,6 +1604,175 @@ export const FolderContentView: FC = () => {
         isOpen={!!documentToShare}
         item={documentToShare}
         onClose={() => setDocumentToShare(null)}
+      />
+
+      {/* File Details Drawer */}
+      <FileDetailsDrawer
+        open={fileDetailsDrawerOpen}
+        onClose={() => {
+          setFileDetailsDrawerOpen(false)
+          setFileDetailsData(null)
+        }}
+        file={fileDetailsData}
+        onPreview={(fileId) => {
+          // Close drawer and open preview modal
+          setFileDetailsDrawerOpen(false)
+          const item = fileListItems.find((i) => i.id === fileId && i.type === 'file')
+          if (item) {
+            openFilePreview(item)
+          }
+        }}
+        onDownload={async (fileId) => {
+          try {
+            const blob = await downloadDocument(fileId)
+            const url = window.URL.createObjectURL(blob)
+            const link = document.createElement('a')
+            link.href = url
+            link.download = fileDetailsData?.fileName || 'download'
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+            window.URL.revokeObjectURL(url)
+            toast.success(`Downloading "${fileDetailsData?.fileName || 'file'}"`)
+          } catch (error) {
+            console.error('Download failed:', error)
+            toast.error('Failed to download file. Please try again.')
+          }
+        }}
+        onShare={(fileId) => {
+          // Close drawer and open share modal
+          const item = fileListItems.find((i) => i.id === fileId && i.type === 'file')
+          if (item) {
+            setFileDetailsDrawerOpen(false)
+            setDocumentToShare(item)
+          }
+        }}
+        onMove={(fileId) => {
+          // Close drawer and open move modal
+          const item = fileListItems.find((i) => i.id === fileId && i.type === 'file')
+          if (item) {
+            setFileDetailsDrawerOpen(false)
+            setDocumentToMove(item)
+          }
+        }}
+        onDelete={() => {
+          // TODO: Implement delete with confirmation
+          toast.info('Delete feature coming soon')
+        }}
+        onToggleFavorite={async (fileId) => {
+          // Toggle document favorite status
+          try {
+            const result = await toggleDocumentFavorite(fileId)
+            setFavoriteDocumentIds((prev) => {
+              const newSet = new Set(prev)
+              if (result.is_favorite) {
+                newSet.add(fileId)
+              } else {
+                newSet.delete(fileId)
+              }
+              return newSet
+            })
+            // Update the drawer data
+            if (fileDetailsData) {
+              setFileDetailsData({ ...fileDetailsData, isFavorite: result.is_favorite })
+            }
+            if (result.is_favorite) {
+              toast.success('Added to favorites')
+            } else {
+              toast.success('Removed from favorites')
+            }
+          } catch (error) {
+            console.error('Failed to toggle favorite:', error)
+            toast.error('Failed to update favorites. Please try again.')
+          }
+        }}
+        onLoadVersions={async (documentId) => {
+          // Load document versions from API
+          try {
+            const versions = await getDocumentVersions(documentId)
+            return versions.map((v) => ({
+              id: v.id,
+              versionNumber: v.version_number,
+              fileName: v.file_name,
+              fileSize: v.file_size,
+              createdAt: v.created_at,
+              createdBy: v.created_by_name || v.created_by,
+              changeDescription: v.change_description,
+              isCurrent: v.is_current,
+            }))
+          } catch (error) {
+            console.error('Failed to load versions:', error)
+            toast.error('Failed to load version history')
+            return []
+          }
+        }}
+        onLoadAccess={async (documentId) => {
+          // Load document access/permissions from API
+          try {
+            const accessList = await getDocumentAccess(documentId)
+            return accessList.map((a) => ({
+              id: a.id,
+              userId: a.user_id,
+              userName: a.user_name,
+              userEmail: a.user_email,
+              permission: a.permission,
+              grantedAt: a.granted_at,
+              grantedBy: a.granted_by,
+            }))
+          } catch (error) {
+            console.error('Failed to load access list:', error)
+            // Don't show error toast for access - may not have permissions endpoint
+            return []
+          }
+        }}
+        onLoadActivity={async (documentId) => {
+          // Load document activity/audit logs from API
+          try {
+            const activities = await getDocumentActivity(documentId)
+            return activities.map((a) => ({
+              id: a.id,
+              action: a.action,
+              performedBy: a.user || 'System',
+              performedAt: a.timestamp,
+              details: a.details || a.error_message,
+            }))
+          } catch (error) {
+            console.error('Failed to load activity:', error)
+            toast.error('Failed to load activity history')
+            return []
+          }
+        }}
+        onVersionDownload={async (documentId, versionId) => {
+          // Download a specific version
+          try {
+            const blob = await downloadDocumentVersion(documentId, versionId)
+            const url = window.URL.createObjectURL(blob)
+            const link = document.createElement('a')
+            link.href = url
+            link.download = `version_${versionId}_${fileDetailsData?.fileName || 'download'}`
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+            window.URL.revokeObjectURL(url)
+            toast.success('Downloading version...')
+          } catch (error) {
+            console.error('Failed to download version:', error)
+            toast.error('Failed to download version')
+          }
+        }}
+        onVersionRestore={async (documentId, versionId) => {
+          // Restore a specific version
+          try {
+            await restoreDocumentVersion(documentId, versionId)
+            toast.success('Version restored successfully')
+            // Refresh the document list
+            const docs = await getDocumentsInFolder(folderId)
+            setDocuments(docs)
+          } catch (error) {
+            console.error('Failed to restore version:', error)
+            toast.error('Failed to restore version')
+          }
+        }}
       />
     </div>
   )

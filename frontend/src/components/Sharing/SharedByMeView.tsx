@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
 import {
-  DocumentTextIcon,
   UserIcon,
   LinkIcon,
   CalendarIcon,
@@ -10,7 +9,9 @@ import {
   ClockIcon,
   FunnelIcon,
   ChevronUpDownIcon,
+  DocumentTextIcon,
 } from '@heroicons/react/24/outline'
+import { FileIcon } from '@/components/FileIcon'
 import type { SharedByMeViewProps, ShareStatus } from '@/types/sharing'
 import { format } from 'date-fns'
 import { getShareStatusColor, getPermissionLabel, isShareExpiringSoon } from '@/types/sharing'
@@ -160,7 +161,7 @@ export const SharedByMeView: React.FC<SharedByMeViewProps> = ({
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="flex-shrink-0">
-                          <DocumentTextIcon className="w-10 h-10 text-gray-400" />
+                          <FileIcon fileName={item.document.name} size="lg" />
                         </div>
                         <div>
                           <div className="font-medium text-gray-900 dark:text-white">

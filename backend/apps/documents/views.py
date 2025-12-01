@@ -106,6 +106,108 @@ class DocumentUploadView(generics.CreateAPIView):
 
 @extend_schema(
     tags=['Documents'],
+    request=inline_serializer(
+        name='CheckDuplicateRequest',
+        fields={
+            'checksums': serializers.ListField(
+                child=serializers.CharField(),
+                help_text='List of SHA-256 checksums to check'
+            )
+        }
+    ),
+    responses={
+        200: inline_serializer(
+            name='CheckDuplicateResponse',
+            fields={
+                'duplicates': serializers.DictField(
+                    help_text='Map of checksum to duplicate info (null if no duplicate)'
+                )
+            }
+        ),
+    }
+)
+class CheckDuplicateView(APIView):
+    """
+    Check if files with given checksums already exist.
+
+    This endpoint allows checking multiple files at once before upload,
+    saving users time by detecting duplicates early.
+
+    Request body:
+    {
+        "checksums": ["abc123...", "def456..."]
+    }
+
+    Response:
+    {
+        "duplicates": {
+            "abc123...": {
+                "id": "uuid",
+                "title": "Existing Document",
+                "file_name": "file.pdf",
+                "folder_id": "uuid",
+                "folder_name": "Folder Name",
+                "folder_path": "/path/to/folder",
+                "confidentiality_level": "INTERNAL",
+                "document_type": "CONTRACT"
+            },
+            "def456...": null  // No duplicate found
+        }
+    }
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        checksums = request.data.get('checksums', [])
+
+        if not checksums:
+            return Response(
+                {'error': 'No checksums provided'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not isinstance(checksums, list):
+            return Response(
+                {'error': 'checksums must be a list'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Limit to prevent abuse
+        if len(checksums) > 50:
+            return Response(
+                {'error': 'Maximum 50 checksums per request'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Find existing documents with matching checksums
+        existing_docs = Document.objects.select_related('folder', 'department').filter(
+            checksum__in=checksums,
+            is_deleted=False
+        )
+
+        # Build response map
+        duplicates = {}
+        for checksum in checksums:
+            doc = next((d for d in existing_docs if d.checksum == checksum), None)
+            if doc:
+                duplicates[checksum] = {
+                    'id': str(doc.id),
+                    'title': doc.title,
+                    'file_name': doc.file_name,
+                    'folder_id': str(doc.folder_id) if doc.folder_id else None,
+                    'folder_name': doc.folder.name if doc.folder else None,
+                    'folder_path': doc.folder.path if doc.folder else None,
+                    'confidentiality_level': doc.confidentiality_level,
+                    'document_type': doc.document_type,
+                }
+            else:
+                duplicates[checksum] = None
+
+        return Response({'duplicates': duplicates})
+
+
+@extend_schema(
+    tags=['Documents'],
     parameters=[
         OpenApiParameter(
             name='folder',
@@ -394,22 +496,44 @@ class DocumentDownloadView(APIView):
             if expiration > 86400:
                 expiration = 86400
 
+            # Check if file exists before any operation
+            # For MinIO storage, check minio_object_key; for local storage, check document.file
+            has_minio_file = document.minio_object_key and document.minio_bucket
+            has_local_file = document.file and document.file.name
+
+            if not has_minio_file and not has_local_file:
+                return Response(
+                    {'error': 'File not found', 'detail': 'This document does not have an associated file. It may have been deleted from storage.'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
             if mode == 'stream':
                 # Direct file streaming through Django
-                from django.http import FileResponse
+                from django.http import FileResponse, HttpResponse
                 from wsgiref.util import FileWrapper
                 import mimetypes
 
                 try:
-                    # Open file
-                    document.file.open('rb')
-                    file_wrapper = FileWrapper(document.file)
-
                     # Determine content type
                     content_type = document.file_type or mimetypes.guess_type(document.file_name)[0] or 'application/octet-stream'
 
-                    # Create response
-                    response = FileResponse(file_wrapper, content_type=content_type)
+                    if has_minio_file:
+                        # Download from MinIO storage
+                        from apps.storage.services import storage_service
+                        file_content = storage_service.download_file(document.minio_bucket, document.minio_object_key)
+
+                        if file_content is None:
+                            return Response(
+                                {'error': 'File not found in storage'},
+                                status=status.HTTP_404_NOT_FOUND
+                            )
+
+                        response = HttpResponse(file_content, content_type=content_type)
+                    else:
+                        # Stream from local file storage (legacy)
+                        document.file.open('rb')
+                        file_wrapper = FileWrapper(document.file)
+                        response = FileResponse(file_wrapper, content_type=content_type)
 
                     # Set disposition (inline for preview, attachment for download)
                     if inline:
@@ -442,7 +566,8 @@ class DocumentDownloadView(APIView):
 
             else:
                 # Generate presigned URL (default)
-                file_key = document.file.name
+                # Prefer MinIO object key, fall back to document.file.name for legacy documents
+                file_key = document.minio_object_key if has_minio_file else document.file.name
                 download_url = generate_presigned_url(
                     file_key,
                     expiration=expiration,
@@ -488,6 +613,254 @@ class DocumentDownloadView(APIView):
                 error_message = f'Storage service error: {str(e)}'
             return Response(
                 {'error': error_message, 'detail': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+@extend_schema(
+    tags=['Documents'],
+    responses={
+        200: inline_serializer(
+            name='DocumentTextContentResponse',
+            fields={
+                'content': serializers.CharField(),
+                'file_name': serializers.CharField(),
+                'file_type': serializers.CharField(),
+                'file_size': serializers.IntegerField(),
+                'language': serializers.CharField(),
+                'line_count': serializers.IntegerField(),
+            }
+        ),
+        400: OpenApiResponse(description='File type not supported for text preview'),
+        403: OpenApiResponse(description='Permission denied'),
+        404: OpenApiResponse(description='Document not found'),
+    }
+)
+class DocumentTextContentView(APIView):
+    """
+    Get text content of a document for preview.
+
+    Supports text-based files like:
+    - Plain text (.txt, .log, .md)
+    - Code files (.py, .js, .ts, .java, .cpp, .c, .h, .css, .html, .xml, .json, .yaml, .yml)
+    - Config files (.ini, .conf, .cfg, .env)
+    - Data files (.csv, .tsv)
+
+    Returns the raw text content with metadata for syntax highlighting.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    # Supported text file extensions and their language mappings
+    SUPPORTED_EXTENSIONS = {
+        # Plain text
+        '.txt': 'text',
+        '.log': 'text',
+        '.md': 'markdown',
+        '.markdown': 'markdown',
+        '.rst': 'restructuredtext',
+
+        # Web
+        '.html': 'html',
+        '.htm': 'html',
+        '.css': 'css',
+        '.scss': 'scss',
+        '.sass': 'sass',
+        '.less': 'less',
+
+        # JavaScript/TypeScript
+        '.js': 'javascript',
+        '.jsx': 'jsx',
+        '.ts': 'typescript',
+        '.tsx': 'tsx',
+        '.mjs': 'javascript',
+        '.cjs': 'javascript',
+
+        # Python
+        '.py': 'python',
+        '.pyw': 'python',
+        '.pyx': 'python',
+
+        # Java/Kotlin
+        '.java': 'java',
+        '.kt': 'kotlin',
+        '.kts': 'kotlin',
+
+        # C/C++
+        '.c': 'c',
+        '.h': 'c',
+        '.cpp': 'cpp',
+        '.hpp': 'cpp',
+        '.cc': 'cpp',
+        '.cxx': 'cpp',
+
+        # C#
+        '.cs': 'csharp',
+
+        # Go
+        '.go': 'go',
+
+        # Rust
+        '.rs': 'rust',
+
+        # Ruby
+        '.rb': 'ruby',
+
+        # PHP
+        '.php': 'php',
+
+        # Shell
+        '.sh': 'bash',
+        '.bash': 'bash',
+        '.zsh': 'bash',
+        '.ps1': 'powershell',
+        '.bat': 'batch',
+        '.cmd': 'batch',
+
+        # Data formats
+        '.json': 'json',
+        '.xml': 'xml',
+        '.yaml': 'yaml',
+        '.yml': 'yaml',
+        '.toml': 'toml',
+        '.csv': 'csv',
+        '.tsv': 'csv',
+
+        # Config
+        '.ini': 'ini',
+        '.conf': 'text',
+        '.cfg': 'ini',
+        '.env': 'text',
+        '.properties': 'properties',
+
+        # SQL
+        '.sql': 'sql',
+
+        # Docker
+        'Dockerfile': 'dockerfile',
+        '.dockerfile': 'dockerfile',
+
+        # Other
+        '.gitignore': 'text',
+        '.editorconfig': 'ini',
+        'Makefile': 'makefile',
+        '.makefile': 'makefile',
+    }
+
+    # Maximum file size for text preview (5MB)
+    MAX_TEXT_SIZE = 5 * 1024 * 1024
+
+    def get(self, request, id):
+        """Get text content of document"""
+        try:
+            # Get document with permission check
+            user = request.user
+            document = Document.objects.select_related('department', 'owner').get(id=id, is_deleted=False)
+
+            # Check permissions
+            if not user.is_staff and document.department != user.department:
+                return Response(
+                    {'detail': 'You do not have permission to view this document'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            # Check file size
+            if document.file_size > self.MAX_TEXT_SIZE:
+                return Response(
+                    {'error': f'File too large for text preview. Maximum size is {self.MAX_TEXT_SIZE // (1024*1024)}MB'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Get file extension
+            file_name = document.file_name.lower()
+            extension = None
+
+            # Check for special filenames (like Dockerfile, Makefile)
+            base_name = file_name.split('/')[-1]
+            if base_name in self.SUPPORTED_EXTENSIONS:
+                extension = base_name
+            else:
+                # Get extension from filename
+                import os
+                _, ext = os.path.splitext(file_name)
+                extension = ext.lower() if ext else None
+
+            # Check if file type is supported
+            if not extension or extension not in self.SUPPORTED_EXTENSIONS:
+                return Response(
+                    {'error': f'File type not supported for text preview. Supported: {", ".join(sorted(set(self.SUPPORTED_EXTENSIONS.keys())))}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            language = self.SUPPORTED_EXTENSIONS[extension]
+
+            # Read file content
+            try:
+                # Check for MinIO or local file storage
+                has_minio_file = document.minio_object_key and document.minio_bucket
+                has_local_file = document.file and document.file.name
+
+                if not has_minio_file and not has_local_file:
+                    return Response(
+                        {'error': 'File not found', 'detail': 'This document does not have an associated file.'},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+
+                if has_minio_file:
+                    # Read from MinIO storage
+                    from apps.storage.services import storage_service
+                    content_bytes = storage_service.download_file(document.minio_bucket, document.minio_object_key)
+                    if content_bytes is None:
+                        return Response(
+                            {'error': 'File not found in storage'},
+                            status=status.HTTP_404_NOT_FOUND
+                        )
+                else:
+                    # Read from local file storage (legacy)
+                    document.file.open('rb')
+                    content_bytes = document.file.read()
+                    document.file.close()
+
+                # Try to decode as UTF-8, fallback to latin-1
+                try:
+                    content = content_bytes.decode('utf-8')
+                except UnicodeDecodeError:
+                    try:
+                        content = content_bytes.decode('latin-1')
+                    except UnicodeDecodeError:
+                        return Response(
+                            {'error': 'Unable to decode file content. File may be binary.'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+
+                # Count lines
+                line_count = content.count('\n') + 1 if content else 0
+
+                # Log view activity
+                from apps.documents.signals import log_document_view_activity
+                log_document_view_activity(user, document)
+
+                return Response({
+                    'content': content,
+                    'file_name': document.file_name,
+                    'file_type': document.file_type,
+                    'file_size': document.file_size,
+                    'language': language,
+                    'line_count': line_count,
+                })
+
+            except Exception as e:
+                logger.error(f"Error reading file content: {e}", exc_info=True)
+                return Response(
+                    {'error': 'Failed to read file content'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
+        except Document.DoesNotExist:
+            raise Http404('Document not found or has been deleted')
+        except Exception as e:
+            logger.error(f"Error in text content view: {e}", exc_info=True)
+            return Response(
+                {'error': 'Failed to get text content', 'detail': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 

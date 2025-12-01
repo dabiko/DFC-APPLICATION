@@ -91,7 +91,7 @@ class Document(models.Model):
     )
     file_name = models.CharField(max_length=255)
     file_size = models.BigIntegerField(help_text='File size in bytes')
-    file_type = models.CharField(max_length=50, help_text='MIME type')
+    file_type = models.CharField(max_length=100, help_text='MIME type')
     checksum = models.CharField(
         max_length=64,
         unique=True,
@@ -582,7 +582,7 @@ class DocumentVersion(models.Model):
         help_text='File size in bytes'
     )
     file_type = models.CharField(
-        max_length=50,
+        max_length=100,
         help_text='MIME type'
     )
     checksum = models.CharField(
@@ -886,7 +886,7 @@ class RecentActivity(models.Model):
         help_text='Name of the document or folder'
     )
     file_type = models.CharField(
-        max_length=50,
+        max_length=100,
         blank=True,
         help_text='MIME type (for documents only)'
     )

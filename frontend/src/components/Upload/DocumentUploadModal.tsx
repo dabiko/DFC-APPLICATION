@@ -14,21 +14,36 @@ import {
   XMarkIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
+  BuildingOfficeIcon,
+  FolderIcon,
 } from '@heroicons/react/24/outline'
 import { cn } from '@utils/cn'
 import { format } from 'date-fns'
-import documentService, { isDuplicateFileError } from '@/services/documentService'
+import documentService, {
+  isDuplicateFileError,
+  checkDuplicates,
+  type DuplicateInfo,
+} from '@/services/documentService'
+import { getDepartments, type Department } from '@/services/userManagementService'
+import { calculateFileChecksums } from '@/utils/fileChecksum'
 import type { FileUploadItem, DocumentUploadModalProps, DuplicateFileInfo } from '@/types/upload'
 import type { CreateDocumentMetadata } from '@/types/metadata'
 import {
   DOCUMENT_TYPES,
-  DEPARTMENTS,
   RETENTION_PERIODS,
   CONFIDENTIALITY_LEVELS,
   IDENTIFIER_TYPES,
   getDefaultRetentionForDocumentType,
-  getDefaultConfidentialityForDepartment,
 } from '@/constants/metadata'
+
+/** Duplicate check result for a file */
+interface FileDuplicateResult {
+  file: File
+  uploadId: string
+  checksum: string
+  isDuplicate: boolean
+  existingDocument?: DuplicateInfo
+}
 
 /**
  * DocumentUploadModal - Upload documents with metadata
@@ -38,12 +53,15 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
   onClose,
   onUploadComplete,
   folderId,
+  folderInfo,
   config,
   requireMetadata = true,
   className,
 }) => {
   const [isDragging, setIsDragging] = useState(false)
   const [uploads, setUploads] = useState<FileUploadItem[]>([])
+  const [departments, setDepartments] = useState<Department[]>([])
+  const [departmentsLoading, setDepartmentsLoading] = useState(false)
   const [metadata, setMetadata] = useState<Partial<CreateDocumentMetadata>>({
     confidentialityLevel: 'INTERNAL', // Backend expects UPPERCASE
     retentionPeriod: '5_years',
@@ -51,12 +69,46 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
     date: format(new Date(), 'yyyy-MM-dd'),
   })
   const [metadataErrors, setMetadataErrors] = useState<Record<string, string>>({})
-  const [currentStep, setCurrentStep] = useState<'select-files' | 'metadata' | 'uploading'>(
-    'select-files'
-  )
+  const [currentStep, setCurrentStep] = useState<
+    'select-files' | 'checking-duplicates' | 'metadata' | 'uploading'
+  >('select-files')
   const [showAdvanced, setShowAdvanced] = useState(false)
 
-  // Reset state when modal opens/closes
+  // Duplicate checking state
+  const [isCheckingDuplicates, setIsCheckingDuplicates] = useState(false)
+  const [duplicateCheckProgress, setDuplicateCheckProgress] = useState(0)
+  const [duplicateCheckFile, setDuplicateCheckFile] = useState('')
+  const [duplicateResults, setDuplicateResults] = useState<FileDuplicateResult[]>([])
+  const [showDuplicateWarning, setShowDuplicateWarning] = useState(false)
+
+  // Fetch departments from API
+  useEffect(() => {
+    if (isOpen && departments.length === 0) {
+      setDepartmentsLoading(true)
+      getDepartments()
+        .then((depts) => {
+          setDepartments(depts)
+        })
+        .catch((err) => {
+          console.error('Failed to fetch departments:', err)
+        })
+        .finally(() => {
+          setDepartmentsLoading(false)
+        })
+    }
+  }, [isOpen, departments.length])
+
+  // Auto-set department from folder info when modal opens
+  useEffect(() => {
+    if (isOpen && folderInfo?.departmentId) {
+      setMetadata((prev) => ({
+        ...prev,
+        department: String(folderInfo.departmentId),
+      }))
+    }
+  }, [isOpen, folderInfo?.departmentId])
+
+  // Reset state when modal closes
   useEffect(() => {
     if (!isOpen) {
       setUploads([])
@@ -65,12 +117,20 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
         retentionPeriod: '5_years',
         tags: [],
         date: format(new Date(), 'yyyy-MM-dd'),
+        // Keep department if folder info is provided
+        ...(folderInfo?.departmentId ? { department: String(folderInfo.departmentId) } : {}),
       })
       setMetadataErrors({})
       setCurrentStep('select-files')
       setShowAdvanced(false)
+      // Reset duplicate check state
+      setIsCheckingDuplicates(false)
+      setDuplicateCheckProgress(0)
+      setDuplicateCheckFile('')
+      setDuplicateResults([])
+      setShowDuplicateWarning(false)
     }
-  }, [isOpen])
+  }, [isOpen, folderInfo?.departmentId])
 
   // Handle file selection
   const handleFilesSelected = useCallback((files: File[]) => {
@@ -224,13 +284,151 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
     return Object.keys(errors).length === 0
   }
 
-  // Continue to metadata step
-  const handleContinueToMetadata = useCallback(() => {
+  // Check for duplicates before continuing to metadata
+  const handleContinueToMetadata = useCallback(async () => {
+    console.log('[DuplicateCheck] Starting duplicate check, uploads:', uploads.length)
+
     if (uploads.length === 0) {
+      console.log('[DuplicateCheck] No uploads, returning')
       return
     }
-    setCurrentStep('metadata')
-  }, [uploads.length])
+
+    // Start duplicate check
+    console.log('[DuplicateCheck] Setting step to checking-duplicates')
+    setIsCheckingDuplicates(true)
+    setCurrentStep('checking-duplicates')
+    setDuplicateCheckProgress(0)
+    setDuplicateCheckFile('')
+
+    try {
+      // Get all files from uploads
+      const files = uploads.map((u) => u.file)
+      console.log(
+        '[DuplicateCheck] Files to check:',
+        files.map((f) => f.name)
+      )
+
+      // Calculate checksums for all files
+      console.log('[DuplicateCheck] Calculating checksums...')
+      const checksumMap = await calculateFileChecksums(files, (progress, currentFile) => {
+        setDuplicateCheckProgress(Math.round(progress * 0.7)) // 0-70% for checksum calculation
+        setDuplicateCheckFile(currentFile)
+      })
+      console.log('[DuplicateCheck] Checksums calculated:', checksumMap.size)
+
+      // Convert to array of checksums
+      const checksums: string[] = []
+      const fileChecksumMap = new Map<string, { file: File; uploadId: string }>()
+
+      for (const upload of uploads) {
+        const checksum = checksumMap.get(upload.file)
+        if (checksum) {
+          checksums.push(checksum)
+          fileChecksumMap.set(checksum, { file: upload.file, uploadId: upload.id })
+        }
+      }
+
+      setDuplicateCheckProgress(75) // 75% - checking with server
+      setDuplicateCheckFile('Checking for existing files...')
+
+      // Check duplicates with backend
+      console.log('[DuplicateCheck] Calling API with checksums:', checksums)
+      const response = await checkDuplicates(checksums)
+      console.log('[DuplicateCheck] API response:', response)
+
+      setDuplicateCheckProgress(100)
+
+      // Build duplicate results
+      const results: FileDuplicateResult[] = []
+      let hasDuplicates = false
+
+      for (const [checksum, duplicateInfo] of Object.entries(response.duplicates)) {
+        const fileInfo = fileChecksumMap.get(checksum)
+        if (fileInfo) {
+          const isDuplicate = duplicateInfo !== null
+          if (isDuplicate) hasDuplicates = true
+          console.log('[DuplicateCheck] File:', fileInfo.file.name, 'isDuplicate:', isDuplicate)
+
+          results.push({
+            file: fileInfo.file,
+            uploadId: fileInfo.uploadId,
+            checksum,
+            isDuplicate,
+            existingDocument: duplicateInfo || undefined,
+          })
+        }
+      }
+
+      console.log('[DuplicateCheck] hasDuplicates:', hasDuplicates, 'results:', results.length)
+      setDuplicateResults(results)
+      setIsCheckingDuplicates(false)
+
+      if (hasDuplicates) {
+        // Show duplicate warning
+        console.log('[DuplicateCheck] Showing duplicate warning')
+        setShowDuplicateWarning(true)
+      } else {
+        // No duplicates, proceed to metadata
+        console.log('[DuplicateCheck] No duplicates, proceeding to metadata')
+        setCurrentStep('metadata')
+      }
+    } catch (error) {
+      console.error('[DuplicateCheck] Failed to check for duplicates:', error)
+      // On error, just proceed to metadata (backend will catch duplicates during upload)
+      setIsCheckingDuplicates(false)
+      setCurrentStep('metadata')
+    }
+  }, [uploads])
+
+  // Handle removing a duplicate file from the early check
+  const handleRemoveDuplicateFile = useCallback((uploadId: string) => {
+    // Remove from uploads
+    setUploads((prev) => prev.filter((u) => u.id !== uploadId))
+    // Remove from duplicate results
+    setDuplicateResults((prev) => prev.filter((r) => r.uploadId !== uploadId))
+  }, [])
+
+  // Handle creating a shortcut for a duplicate file during early check
+  const handleCreateShortcutForDuplicate = useCallback(
+    async (uploadId: string, documentId: string) => {
+      if (!folderId) return
+
+      try {
+        await documentService.createShortcut(documentId, folderId)
+
+        // Remove from uploads (shortcut created instead)
+        setUploads((prev) => prev.filter((u) => u.id !== uploadId))
+        // Remove from duplicate results
+        setDuplicateResults((prev) => prev.filter((r) => r.uploadId !== uploadId))
+
+        // If this was the last file, trigger refresh
+        const remainingResults = duplicateResults.filter((r) => r.uploadId !== uploadId)
+        const remainingUploads = uploads.filter((u) => u.id !== uploadId)
+
+        if (remainingUploads.length === 0) {
+          // All files handled, close modal and refresh
+          if (onUploadComplete) {
+            onUploadComplete({
+              total: 1,
+              successful: 1,
+              failed: 0,
+              results: [
+                {
+                  success: true,
+                  documentId: documentId,
+                  file: uploads.find((u) => u.id === uploadId)?.file as File,
+                },
+              ],
+            })
+          }
+          onClose()
+        }
+      } catch (error) {
+        console.error('Failed to create shortcut:', error)
+      }
+    },
+    [folderId, duplicateResults, uploads, onUploadComplete, onClose]
+  )
 
   // Start upload
   const handleStartUpload = useCallback(async () => {
@@ -368,11 +566,6 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
       // Auto-update retention period based on document type
       if (field === 'documentType') {
         updated.retentionPeriod = getDefaultRetentionForDocumentType(value)
-      }
-
-      // Auto-update confidentiality based on department
-      if (field === 'department') {
-        updated.confidentialityLevel = getDefaultConfidentialityForDepartment(value)
       }
 
       return updated
@@ -515,10 +708,17 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
     label: `${type.icon} ${type.label}`,
   }))
 
-  const departmentOptions = DEPARTMENTS.map((dept) => ({
-    value: dept.value,
-    label: dept.label,
+  // Use departments from API
+  const departmentOptions = departments.map((dept) => ({
+    value: String(dept.id),
+    label: dept.name,
   }))
+
+  // Get current department name for display
+  const currentDepartmentName =
+    folderInfo?.departmentName ||
+    departments.find((d) => String(d.id) === metadata.department)?.name ||
+    ''
 
   const identifierTypeOptions = IDENTIFIER_TYPES.map((type) => ({
     value: type.value,
@@ -546,20 +746,24 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
       title={
         currentStep === 'select-files'
           ? 'Upload Documents'
-          : currentStep === 'metadata'
-            ? 'Document Metadata'
-            : uploads.length === 0
-              ? 'Upload Documents'
-              : allUploadsComplete
-                ? 'Upload Complete'
-                : 'Uploading...'
+          : currentStep === 'checking-duplicates'
+            ? 'Checking for Duplicates'
+            : currentStep === 'metadata'
+              ? 'Document Metadata'
+              : uploads.length === 0
+                ? 'Upload Documents'
+                : allUploadsComplete
+                  ? 'Upload Complete'
+                  : 'Uploading...'
       }
       description={
         currentStep === 'select-files'
           ? 'Select files to upload'
-          : currentStep === 'metadata'
-            ? 'Provide metadata for your documents (required for compliance)'
-            : undefined
+          : currentStep === 'checking-duplicates'
+            ? 'Verifying files are not already in the system'
+            : currentStep === 'metadata'
+              ? 'Provide metadata for your documents (required for compliance)'
+              : undefined
       }
       footer={
         currentStep === 'select-files' ? (
@@ -576,7 +780,7 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
               Continue to Metadata
             </Button>
           </>
-        ) : currentStep === 'metadata' ? (
+        ) : currentStep === 'checking-duplicates' ? null : currentStep === 'metadata' ? ( // No footer during duplicate check - show progress in content
           <>
             <Button variant="ghost" onClick={() => setCurrentStep('select-files')}>
               Back
@@ -599,6 +803,37 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
         ) : null
       }
     >
+      {/* Folder/Department Info Banner - shows on all steps */}
+      {(folderInfo || currentDepartmentName) && (
+        <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+          <div className="flex items-center gap-4 text-sm">
+            {folderInfo && (
+              <div className="flex items-center gap-2">
+                <FolderIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <span className="text-gray-600 dark:text-gray-400">Folder:</span>
+                <span className="font-medium text-gray-900 dark:text-gray-100">
+                  {folderInfo.name}
+                </span>
+                {folderInfo.path && folderInfo.path !== '/' && (
+                  <span className="text-gray-400 dark:text-gray-500 text-xs">
+                    ({folderInfo.path})
+                  </span>
+                )}
+              </div>
+            )}
+            {currentDepartmentName && (
+              <div className="flex items-center gap-2">
+                <BuildingOfficeIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <span className="text-gray-600 dark:text-gray-400">Department:</span>
+                <span className="font-medium text-gray-900 dark:text-gray-100">
+                  {currentDepartmentName}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Step 1: File Selection */}
       {currentStep === 'select-files' && (
         <div className="space-y-4">
@@ -667,6 +902,194 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
           )}
         </div>
       )}
+
+      {/* Step 1.5: Checking for Duplicates */}
+      {currentStep === 'checking-duplicates' && !showDuplicateWarning && (
+        <div className="flex flex-col items-center justify-center py-12">
+          {/* Spinner */}
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary-200 border-t-primary-600 mb-6" />
+
+          <p className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Checking for duplicate files...
+          </p>
+
+          {duplicateCheckFile && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">{duplicateCheckFile}</p>
+          )}
+
+          {/* Progress bar */}
+          <div className="w-64 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary-600 transition-all duration-300"
+              style={{ width: `${duplicateCheckProgress}%` }}
+            />
+          </div>
+
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+            {duplicateCheckProgress}% complete
+          </p>
+        </div>
+      )}
+
+      {/* Duplicate Warning - uses same FileUploadProgress style */}
+      {currentStep === 'checking-duplicates' &&
+        showDuplicateWarning &&
+        (() => {
+          // Check if all duplicates are in the same folder (error) or different folders (warning)
+          // Compare as strings to handle type differences (API returns string, prop might be string or null)
+          const currentFolderIdStr = folderId ? String(folderId) : null
+          const allDuplicatesInSameFolder = duplicateResults
+            .filter((r) => r.isDuplicate && r.existingDocument)
+            .every((r) => {
+              const dupFolderId = r.existingDocument?.folder_id
+                ? String(r.existingDocument.folder_id)
+                : null
+              return dupFolderId === currentFolderIdStr
+            })
+          const isError = allDuplicatesInSameFolder
+
+          return (
+            <div className="space-y-4">
+              {/* Header - Error (red) if same folder, Warning (amber) if different folder */}
+              <div
+                className={cn(
+                  'flex items-start gap-3 p-4 rounded-lg border',
+                  isError
+                    ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                    : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+                )}
+              >
+                <ExclamationTriangleIcon
+                  className={cn(
+                    'h-6 w-6 flex-shrink-0 mt-0.5',
+                    isError
+                      ? 'text-red-600 dark:text-red-400'
+                      : 'text-amber-600 dark:text-amber-400'
+                  )}
+                />
+                <div>
+                  <h4
+                    className={cn(
+                      'text-base font-medium',
+                      isError
+                        ? 'text-red-900 dark:text-red-100'
+                        : 'text-amber-900 dark:text-amber-100'
+                    )}
+                  >
+                    {isError
+                      ? duplicateResults.filter((r) => r.isDuplicate).length === 1
+                        ? 'Duplicate file detected'
+                        : 'Duplicate files detected'
+                      : duplicateResults.filter((r) => r.isDuplicate).length ===
+                          duplicateResults.length
+                        ? 'Duplicate files detected'
+                        : 'Some files already exist'}
+                  </h4>
+                  <p
+                    className={cn(
+                      'text-sm mt-1',
+                      isError
+                        ? 'text-red-700 dark:text-red-300'
+                        : 'text-amber-700 dark:text-amber-300'
+                    )}
+                  >
+                    {isError
+                      ? duplicateResults.filter((r) => r.isDuplicate).length === 1
+                        ? 'File already exists in this folder.'
+                        : `${duplicateResults.filter((r) => r.isDuplicate).length} file(s) already exist in this folder.`
+                      : `${duplicateResults.filter((r) => r.isDuplicate).length} of ${duplicateResults.length} file(s) already exist in the system.${folderId ? ' You can create shortcuts to reference the existing files in this folder.' : ''}`}
+                  </p>
+                </div>
+              </div>
+
+              {/* Files list - using FileUploadProgress component style */}
+              <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                {duplicateResults.map((result) => {
+                  if (result.isDuplicate && result.existingDocument) {
+                    // Show as duplicate with actions
+                    const duplicateUpload: FileUploadItem = {
+                      id: result.uploadId,
+                      file: result.file,
+                      status: 'duplicate',
+                      progress: 0,
+                      duplicateInfo: {
+                        documentId: result.existingDocument.id,
+                        title: result.existingDocument.title,
+                        fileName: result.existingDocument.file_name,
+                        folderId: result.existingDocument.folder_id,
+                        folderName: result.existingDocument.folder_name,
+                        folderPath: result.existingDocument.folder_path,
+                        confidentialityLevel: result.existingDocument.confidentiality_level,
+                        documentType: result.existingDocument.document_type,
+                      },
+                    }
+                    return (
+                      <FileUploadProgress
+                        key={result.uploadId}
+                        upload={duplicateUpload}
+                        onRemove={handleRemoveDuplicateFile}
+                        onCreateShortcut={folderId ? handleCreateShortcutForDuplicate : undefined}
+                        currentFolderId={folderId}
+                        showDetails={true}
+                      />
+                    )
+                  } else {
+                    // Show as ready to upload
+                    return (
+                      <div
+                        key={result.uploadId}
+                        className="flex items-center gap-3 p-4 rounded-lg border border-success-200 dark:border-success-800 bg-success-50 dark:bg-success-900/10"
+                      >
+                        <CheckCircleIcon className="w-5 h-5 text-success-600 dark:text-success-400 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                            {result.file.name}
+                          </p>
+                          <p className="text-xs text-success-600 dark:text-success-400">
+                            Ready to upload
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  }
+                })}
+              </div>
+
+              {/* Footer with continue button */}
+              {(() => {
+                // Check if there are any non-duplicate files that can be uploaded
+                const nonDuplicateCount = duplicateResults.filter((r) => !r.isDuplicate).length
+                const hasFilesToUpload = nonDuplicateCount > 0
+
+                return (
+                  <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        setShowDuplicateWarning(false)
+                        setDuplicateResults([])
+                        setCurrentStep('select-files')
+                      }}
+                    >
+                      Back
+                    </Button>
+                    <Button
+                      variant="primary"
+                      disabled={!hasFilesToUpload}
+                      onClick={() => {
+                        setShowDuplicateWarning(false)
+                        setDuplicateResults([])
+                        setCurrentStep('metadata')
+                      }}
+                    >
+                      Continue to Metadata
+                    </Button>
+                  </div>
+                )
+              })()}
+            </div>
+          )
+        })()}
 
       {/* Step 2: Metadata - Fixed: Increased padding and themed scrollbar */}
       {currentStep === 'metadata' && (
@@ -783,8 +1206,10 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
               </div>
             </div>
 
-            {/* Date, Creator, Department */}
-            <div className="grid grid-cols-3 gap-4">
+            {/* Date, Creator, Department (Department hidden when auto-set from folder) */}
+            <div
+              className={cn('grid gap-4', folderInfo?.departmentId ? 'grid-cols-2' : 'grid-cols-3')}
+            >
               <DatePicker
                 label="Date"
                 required
@@ -821,16 +1246,20 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
                 )}
               </div>
 
-              <Select
-                label="Department"
-                options={departmentOptions}
-                value={metadata.department || ''}
-                onChange={(value) => handleMetadataChange('department', value)}
-                placeholder="Select..."
-                searchable={departmentOptions.length > 5}
-                error={metadataErrors.department}
-                fullWidth
-              />
+              {/* Only show Department field when NOT auto-set from folder */}
+              {!folderInfo?.departmentId && (
+                <Select
+                  label="Department"
+                  options={departmentOptions}
+                  value={metadata.department || ''}
+                  onChange={(value) => handleMetadataChange('department', value)}
+                  placeholder={departmentsLoading ? 'Loading...' : 'Select...'}
+                  searchable={departmentOptions.length > 5}
+                  error={metadataErrors.department}
+                  disabled={departmentsLoading}
+                  fullWidth
+                />
+              )}
             </div>
 
             {/* Retention Period */}
@@ -1074,6 +1503,7 @@ export const DocumentUploadModal: FC<DocumentUploadModalProps> = ({
                   onRetry={handleRetryUpload}
                   onRemove={handleRemoveUpload}
                   onCreateShortcut={handleCreateShortcut}
+                  currentFolderId={folderId}
                   showDetails={true}
                 />
               ))}

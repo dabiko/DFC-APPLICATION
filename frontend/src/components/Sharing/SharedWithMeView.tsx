@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
 import {
-  DocumentTextIcon,
   UserIcon,
   CalendarIcon,
   EyeIcon,
@@ -10,7 +9,9 @@ import {
   ChevronUpDownIcon,
   SparklesIcon,
   XMarkIcon,
+  DocumentTextIcon,
 } from '@heroicons/react/24/outline'
+import { FileIcon } from '@/components/FileIcon'
 import type { SharedWithMeViewProps } from '@/types/sharing'
 import { format } from 'date-fns'
 import { getPermissionLabel, getPermissionIcon } from '@/types/sharing'
@@ -138,7 +139,7 @@ export const SharedWithMeView: React.FC<SharedWithMeViewProps> = ({
                           />
                         ) : (
                           <div className="flex-shrink-0">
-                            <DocumentTextIcon className="w-10 h-10 text-gray-400" />
+                            <FileIcon fileName={item.document.name} size="lg" />
                           </div>
                         )}
                         <div className="flex-1 min-w-0">

@@ -1,11 +1,11 @@
 import { useRef, useState, DragEvent, ChangeEvent } from 'react'
 import {
   CloudArrowUpIcon,
-  DocumentIcon,
   XMarkIcon,
   CheckCircleIcon,
   ExclamationCircleIcon,
 } from '@heroicons/react/24/outline'
+import { FileIcon } from '@/components/FileIcon'
 import { Progress } from '@components/Feedback'
 import { Button } from '@components/Button'
 import { cn } from '@utils/cn'
@@ -376,7 +376,7 @@ function FileItem({ uploadedFile, onRemove }: FileItemProps) {
         ) : status === 'error' ? (
           <ExclamationCircleIcon className="h-5 w-5 text-error-600 dark:text-error-400" />
         ) : (
-          <DocumentIcon className="h-5 w-5 text-gray-400" />
+          <FileIcon fileName={file.name} mimeType={file.type} size="sm" />
         )}
       </div>
 

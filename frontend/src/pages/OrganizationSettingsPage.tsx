@@ -86,6 +86,8 @@ export function OrganizationSettingsPage() {
     firstName: userData?.first_name || 'User',
     lastName: userData?.last_name || '',
     email: userData?.email || '',
+    is_staff: userData?.is_staff || false,
+    is_superuser: userData?.is_superuser || false,
   }
 
   // Mock notifications for header

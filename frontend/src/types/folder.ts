@@ -43,6 +43,9 @@ export interface Folder {
   isExpanded?: boolean // UI state (for tree expansion)
   isLoading?: boolean // UI state (for lazy loading)
   permissions: FolderPermission
+  // Department info
+  departmentId?: number | string | null
+  departmentName?: string | null
   // Trash-specific fields (only present for trashed folders)
   deletedAt?: string | null
   deletedBy?: string | null

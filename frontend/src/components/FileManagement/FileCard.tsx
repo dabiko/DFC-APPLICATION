@@ -16,7 +16,7 @@ import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid'
 import { cn } from '@utils/cn'
 import type { FileCardProps } from '@/types/fileManagement'
 import { CONFIDENTIALITY_COLORS, CONFIDENTIALITY_ICONS } from '@/types/fileManagement'
-import { getFileIcon } from '@/utils/fileValidation'
+import { FileIcon } from '@/components/FileIcon'
 import { formatFileSize } from '@/utils/versionUtils'
 import { formatDistanceToNow } from 'date-fns'
 
@@ -149,9 +149,12 @@ export const FileCard: FC<FileCardProps> = ({
           ) : item.thumbnailUrl ? (
             <img src={item.thumbnailUrl} alt={item.name} className="w-full h-full object-cover" />
           ) : (
-            <span className="text-6xl">
-              {getFileIcon({ name: item.name, type: item.mimeType || '' } as File)}
-            </span>
+            <FileIcon
+              fileName={item.name}
+              mimeType={item.mimeType}
+              size="xl"
+              className="w-16 h-16"
+            />
           )}
           {/* Shortcut indicator overlay */}
           {item.isShortcut && (
@@ -237,9 +240,7 @@ export const FileCard: FC<FileCardProps> = ({
         ) : item.thumbnailUrl ? (
           <img src={item.thumbnailUrl} alt={item.name} className="w-10 h-10 object-cover rounded" />
         ) : (
-          <span className="text-2xl">
-            {getFileIcon({ name: item.name, type: item.mimeType || '' } as File)}
-          </span>
+          <FileIcon fileName={item.name} mimeType={item.mimeType} size="lg" />
         )}
         {/* Shortcut indicator for list view */}
         {item.isShortcut && (

@@ -183,6 +183,8 @@ export interface FileUploadProgressProps {
   onRemove?: (id: string) => void
   /** Callback to create shortcut (when duplicate detected) */
   onCreateShortcut?: (id: string, documentId: string) => void
+  /** Current folder ID (used to determine if shortcut can be created) */
+  currentFolderId?: string | null
   /** Show details */
   showDetails?: boolean
   /** Custom class name */
@@ -214,7 +216,14 @@ export interface DocumentUploadModalProps {
   /** Callback when upload completes */
   onUploadComplete?: (results: BulkUploadResult) => void
   /** Target folder ID */
-  folderId?: string
+  folderId?: string | null
+  /** Folder info for auto-populating department */
+  folderInfo?: {
+    name: string
+    departmentId: number | string
+    departmentName: string
+    path?: string
+  }
   /** Upload configuration */
   config?: Partial<UploadConfig>
   /** Require metadata before upload */

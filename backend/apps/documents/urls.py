@@ -4,11 +4,13 @@ URL configuration for documents app.
 from django.urls import path
 from apps.documents.views import (
     DocumentUploadView,
+    CheckDuplicateView,
     DocumentListView,
     DocumentDetailView,
     DocumentUpdateView,
     DocumentDeleteView,
     DocumentDownloadView,
+    DocumentTextContentView,
     DocumentVersionCreateView,
     TagListCreateView,
     TagDetailView,
@@ -76,11 +78,13 @@ app_name = 'documents'
 urlpatterns = [
     # Document endpoints
     path('upload/', DocumentUploadView.as_view(), name='document_upload'),
+    path('check-duplicates/', CheckDuplicateView.as_view(), name='check_duplicates'),
     path('', DocumentListView.as_view(), name='document_list'),
     path('<uuid:id>/', DocumentDetailView.as_view(), name='document_detail'),
     path('<uuid:id>/update/', DocumentUpdateView.as_view(), name='document_update'),
     path('<uuid:id>/delete/', DocumentDeleteView.as_view(), name='document_delete'),
     path('<uuid:id>/download/', DocumentDownloadView.as_view(), name='document_download'),
+    path('<uuid:id>/text-content/', DocumentTextContentView.as_view(), name='document_text_content'),
     path('<uuid:id>/versions/', DocumentVersionCreateView.as_view(), name='document_version_create'),
 
     # Chunked upload endpoints

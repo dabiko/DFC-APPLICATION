@@ -93,7 +93,14 @@ export default function SmartFolderResultsPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list')
 
   // Get current user
-  const user = authService.getCurrentUser()
+  const userData = authService.getUser()
+  const user = {
+    firstName: userData?.first_name || 'User',
+    lastName: userData?.last_name || '',
+    email: userData?.email || '',
+    is_staff: userData?.is_staff || false,
+    is_superuser: userData?.is_superuser || false,
+  }
 
   // Handle logout
   const handleLogout = async () => {

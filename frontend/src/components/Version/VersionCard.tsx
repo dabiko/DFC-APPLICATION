@@ -13,12 +13,8 @@ import {
 } from '@heroicons/react/24/outline'
 import { cn } from '@utils/cn'
 import type { VersionCardProps } from '@/types/version'
-import {
-  formatVersionNumber,
-  formatRelativeTime,
-  formatFileSize,
-  getFileIcon,
-} from '@/utils/versionUtils'
+import { formatVersionNumber, formatRelativeTime, formatFileSize } from '@/utils/versionUtils'
+import { FileIcon } from '@/components/FileIcon'
 
 export const VersionCard: FC<VersionCardProps> = ({
   version,
@@ -48,7 +44,7 @@ export const VersionCard: FC<VersionCardProps> = ({
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2">
-          <span className="text-2xl">{getFileIcon(version.mimeType)}</span>
+          <FileIcon fileName={version.fileName} mimeType={version.mimeType} size="lg" />
           <div>
             <div className="flex items-center gap-2">
               <span className="font-semibold text-gray-900 dark:text-gray-100">

@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { Upload, Filter, Grid, List, Plus } from 'lucide-react'
+import { FileIcon } from '@/components/FileIcon'
 import { ThreePanelLayout } from '@components/Layout/ThreePanelLayout'
 import { DashboardHeader } from '@components/Dashboard/DashboardHeader'
 import { DashboardSidebar } from '@components/Dashboard/DashboardSidebar'
@@ -41,6 +42,8 @@ export function Documents() {
     firstName: userData?.first_name || 'User',
     lastName: userData?.last_name || '',
     email: userData?.email || '',
+    is_staff: userData?.is_staff || false,
+    is_superuser: userData?.is_superuser || false,
   }
 
   // Fetch folders on mount
@@ -266,8 +269,8 @@ export function Documents() {
                     className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
                   >
                     <div className="flex flex-col items-center text-center">
-                      <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center mb-3">
-                        <span className="text-2xl">📄</span>
+                      <div className="w-16 h-16 flex items-center justify-center mb-3">
+                        <FileIcon fileName={doc.name} size="xl" />
                       </div>
                       <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1 truncate w-full">
                         {doc.name}

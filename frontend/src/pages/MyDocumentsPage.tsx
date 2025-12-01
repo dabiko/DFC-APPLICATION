@@ -58,6 +58,7 @@ import {
 import { DashboardSidebar } from '@/components/Dashboard/DashboardSidebar'
 import { DashboardHeader } from '@/components/Dashboard/DashboardHeader'
 import { ContextMenu, type ContextMenuItem } from '@/components/common/ContextMenu'
+import { FileIcon } from '@/components/FileIcon'
 import { authService } from '@/services/auth.service'
 import {
   getMyDocuments,
@@ -152,22 +153,8 @@ const SORT_OPTIONS: { value: SortField; label: string }[] = [
   { value: 'file_size', label: 'Size' },
 ]
 
-// Get file icon based on MIME type
-const getFileIcon = (mimeType: string) => {
-  if (mimeType === 'application/pdf') return 'pdf'
-  if (
-    mimeType === 'application/msword' ||
-    mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  )
-    return 'word'
-  if (
-    mimeType === 'application/vnd.ms-excel' ||
-    mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-  )
-    return 'excel'
-  if (mimeType.startsWith('image/')) return 'image'
-  return 'file'
-}
+// FileIcon component is now used instead of this legacy function
+// import { FileIcon } from '@/components/FileIcon'
 
 export function MyDocumentsPage() {
   const navigate = useNavigate()
@@ -178,6 +165,8 @@ export function MyDocumentsPage() {
     firstName: userData?.first_name || 'User',
     lastName: userData?.last_name || '',
     email: userData?.email || '',
+    is_staff: userData?.is_staff || false,
+    is_superuser: userData?.is_superuser || false,
   }
 
   // Handle logout
@@ -1283,8 +1272,8 @@ export function MyDocumentsPage() {
         onContextMenu={(e) => openContextMenu(e, item)}
       >
         {/* File icon */}
-        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
-          <FileText className="w-5 h-5" />
+        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-gray-50 dark:bg-gray-700/50 flex items-center justify-center">
+          <FileIcon fileName={item.file_name} mimeType={item.file_type} size="md" />
         </div>
 
         {/* Info */}
@@ -1373,8 +1362,8 @@ export function MyDocumentsPage() {
       >
         {/* Header with icon */}
         <div className="flex items-start justify-between mb-3">
-          <div className="w-12 h-12 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
-            <FileText className="w-6 h-6" />
+          <div className="w-12 h-12 rounded-lg bg-gray-50 dark:bg-gray-700/50 flex items-center justify-center">
+            <FileIcon fileName={item.file_name} mimeType={item.file_type} size="lg" />
           </div>
           <div className="flex items-center gap-1">
             <span

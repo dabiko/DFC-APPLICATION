@@ -1,19 +1,27 @@
 import { useState, useRef, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Bell,
-  User,
   Settings,
-  Users,
   LogOut,
   Sun,
   Moon,
   Monitor,
   Wifi,
   WifiOff,
+  Shield,
+  Users,
+  Building2,
+  ClipboardList,
+  Clock,
+  Scale,
+  Server,
+  CreditCard,
 } from 'lucide-react'
 import { TopNavigationBar } from '@components/Navigation/TopNavigationBar'
 import { useTheme } from '@hooks/useTheme'
 import { useNetworkStatus } from '@/contexts/NetworkStatusContext'
+import { useAuth } from '@hooks/useAuth'
 import { cn } from '@utils/cn'
 
 interface DashboardHeaderProps {
@@ -22,6 +30,10 @@ interface DashboardHeaderProps {
     lastName: string
     email: string
     avatar?: string
+    role?: 'admin' | 'manager' | 'editor' | 'viewer' | string
+    is_staff?: boolean
+    is_superuser?: boolean
+    mfaEnabled?: boolean
   }
   notifications?: Array<{
     id: string
@@ -44,15 +56,31 @@ export function DashboardHeader({
   notifications = [],
   onLogout,
 }: DashboardHeaderProps) {
+  const navigate = useNavigate()
   const { theme, setTheme } = useTheme()
   const { isOnline, isSlow } = useNetworkStatus()
+  const { user: authUser } = useAuth()
+
   const [showNotifications, setShowNotifications] = useState(false)
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [showThemeMenu, setShowThemeMenu] = useState(false)
+  const [showAdminMenu, setShowAdminMenu] = useState(false)
 
   const notificationRef = useRef<HTMLDivElement>(null)
   const profileRef = useRef<HTMLDivElement>(null)
   const themeRef = useRef<HTMLDivElement>(null)
+  const adminRef = useRef<HTMLDivElement>(null)
+
+  // Check if user has admin privileges
+  // authUser from useAuth() has 'role' field (admin, manager, editor, viewer)
+  // user prop may have is_staff/is_superuser from backend
+  const isAdmin =
+    authUser?.role === 'admin' ||
+    authUser?.role === 'manager' ||
+    user?.role === 'admin' ||
+    user?.role === 'manager' ||
+    user?.is_staff === true ||
+    user?.is_superuser === true
 
   const unreadCount = notifications.filter((n) => !n.read).length
 
@@ -71,6 +99,9 @@ export function DashboardHeader({
       }
       if (themeRef.current && !themeRef.current.contains(event.target as Node)) {
         setShowThemeMenu(false)
+      }
+      if (adminRef.current && !adminRef.current.contains(event.target as Node)) {
+        setShowAdminMenu(false)
       }
     }
 
@@ -98,14 +129,20 @@ export function DashboardHeader({
         <TopNavigationBar />
       </div>
 
-      {/* Right Section - Theme, Notifications, Profile */}
+      {/* Right Section - Theme, Admin, Notifications, Profile */}
       <div className="flex items-center gap-2">
         {/* Theme Toggle */}
         <div className="relative" ref={themeRef}>
           <button
-            onClick={() => setShowThemeMenu(!showThemeMenu)}
+            onClick={() => {
+              setShowThemeMenu(!showThemeMenu)
+              setShowAdminMenu(false)
+              setShowNotifications(false)
+              setShowProfileMenu(false)
+            }}
             className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors relative"
             aria-label="Toggle theme"
+            title="Theme"
           >
             {getThemeIcon()}
           </button>
@@ -155,12 +192,136 @@ export function DashboardHeader({
           )}
         </div>
 
+        {/* Admin Menu - Only visible for admins/managers */}
+        {isAdmin && (
+          <div className="relative" ref={adminRef}>
+            <button
+              onClick={() => {
+                setShowAdminMenu(!showAdminMenu)
+                setShowThemeMenu(false)
+                setShowNotifications(false)
+                setShowProfileMenu(false)
+              }}
+              className={cn(
+                'p-2 rounded-lg transition-colors',
+                showAdminMenu
+                  ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                  : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400'
+              )}
+              aria-label="Administration menu"
+              title="Administration"
+            >
+              <Shield className="w-5 h-5" />
+            </button>
+
+            {showAdminMenu && (
+              <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50">
+                {/* Header */}
+                <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
+                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Administration
+                  </p>
+                </div>
+
+                {/* Admin Menu Items */}
+                <div className="py-1">
+                  <button
+                    onClick={() => {
+                      setShowAdminMenu(false)
+                      navigate('/users')
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3"
+                  >
+                    <Users className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                    <span>Users & Roles</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowAdminMenu(false)
+                      navigate('/organization-settings')
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3"
+                  >
+                    <Building2 className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                    <span>Departments</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowAdminMenu(false)
+                      navigate('/audit')
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3"
+                  >
+                    <ClipboardList className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                    <span>Audit Logs</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowAdminMenu(false)
+                      navigate('/retention')
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3"
+                  >
+                    <Clock className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                    <span>Retention Policies</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowAdminMenu(false)
+                      navigate('/compliance')
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3"
+                  >
+                    <Scale className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                    <span>Legal Holds</span>
+                  </button>
+                </div>
+
+                {/* System Settings Section */}
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-1">
+                  <button
+                    onClick={() => {
+                      setShowAdminMenu(false)
+                      navigate('/admin/system')
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3"
+                  >
+                    <Server className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                    <span>System Settings</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowAdminMenu(false)
+                      navigate('/billing')
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3"
+                  >
+                    <CreditCard className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                    <span>Billing & Usage</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Notifications */}
         <div className="relative" ref={notificationRef}>
           <button
-            onClick={() => setShowNotifications(!showNotifications)}
+            onClick={() => {
+              setShowNotifications(!showNotifications)
+              setShowThemeMenu(false)
+              setShowAdminMenu(false)
+              setShowProfileMenu(false)
+            }}
             className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors relative"
             aria-label="Notifications"
+            title="Notifications"
           >
             <Bell className="w-5 h-5 text-gray-600 dark:text-gray-300" />
             {unreadCount > 0 && (
@@ -209,10 +370,18 @@ export function DashboardHeader({
           )}
         </div>
 
+        {/* Divider */}
+        <div className="h-6 w-px bg-gray-200 dark:bg-gray-700 mx-1" />
+
         {/* Profile Menu */}
         <div className="relative" ref={profileRef}>
           <button
-            onClick={() => setShowProfileMenu(!showProfileMenu)}
+            onClick={() => {
+              setShowProfileMenu(!showProfileMenu)
+              setShowThemeMenu(false)
+              setShowAdminMenu(false)
+              setShowNotifications(false)
+            }}
             className="flex items-center gap-3 p-1 pr-3 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
             aria-label="Profile menu"
           >
@@ -247,7 +416,7 @@ export function DashboardHeader({
           </button>
 
           {showProfileMenu && (
-            <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50">
+            <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50">
               <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                 <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
                   {user.firstName} {user.lastName}
@@ -280,51 +449,33 @@ export function DashboardHeader({
                 </div>
               </div>
 
-              <button
-                onClick={() => {
-                  setShowProfileMenu(false)
-                  // Handle profile navigation
-                }}
-                className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3"
-              >
-                <User className="w-4 h-4" />
-                <span>Profile</span>
-              </button>
+              {/* Settings */}
+              <div className="py-1">
+                <button
+                  onClick={() => {
+                    setShowProfileMenu(false)
+                    navigate('/settings')
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3"
+                >
+                  <Settings className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                  <span>Settings</span>
+                </button>
+              </div>
 
-              <button
-                onClick={() => {
-                  setShowProfileMenu(false)
-                  // Handle settings navigation
-                }}
-                className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3"
-              >
-                <Settings className="w-4 h-4" />
-                <span>Settings</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setShowProfileMenu(false)
-                  // Handle collaborations navigation
-                }}
-                className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3"
-              >
-                <Users className="w-4 h-4" />
-                <span>Collaborations</span>
-              </button>
-
-              <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
-
-              <button
-                onClick={() => {
-                  setShowProfileMenu(false)
-                  onLogout?.()
-                }}
-                className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3"
-              >
-                <LogOut className="w-4 h-4" />
-                <span>Logout</span>
-              </button>
+              {/* Logout */}
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-1">
+                <button
+                  onClick={() => {
+                    setShowProfileMenu(false)
+                    onLogout?.()
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Sign Out</span>
+                </button>
+              </div>
             </div>
           )}
         </div>

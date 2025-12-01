@@ -7,8 +7,8 @@ import { FC, useState, useEffect } from 'react'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import { cn } from '@utils/cn'
 import type { FilePreviewCardProps } from '@/types/upload'
+import { FileIcon } from '@/components/FileIcon'
 import {
-  getFileIcon,
   getFileCategoryLabel,
   isImageFile,
   createFilePreviewUrl,
@@ -87,7 +87,7 @@ export const FilePreviewCard: FC<FilePreviewCardProps> = ({
             onError={() => setInternalPreviewUrl(null)}
           />
         ) : (
-          <span className="text-6xl">{getFileIcon(file)}</span>
+          <FileIcon fileName={file.name} mimeType={file.type} size="xl" className="w-16 h-16" />
         )}
       </div>
 

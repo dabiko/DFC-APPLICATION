@@ -48,6 +48,10 @@ export function transformFolderFromBackend(backendFolder: any): Folder {
       canManage: backendFolder.permissions?.can_manage ?? true,
     },
 
+    // Department info
+    departmentId: backendFolder.department || null,
+    departmentName: backendFolder.department_name || null,
+
     // Trash-specific fields (only present for trashed folders)
     deletedAt: backendFolder.deleted_at || null,
     deletedBy: backendFolder.deleted_by || null,

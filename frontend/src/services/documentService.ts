@@ -77,17 +77,21 @@ export const uploadDocument = async ({
   formData.append('document_date', metadata.date) // Backend expects 'document_date'
   formData.append('creator_source', metadata.creator) // Backend expects 'creator_source'
 
-  // Department: Use the logged-in user's department ID (UUID)
-  const userStr = localStorage.getItem('user') || sessionStorage.getItem('user')
-  if (userStr) {
-    try {
-      const user = JSON.parse(userStr)
-      if (user.department_id) {
-        // Use user's department ID (UUID)
-        formData.append('department', user.department_id)
+  // Department: Use metadata.department if provided, otherwise fall back to user's department
+  if (metadata.department) {
+    formData.append('department', metadata.department)
+  } else {
+    // Fall back to logged-in user's department ID
+    const userStr = localStorage.getItem('user') || sessionStorage.getItem('user')
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr)
+        if (user.department_id) {
+          formData.append('department', user.department_id)
+        }
+      } catch (e) {
+        console.error('Failed to parse user data:', e)
       }
-    } catch (e) {
-      console.error('Failed to parse user data:', e)
     }
   }
 
@@ -289,6 +293,29 @@ export const getDocumentPreview = async (
  */
 export const deleteDocument = async (documentId: string): Promise<void> => {
   await apiClient.delete(`/documents/${documentId}/`)
+}
+
+/**
+ * Text content response from backend
+ */
+export interface TextContentResponse {
+  content: string
+  file_name: string
+  file_type: string
+  file_size: number
+  language: string
+  line_count: number
+}
+
+/**
+ * Get text content of a document for preview
+ * Supports text files, code files, config files, etc.
+ */
+export const getDocumentTextContent = async (documentId: string): Promise<TextContentResponse> => {
+  const response = await apiClient.get<TextContentResponse>(
+    `/documents/${documentId}/text-content/`
+  )
+  return response.data
 }
 
 /**
@@ -914,6 +941,199 @@ export const renameDocument = async (documentId: string, newTitle: string): Prom
   })
 }
 
+// ============================================================================
+// DOCUMENT VERSIONS API FUNCTIONS
+// ============================================================================
+
+/**
+ * Version from backend API response
+ */
+export interface DocumentVersionFromBackend {
+  id: string
+  document: string
+  version_number: number
+  file_name: string
+  file_size: number
+  file_type: string
+  checksum: string
+  storage_path: string
+  created_at: string
+  created_by: string
+  created_by_name: string
+  change_description?: string
+  is_current: boolean
+}
+
+/**
+ * Get all versions of a document
+ */
+export const getDocumentVersions = async (
+  documentId: string
+): Promise<DocumentVersionFromBackend[]> => {
+  const response = await apiClient.get<
+    DocumentVersionFromBackend[] | { results: DocumentVersionFromBackend[] }
+  >(`/documents/${documentId}/versions/`)
+
+  // Handle both paginated and direct array response
+  if (Array.isArray(response.data)) {
+    return response.data
+  } else if (response.data && 'results' in response.data) {
+    return response.data.results
+  }
+  return []
+}
+
+/**
+ * Download a specific version of a document
+ */
+export const downloadDocumentVersion = async (
+  documentId: string,
+  versionId: string
+): Promise<Blob> => {
+  const response = await apiClient.get(`/documents/${documentId}/versions/${versionId}/download/`, {
+    responseType: 'blob',
+  })
+  return response.data
+}
+
+/**
+ * Restore a specific version of a document
+ */
+export const restoreDocumentVersion = async (
+  documentId: string,
+  versionId: string
+): Promise<void> => {
+  await apiClient.post(`/documents/${documentId}/versions/${versionId}/restore/`)
+}
+
+// ============================================================================
+// DOCUMENT ACCESS/PERMISSIONS API FUNCTIONS
+// ============================================================================
+
+/**
+ * Access entry from backend API response
+ */
+export interface DocumentAccessFromBackend {
+  id: string
+  user_id: string
+  user_name: string
+  user_email: string
+  permission: 'view' | 'edit' | 'manage' | 'owner'
+  granted_at: string
+  granted_by?: string
+}
+
+/**
+ * Get access list for a document
+ */
+export const getDocumentAccess = async (
+  documentId: string
+): Promise<DocumentAccessFromBackend[]> => {
+  const response = await apiClient.get<
+    DocumentAccessFromBackend[] | { results: DocumentAccessFromBackend[] }
+  >(`/documents/${documentId}/permissions/`)
+
+  // Handle both paginated and direct array response
+  if (Array.isArray(response.data)) {
+    return response.data
+  } else if (response.data && 'results' in response.data) {
+    return response.data.results
+  }
+  return []
+}
+
+// ============================================================================
+// AUDIT/ACTIVITY API FUNCTIONS
+// ============================================================================
+
+/**
+ * Activity entry from backend API response
+ */
+export interface ActivityFromBackend {
+  id: string
+  action: string
+  resource_type: string
+  resource_id: string
+  resource_name: string
+  user: string
+  user_email: string
+  timestamp: string
+  outcome: 'SUCCESS' | 'FAILURE'
+  ip_address?: string
+  user_agent?: string
+  details?: string
+  before_value?: Record<string, unknown>
+  after_value?: Record<string, unknown>
+  changed_fields?: string[]
+  error_message?: string
+}
+
+/**
+ * Get activity/audit logs for a specific resource
+ * @param resourceType - 'DOCUMENT' or 'FOLDER'
+ * @param resourceId - The ID of the resource
+ */
+export const getResourceActivity = async (
+  resourceType: 'DOCUMENT' | 'FOLDER',
+  resourceId: string
+): Promise<ActivityFromBackend[]> => {
+  const response = await apiClient.get<ActivityFromBackend[] | { results: ActivityFromBackend[] }>(
+    `/audit/logs/resource/${resourceType}/${resourceId}/`
+  )
+
+  // Handle both paginated and direct array response
+  if (Array.isArray(response.data)) {
+    return response.data
+  } else if (response.data && 'results' in response.data) {
+    return response.data.results
+  }
+  return []
+}
+
+/**
+ * Get activity for a document
+ */
+export const getDocumentActivity = async (documentId: string): Promise<ActivityFromBackend[]> => {
+  return getResourceActivity('DOCUMENT', documentId)
+}
+
+/**
+ * Get activity for a folder
+ */
+export const getFolderActivity = async (folderId: string): Promise<ActivityFromBackend[]> => {
+  return getResourceActivity('FOLDER', folderId)
+}
+
+/**
+ * Duplicate check result from API
+ */
+export interface DuplicateInfo {
+  id: string
+  title: string
+  file_name: string
+  folder_id: string | null
+  folder_name: string | null
+  folder_path: string | null
+  confidentiality_level: string
+  document_type: string
+}
+
+export interface CheckDuplicatesResponse {
+  duplicates: Record<string, DuplicateInfo | null>
+}
+
+/**
+ * Check if files with given checksums already exist
+ * @param checksums - Array of SHA-256 checksums to check
+ * @returns Map of checksum to duplicate info (null if no duplicate)
+ */
+export const checkDuplicates = async (checksums: string[]): Promise<CheckDuplicatesResponse> => {
+  const response = await apiClient.post<CheckDuplicatesResponse>('/documents/check-duplicates/', {
+    checksums,
+  })
+  return response.data
+}
+
 // Export default service object
 const documentService = {
   uploadDocument,
@@ -940,6 +1160,18 @@ const documentService = {
   moveDocuments,
   // Rename function
   renameDocument,
+  // Duplicate check
+  checkDuplicates,
+  // Version functions
+  getDocumentVersions,
+  downloadDocumentVersion,
+  restoreDocumentVersion,
+  // Access/permissions functions
+  getDocumentAccess,
+  // Activity/audit functions
+  getResourceActivity,
+  getDocumentActivity,
+  getFolderActivity,
 }
 
 export default documentService

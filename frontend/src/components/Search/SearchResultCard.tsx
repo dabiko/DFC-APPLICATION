@@ -14,7 +14,7 @@ import {
 import { cn } from '@utils/cn'
 import type { SearchResultCardProps } from '@/types/search'
 import { CONFIDENTIALITY_COLORS, CONFIDENTIALITY_ICONS } from '@/types/fileManagement'
-import { getFileIcon } from '@/utils/fileValidation'
+import { FileIcon } from '@/components/FileIcon'
 import { formatFileSize } from '@/utils/versionUtils'
 import { formatDistanceToNow } from 'date-fns'
 
@@ -136,9 +136,7 @@ export const SearchResultCard: FC<SearchResultCardProps> = ({
           {thumbnailUrl ? (
             <img src={thumbnailUrl} alt={fileName} className="w-full h-full object-cover" />
           ) : (
-            <span className="text-6xl">
-              {getFileIcon({ name: fileName, type: mimeType } as File)}
-            </span>
+            <FileIcon fileName={fileName} mimeType={mimeType} size="xl" className="w-16 h-16" />
           )}
         </div>
 
@@ -240,9 +238,7 @@ export const SearchResultCard: FC<SearchResultCardProps> = ({
         {thumbnailUrl ? (
           <img src={thumbnailUrl} alt={fileName} className="w-12 h-12 object-cover rounded" />
         ) : (
-          <span className="text-3xl">
-            {getFileIcon({ name: fileName, type: mimeType } as File)}
-          </span>
+          <FileIcon fileName={fileName} mimeType={mimeType} size="lg" />
         )}
       </div>
 

@@ -18,7 +18,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { cn } from '@utils/cn'
 import type { FileUploadProgressProps } from '@/types/upload'
-import { getFileIcon } from '@/utils/fileValidation'
+import { FileIcon } from '@/components/FileIcon'
 import { formatFileSize } from '@/utils/versionUtils'
 import { formatUploadSpeed, formatTimeRemaining } from '@/utils/fileValidation'
 
@@ -28,10 +28,21 @@ export const FileUploadProgress: FC<FileUploadProgressProps> = ({
   onRetry,
   onRemove,
   onCreateShortcut,
+  currentFolderId,
   showDetails = true,
   className,
 }) => {
   const { file, status, progress, error, uploadSpeed, timeRemaining, duplicateInfo } = upload
+
+  // Check if duplicate is in the same folder (can't create shortcut in same folder)
+  // Compare as strings to handle type differences
+  const isDuplicateInSameFolder =
+    duplicateInfo &&
+    (() => {
+      const dupFolderId = duplicateInfo.folderId ? String(duplicateInfo.folderId) : null
+      const currFolderId = currentFolderId ? String(currentFolderId) : null
+      return dupFolderId === currFolderId
+    })()
   const [isRemoving, setIsRemoving] = useState(false)
   const [showConfirmation, setShowConfirmation] = useState(false)
 
@@ -129,7 +140,7 @@ export const FileUploadProgress: FC<FileUploadProgressProps> = ({
     >
       {/* File icon and info */}
       <div className="flex-shrink-0">
-        <span className="text-3xl">{getFileIcon(file)}</span>
+        <FileIcon fileName={file.name} mimeType={file.type} size="lg" />
       </div>
 
       <div className="flex-1 min-w-0">
@@ -264,7 +275,7 @@ export const FileUploadProgress: FC<FileUploadProgressProps> = ({
 
             {/* Action buttons */}
             <div className="flex items-center gap-2">
-              {onCreateShortcut && (
+              {onCreateShortcut && !isDuplicateInSameFolder && (
                 <button
                   onClick={() => onCreateShortcut(upload.id, duplicateInfo.documentId)}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-700 dark:text-primary-300 bg-primary-100 dark:bg-primary-900/30 hover:bg-primary-200 dark:hover:bg-primary-900/50 rounded-md transition-colors"
@@ -272,6 +283,11 @@ export const FileUploadProgress: FC<FileUploadProgressProps> = ({
                   <LinkIcon className="w-3.5 h-3.5" />
                   Create Shortcut Instead
                 </button>
+              )}
+              {isDuplicateInSameFolder && (
+                <span className="text-xs text-gray-500 dark:text-gray-400 italic">
+                  File already exists in this folder
+                </span>
               )}
               {onRemove && (
                 <button

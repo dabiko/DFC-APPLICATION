@@ -115,14 +115,21 @@ export function DatePicker({
 
               <div className="flex items-center gap-1">
                 {clearable && value && !disabled && (
-                  <button
-                    type="button"
+                  <span
+                    role="button"
+                    tabIndex={0}
                     onClick={handleClear}
-                    className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        handleClear(e as unknown as React.MouseEvent)
+                      }
+                    }}
+                    className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors cursor-pointer"
                     aria-label="Clear date"
                   >
                     <XMarkIcon className="h-4 w-4 text-gray-500" />
-                  </button>
+                  </span>
                 )}
                 <CalendarIcon className="h-5 w-5 text-gray-500" />
               </div>
@@ -275,14 +282,21 @@ export function DateRangePicker({
 
               <div className="flex items-center gap-1">
                 {clearable && value?.from && !disabled && (
-                  <button
-                    type="button"
+                  <span
+                    role="button"
+                    tabIndex={0}
                     onClick={handleClear}
-                    className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        handleClear(e as unknown as React.MouseEvent)
+                      }
+                    }}
+                    className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors cursor-pointer"
                     aria-label="Clear date range"
                   >
                     <XMarkIcon className="h-4 w-4 text-gray-500" />
-                  </button>
+                  </span>
                 )}
                 <CalendarIcon className="h-5 w-5 text-gray-500" />
               </div>
