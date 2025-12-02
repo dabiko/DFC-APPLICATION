@@ -6,15 +6,13 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FolderPlus, RefreshCw, Search, X, Plus, FolderSearch } from 'lucide-react'
+import { FolderPlus, RefreshCw, Search, X } from 'lucide-react'
 import { FolderTree } from './FolderTree'
-import { UserSmartFolderItem } from './UserSmartFolderItem'
 import { CreateFolderModal } from './CreateFolderModal'
 import { RenameFolderModal } from './RenameFolderModal'
 import { MoveFolderModal } from './MoveFolderModal'
 import { DeleteFolderModal } from './DeleteFolderModal'
 import { FolderPropertiesModal } from './FolderPropertiesModal'
-import { SmartFolderModal, DeleteSmartFolderModal } from '@/components/SmartFolder'
 import { useAppDispatch, useAppSelector } from '@/store'
 import {
   fetchFolders,
@@ -29,7 +27,6 @@ import {
   selectFolder,
 } from '@/store/slices/folderSlice'
 import { getSmartFolders, isSmartFolder } from '@/utils/smartFolders'
-import { getVisibleSmartFolders, type SmartFolder } from '@/services/smartFolderService'
 import type { Folder, FolderOperation, CreateFolderData } from '@/types/folder'
 import { cn } from '@utils/cn'
 
@@ -56,15 +53,6 @@ export function FolderSidebar({ isCollapsed = false, className }: FolderSidebarP
   const [activeOperation, setActiveOperation] = useState<FolderOperation | null>(null)
   const [operationFolder, setOperationFolder] = useState<Folder | null>(null)
 
-  // Smart folder modal states
-  const [showSmartFolderModal, setShowSmartFolderModal] = useState(false)
-  const [showDeleteSmartFolderModal, setShowDeleteSmartFolderModal] = useState(false)
-  const [editingSmartFolder, setEditingSmartFolder] = useState<SmartFolder | null>(null)
-  const [deletingSmartFolder, setDeletingSmartFolder] = useState<SmartFolder | null>(null)
-  const [userSmartFolders, setUserSmartFolders] = useState<SmartFolder[]>([])
-  const [userSmartFoldersLoading, setUserSmartFoldersLoading] = useState(false)
-  const [selectedUserSmartFolder, setSelectedUserSmartFolder] = useState<string | null>(null)
-
   // Get system smart folders
   const smartFolders = useMemo(() => getSmartFolders(), [])
 
@@ -78,26 +66,6 @@ export function FolderSidebar({ isCollapsed = false, className }: FolderSidebarP
       })
     }
   }, [dispatch])
-
-  // Fetch user-created smart folders
-  const fetchUserSmartFolders = useCallback(async () => {
-    const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token')
-    if (!token) return
-
-    setUserSmartFoldersLoading(true)
-    try {
-      const folders = await getVisibleSmartFolders()
-      setUserSmartFolders(folders)
-    } catch (error) {
-      console.error('Failed to fetch user smart folders:', error)
-    } finally {
-      setUserSmartFoldersLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchUserSmartFolders()
-  }, [fetchUserSmartFolders])
 
   // Handle folder selection
   const handleFolderSelect = useCallback(
@@ -182,53 +150,6 @@ export function FolderSidebar({ isCollapsed = false, className }: FolderSidebarP
     setActiveOperation('create')
   }, [selectedFolder])
 
-  // Handle user smart folder selection
-  const handleUserSmartFolderClick = useCallback((folder: SmartFolder) => {
-    setSelectedUserSmartFolder(folder.id)
-  }, [])
-
-  // Handle edit user smart folder
-  const handleEditUserSmartFolder = useCallback((folder: SmartFolder) => {
-    setEditingSmartFolder(folder)
-    setShowSmartFolderModal(true)
-  }, [])
-
-  // Handle delete user smart folder - opens confirmation modal
-  const handleDeleteUserSmartFolder = useCallback((folder: SmartFolder) => {
-    setDeletingSmartFolder(folder)
-    setShowDeleteSmartFolderModal(true)
-  }, [])
-
-  // Handle delete smart folder modal close
-  const handleDeleteSmartFolderModalClose = useCallback(() => {
-    setShowDeleteSmartFolderModal(false)
-    setDeletingSmartFolder(null)
-  }, [])
-
-  // Handle smart folder deleted
-  const handleSmartFolderDeleted = useCallback(() => {
-    fetchUserSmartFolders()
-  }, [fetchUserSmartFolders])
-
-  // Handle smart folder modal close
-  const handleSmartFolderModalClose = useCallback(() => {
-    setShowSmartFolderModal(false)
-    setEditingSmartFolder(null)
-  }, [])
-
-  // Handle smart folder save (create or update)
-  const handleSmartFolderSave = useCallback(() => {
-    // Refresh the smart folders list after create/update
-    fetchUserSmartFolders()
-    // Note: Modal handles its own close via onClose prop
-  }, [fetchUserSmartFolders])
-
-  // Open create smart folder modal
-  const openCreateSmartFolderModal = useCallback(() => {
-    setEditingSmartFolder(null)
-    setShowSmartFolderModal(true)
-  }, [])
-
   // Shared modals - rendered regardless of collapsed state
   const modals = (
     <>
@@ -281,20 +202,6 @@ export function FolderSidebar({ isCollapsed = false, className }: FolderSidebarP
           setOperationFolder(null)
         }}
       />
-
-      <SmartFolderModal
-        isOpen={showSmartFolderModal}
-        onClose={handleSmartFolderModalClose}
-        onSave={handleSmartFolderSave}
-        smartFolder={editingSmartFolder}
-      />
-
-      <DeleteSmartFolderModal
-        isOpen={showDeleteSmartFolderModal}
-        smartFolder={deletingSmartFolder}
-        onClose={handleDeleteSmartFolderModalClose}
-        onDeleted={handleSmartFolderDeleted}
-      />
     </>
   )
 
@@ -344,48 +251,8 @@ export function FolderSidebar({ isCollapsed = false, className }: FolderSidebarP
 
       {/* Folder Tree */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden">
-        {/* User Smart Folders Section */}
-        <div className="px-3 py-2">
-          <div className="flex items-center justify-between px-3 mb-2">
-            <div className="text-xs font-semibold text-gray-500 dark:text-gray-400">
-              SMART FOLDERS
-            </div>
-            <button
-              onClick={openCreateSmartFolderModal}
-              className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              title="Create Smart Folder"
-            >
-              <Plus className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
-            </button>
-          </div>
-          <div className="space-y-1">
-            {userSmartFoldersLoading ? (
-              <div className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">Loading...</div>
-            ) : userSmartFolders.length === 0 ? (
-              <button
-                onClick={openCreateSmartFolderModal}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-              >
-                <FolderSearch className="w-4 h-4" />
-                <span>Create your first smart folder</span>
-              </button>
-            ) : (
-              userSmartFolders.map((folder) => (
-                <UserSmartFolderItem
-                  key={folder.id}
-                  folder={folder}
-                  isSelected={selectedUserSmartFolder === folder.id}
-                  onClick={handleUserSmartFolderClick}
-                  onEdit={handleEditUserSmartFolder}
-                  onDelete={handleDeleteUserSmartFolder}
-                />
-              ))
-            )}
-          </div>
-        </div>
-
         {/* User Folders Section */}
-        <div className="px-3 py-2 border-t border-gray-200 dark:border-gray-800">
+        <div className="px-3 py-2">
           {/* MY FOLDERS Header with Actions */}
           <div className="flex items-center justify-between px-3 mb-2">
             <div className="text-xs font-semibold text-gray-500 dark:text-gray-400">MY FOLDERS</div>

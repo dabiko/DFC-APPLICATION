@@ -19,6 +19,7 @@ import { RecentPage } from './pages/RecentPage'
 import { SharedWithMePage } from './pages/SharedWithMePage'
 import { MyDocumentsPage } from './pages/MyDocumentsPage'
 import SmartFolderResultsPage from './pages/SmartFolderResultsPage'
+import { SmartFoldersPage } from './pages/SmartFoldersPage'
 import { AuditLogPage } from './pages/AuditLogPage'
 import { PermissionAuditPage } from './pages/PermissionAuditPage'
 import { UsersRolesPage } from './pages/UsersRolesPage'
@@ -142,6 +143,16 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <MyDocumentsPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Smart Folders Management - Protected Route */}
+              <Route
+                path="/smart-folders"
+                element={
+                  <ProtectedRoute>
+                    <SmartFoldersPage />
                   </ProtectedRoute>
                 }
               />

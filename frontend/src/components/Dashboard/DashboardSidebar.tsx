@@ -6,7 +6,7 @@
 
 import { NavLink } from 'react-router-dom'
 import { useState, useEffect, useMemo } from 'react'
-import { LayoutDashboard, Search, ChevronLeft, ChevronRight } from 'lucide-react'
+import { LayoutDashboard, FolderSearch, ChevronLeft, ChevronRight } from 'lucide-react'
 import { FolderSidebar, SmartFolderItem } from '@components/Folder'
 import { getSmartFolders } from '@/utils/smartFolders'
 import { cn } from '@utils/cn'
@@ -14,7 +14,7 @@ import { cn } from '@utils/cn'
 // Navigation links (non-smart folder items)
 const navLinks = [
   { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { path: '/search', icon: Search, label: 'Global Search' },
+  { path: '/smart-folders', icon: FolderSearch, label: 'Smart Folders' },
 ]
 
 interface DashboardSidebarProps {

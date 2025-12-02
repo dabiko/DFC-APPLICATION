@@ -416,13 +416,10 @@ export function TrashPage() {
     paginatedItems.length > 0 && paginatedItems.every((f) => selectedIds.has(f.id))
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-950">
-      {/* Header */}
-      <DashboardHeader user={user} notifications={[]} onLogout={handleLogout} />
-
-      <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
-        <DashboardSidebar />
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+      <DashboardSidebar />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <DashboardHeader user={user} notifications={[]} onLogout={handleLogout} />
 
         {/* Main Content */}
         <main className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-900">

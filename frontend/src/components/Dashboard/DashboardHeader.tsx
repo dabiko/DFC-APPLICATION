@@ -20,11 +20,14 @@ import {
   GitBranch,
   Zap,
   KeyRound,
+  Search,
 } from 'lucide-react'
 import { TopNavigationBar } from '@components/Navigation/TopNavigationBar'
+import { GlobalSearchCommand } from '@components/Search'
 import { useTheme } from '@hooks/useTheme'
 import { useNetworkStatus } from '@/contexts/NetworkStatusContext'
 import { useAuth } from '@hooks/useAuth'
+import { useGlobalSearch } from '@hooks/useGlobalSearch'
 import { cn } from '@utils/cn'
 
 interface DashboardHeaderProps {
@@ -63,6 +66,7 @@ export function DashboardHeader({
   const { theme, setTheme } = useTheme()
   const { isOnline, isSlow } = useNetworkStatus()
   const { user: authUser } = useAuth()
+  const { isOpen: isSearchOpen, open: openSearch, close: closeSearch } = useGlobalSearch()
 
   const [showNotifications, setShowNotifications] = useState(false)
   const [showProfileMenu, setShowProfileMenu] = useState(false)
@@ -127,6 +131,21 @@ export function DashboardHeader({
 
   return (
     <header className="h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 flex items-center justify-between gap-6">
+      {/* Left Section - Global Search */}
+      <div className="flex items-center gap-4">
+        <button
+          onClick={openSearch}
+          className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+          aria-label="Global search"
+        >
+          <Search className="w-4 h-4" />
+          <span className="hidden sm:inline">Search...</span>
+          <kbd className="hidden lg:inline-flex items-center gap-1 px-2 py-0.5 text-xs font-mono bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded">
+            ⌘K
+          </kbd>
+        </button>
+      </div>
+
       {/* Center - App Navigation */}
       <div className="flex-1">
         <TopNavigationBar />
@@ -516,6 +535,9 @@ export function DashboardHeader({
           )}
         </div>
       </div>
+
+      {/* Global Search Command Overlay */}
+      <GlobalSearchCommand isOpen={isSearchOpen} onClose={closeSearch} />
     </header>
   )
 }
