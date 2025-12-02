@@ -1,6 +1,7 @@
 /**
  * FolderContextMenu Component
  * Right-click context menu for folder operations
+ * Integrated with RBAC permission system
  */
 
 import { FC, useEffect, useRef } from 'react'
@@ -17,6 +18,8 @@ import {
 } from '@heroicons/react/24/outline'
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid'
 import type { Folder, FolderOperation } from '@/types/folder'
+import { useFolderPermission } from '@/hooks/usePermission'
+import { usePermissions } from '@/contexts/PermissionContext'
 
 export interface FolderContextMenuProps {
   folder: Folder
@@ -80,10 +83,30 @@ export const FolderContextMenu: FC<FolderContextMenuProps> = ({
 }) => {
   const menuRef = useRef<HTMLDivElement>(null)
 
-  // Calculate permissions
-  const canDelete = folder.permissions.canDelete && !folder.isLocked
-  const canEdit = folder.permissions.canEdit && !folder.isLocked
-  const canManage = folder.permissions.canManage
+  // Get RBAC permissions for this folder
+  const { isAdmin } = usePermissions()
+  const folderResource = {
+    id: folder.id,
+    owner_id: folder.ownerId,
+  }
+  const rbacPermissions = useFolderPermission(folderResource)
+
+  // Combine static permissions with RBAC permissions
+  // Admin always has full access, owner always has full access (checked in hook)
+  const effectivePermissions = {
+    canView: isAdmin || rbacPermissions.canView || folder.permissions.canView,
+    canEdit: isAdmin || rbacPermissions.canEdit || folder.permissions.canEdit,
+    canDelete: isAdmin || rbacPermissions.canDelete || folder.permissions.canDelete,
+    canShare: isAdmin || rbacPermissions.canShare || folder.permissions.canManage,
+    canUpload: isAdmin || rbacPermissions.canUpload || folder.permissions.canEdit,
+    canManagePermissions:
+      isAdmin || rbacPermissions.canManagePermissions || folder.permissions.canManage,
+  }
+
+  // Calculate final permissions (also check if folder is locked)
+  const canDelete = effectivePermissions.canDelete && !folder.isLocked
+  const canEdit = effectivePermissions.canEdit && !folder.isLocked
+  const canManage = effectivePermissions.canManagePermissions
 
   // Adjust position to prevent overflow
   useEffect(() => {

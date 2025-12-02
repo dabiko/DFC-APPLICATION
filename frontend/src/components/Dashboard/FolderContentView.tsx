@@ -81,12 +81,17 @@ import {
 } from '@/services/favoritesService'
 import { toast } from '@/utils/toast'
 import type { DocumentShortcutListItem } from '@/types'
+import { PermissionGate } from '@/components/Permission'
+import { usePermissions } from '@/contexts/PermissionContext'
 
 export const FolderContentView: FC = () => {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const folderId = searchParams.get('folder')
+
+  // Get permission checking capabilities
+  const { isAdmin, hasGlobalPermission } = usePermissions()
 
   const allFolders = useAppSelector(selectFolders)
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
@@ -1189,20 +1194,61 @@ export const FolderContentView: FC = () => {
           <Breadcrumbs items={breadcrumbItems} showHomeIcon={true} maxItems={5} />
 
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowCreateFolder(true)}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            {/* New Folder button - requires edit permission on folder or global edit permission */}
+            <PermissionGate
+              permission="can_edit"
+              folder={
+                currentFolder
+                  ? { id: currentFolder.id, owner_id: currentFolder.ownerId }
+                  : undefined
+              }
+              fallback={
+                <button
+                  disabled
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-400 dark:text-gray-600 rounded-lg cursor-not-allowed opacity-50"
+                  title="You don't have permission to create folders here"
+                >
+                  <FolderPlus className="w-4 h-4" />
+                  New Folder
+                </button>
+              }
             >
-              <FolderPlus className="w-4 h-4" />
-              New Folder
-            </button>
-            <button
-              onClick={() => setShowUploadModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
+              <button
+                onClick={() => setShowCreateFolder(true)}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                <FolderPlus className="w-4 h-4" />
+                New Folder
+              </button>
+            </PermissionGate>
+
+            {/* Upload button - requires upload permission on folder or global upload permission */}
+            <PermissionGate
+              permission="can_upload"
+              folder={
+                currentFolder
+                  ? { id: currentFolder.id, owner_id: currentFolder.ownerId }
+                  : undefined
+              }
+              fallback={
+                <button
+                  disabled
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-300 dark:bg-blue-800 text-white rounded-lg font-medium text-sm cursor-not-allowed opacity-50"
+                  title="You don't have permission to upload files here"
+                >
+                  <Upload className="w-4 h-4" />
+                  Upload
+                </button>
+              }
             >
-              <Upload className="w-4 h-4" />
-              Upload
-            </button>
+              <button
+                onClick={() => setShowUploadModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
+              >
+                <Upload className="w-4 h-4" />
+                Upload
+              </button>
+            </PermissionGate>
           </div>
         </div>
       </div>
@@ -1252,20 +1298,38 @@ export const FolderContentView: FC = () => {
                   Get started by creating a folder or uploading documents
                 </p>
                 <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setShowCreateFolder(true)}
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-300 dark:border-gray-600"
+                  <PermissionGate
+                    permission="can_edit"
+                    folder={
+                      currentFolder
+                        ? { id: currentFolder.id, owner_id: currentFolder.ownerId }
+                        : undefined
+                    }
                   >
-                    <FolderPlus className="w-4 h-4" />
-                    New Folder
-                  </button>
-                  <button
-                    onClick={() => setShowUploadModal(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
+                    <button
+                      onClick={() => setShowCreateFolder(true)}
+                      className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-300 dark:border-gray-600"
+                    >
+                      <FolderPlus className="w-4 h-4" />
+                      New Folder
+                    </button>
+                  </PermissionGate>
+                  <PermissionGate
+                    permission="can_upload"
+                    folder={
+                      currentFolder
+                        ? { id: currentFolder.id, owner_id: currentFolder.ownerId }
+                        : undefined
+                    }
                   >
-                    <Upload className="w-4 h-4" />
-                    Upload Documents
-                  </button>
+                    <button
+                      onClick={() => setShowUploadModal(true)}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
+                    >
+                      <Upload className="w-4 h-4" />
+                      Upload Documents
+                    </button>
+                  </PermissionGate>
                 </div>
               </div>
             }

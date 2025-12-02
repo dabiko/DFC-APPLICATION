@@ -339,6 +339,268 @@ class FolderPermission(models.Model):
         return permissions
 
 
+class DocumentPermission(models.Model):
+    """
+    Document-level permissions that can override folder permissions.
+
+    Allows explicit permission grants/denials at the document level,
+    enabling scenarios like:
+    - Granting access to a specific document in a folder user can't access
+    - Denying access to a specific document even when user has folder access
+    - Time-limited document access
+
+    Priority: Document permissions > Folder permissions > Inherited permissions
+    """
+
+    # Permission levels (same as folder for consistency)
+    NO_ACCESS = 'NO_ACCESS'
+    VIEW_ONLY = 'VIEW_ONLY'
+    VIEW_DOWNLOAD = 'VIEW_DOWNLOAD'
+    EDIT = 'EDIT'
+    FULL_CONTROL = 'FULL_CONTROL'
+
+    PERMISSION_LEVEL_CHOICES = [
+        (NO_ACCESS, 'No Access'),
+        (VIEW_ONLY, 'View Only'),
+        (VIEW_DOWNLOAD, 'View & Download'),
+        (EDIT, 'Edit'),
+        (FULL_CONTROL, 'Full Control'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    document = models.ForeignKey(
+        'documents.Document',
+        on_delete=models.CASCADE,
+        related_name='permissions'
+    )
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='document_permissions',
+        help_text="Specific user (leave null for department-wide permission)"
+    )
+
+    department = models.ForeignKey(
+        Department,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='document_permissions',
+        help_text="Department-wide permission"
+    )
+
+    permission_level = models.CharField(
+        max_length=20,
+        choices=PERMISSION_LEVEL_CHOICES,
+        default=VIEW_DOWNLOAD,
+        help_text="Level of access granted"
+    )
+
+    # Whether this overrides inherited folder permissions
+    override_folder_permissions = models.BooleanField(
+        default=True,
+        help_text="If True, this permission overrides folder-level permissions"
+    )
+
+    granted_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='document_permissions_granted'
+    )
+
+    granted_at = models.DateTimeField(auto_now_add=True)
+
+    expires_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Optional expiration date for temporary access"
+    )
+
+    reason = models.TextField(
+        blank=True,
+        help_text="Reason for granting/denying this permission"
+    )
+
+    class Meta:
+        db_table = 'document_permissions'
+        ordering = ['document', '-granted_at']
+        verbose_name = 'Document Permission'
+        verbose_name_plural = 'Document Permissions'
+        indexes = [
+            models.Index(fields=['document', 'user']),
+            models.Index(fields=['document', 'department']),
+            models.Index(fields=['user']),
+            models.Index(fields=['expires_at']),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    models.Q(user__isnull=False, department__isnull=True) |
+                    models.Q(user__isnull=True, department__isnull=False)
+                ),
+                name='doc_either_user_or_department'
+            )
+        ]
+
+    def __str__(self):
+        target = self.user.username if self.user else f"Dept: {self.department.name}"
+        return f"{self.document.title} - {target} ({self.get_permission_level_display()})"
+
+    def clean(self):
+        """Validate permission assignment"""
+        if not self.user and not self.department:
+            raise ValidationError("Either user or department must be specified")
+        if self.user and self.department:
+            raise ValidationError("Cannot assign permission to both user and department")
+
+    def is_expired(self):
+        """Check if this permission has expired"""
+        from django.utils import timezone
+        if self.expires_at:
+            return self.expires_at <= timezone.now()
+        return False
+
+    def get_effective_permissions(self):
+        """
+        Get effective permissions for this document.
+        Returns dict of permission flags.
+        """
+        if self.is_expired():
+            return {
+                'can_view': False,
+                'can_download': False,
+                'can_edit': False,
+                'can_delete': False,
+                'can_share': False,
+                'can_manage_permissions': False,
+            }
+
+        permissions = {
+            'can_view': False,
+            'can_download': False,
+            'can_edit': False,
+            'can_delete': False,
+            'can_share': False,
+            'can_manage_permissions': False,
+        }
+
+        if self.permission_level == self.NO_ACCESS:
+            return permissions
+
+        if self.permission_level in [self.VIEW_ONLY, self.VIEW_DOWNLOAD,
+                                     self.EDIT, self.FULL_CONTROL]:
+            permissions['can_view'] = True
+
+        if self.permission_level in [self.VIEW_DOWNLOAD, self.EDIT, self.FULL_CONTROL]:
+            permissions['can_download'] = True
+
+        if self.permission_level in [self.EDIT, self.FULL_CONTROL]:
+            permissions['can_edit'] = True
+            permissions['can_delete'] = True
+
+        if self.permission_level == self.FULL_CONTROL:
+            permissions['can_share'] = True
+            permissions['can_manage_permissions'] = True
+
+        return permissions
+
+
+class PermissionAuditLog(models.Model):
+    """
+    Immutable audit log for permission changes.
+
+    Tracks all permission grants, revocations, and modifications
+    for compliance and security auditing.
+    """
+
+    ACTION_CHOICES = [
+        ('GRANT', 'Permission Granted'),
+        ('REVOKE', 'Permission Revoked'),
+        ('MODIFY', 'Permission Modified'),
+        ('EXPIRE', 'Permission Expired'),
+        ('DENY', 'Access Denied'),
+    ]
+
+    RESOURCE_TYPE_CHOICES = [
+        ('FOLDER', 'Folder'),
+        ('DOCUMENT', 'Document'),
+        ('ROLE', 'Role'),
+        ('DEPARTMENT', 'Department'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    # Who performed the action
+    actor = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='permission_actions'
+    )
+
+    # What action was performed
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+
+    # What type of resource was affected
+    resource_type = models.CharField(max_length=20, choices=RESOURCE_TYPE_CHOICES)
+
+    # ID of the resource (folder, document, etc.)
+    resource_id = models.UUIDField()
+
+    # Who was the target of the permission change
+    target_user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='permission_changes_received'
+    )
+
+    target_department = models.ForeignKey(
+        Department,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='permission_changes_received'
+    )
+
+    # Permission details
+    old_permission_level = models.CharField(max_length=20, blank=True)
+    new_permission_level = models.CharField(max_length=20, blank=True)
+
+    # Additional context
+    reason = models.TextField(blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
+
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'permission_audit_log'
+        ordering = ['-timestamp']
+        verbose_name = 'Permission Audit Log'
+        verbose_name_plural = 'Permission Audit Logs'
+        indexes = [
+            models.Index(fields=['actor', 'timestamp']),
+            models.Index(fields=['target_user', 'timestamp']),
+            models.Index(fields=['resource_type', 'resource_id']),
+            models.Index(fields=['-timestamp']),
+        ]
+
+    def __str__(self):
+        actor_name = self.actor.username if self.actor else 'System'
+        target = self.target_user.username if self.target_user else (
+            self.target_department.name if self.target_department else 'Unknown'
+        )
+        return f"{actor_name} {self.action} on {self.resource_type} for {target}"
+
+
 class PermissionCache(models.Model):
     """
     Cache for computed permissions to improve performance.

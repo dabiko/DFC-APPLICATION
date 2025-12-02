@@ -1,12 +1,12 @@
 /**
  * DocumentContextMenu Component
  * Context menu for documents and shortcuts with navigation options
+ * Integrated with RBAC permission system
  */
 
 import { FC, useEffect, useRef } from 'react'
 import {
   DocumentIcon,
-  ArrowTopRightOnSquareIcon,
   FolderIcon,
   LinkIcon,
   ArrowDownTrayIcon,
@@ -22,6 +22,8 @@ import {
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid'
 import { cn } from '@utils/cn'
 import type { FileListItem } from '@/types/fileManagement'
+import { useDocumentPermission } from '@/hooks/usePermission'
+import { usePermissions } from '@/contexts/PermissionContext'
 
 export type DocumentContextMenuAction =
   | 'preview'
@@ -97,6 +99,24 @@ export const DocumentContextMenu: FC<DocumentContextMenuProps> = ({
   const menuRef = useRef<HTMLDivElement>(null)
   const isShortcut = item.isShortcut
   const isFolder = item.type === 'folder'
+
+  // Get RBAC permissions for this document
+  const { isAdmin } = usePermissions()
+  const documentResource = {
+    id: isShortcut ? item.originalDocumentId || item.id : item.id,
+    owner_id: undefined, // Will be checked by the hook
+  }
+  const permissions = useDocumentPermission(documentResource)
+
+  // Combine static permissions with RBAC permissions
+  // Admin always has full access, owner always has full access (checked in hook)
+  const effectivePermissions = {
+    canView: isAdmin || permissions.canView || item.permissions?.canView,
+    canDownload: isAdmin || permissions.canDownload || item.permissions?.canDownload,
+    canEdit: isAdmin || permissions.canEdit || item.permissions?.canEdit,
+    canDelete: isAdmin || permissions.canDelete || item.permissions?.canDelete,
+    canShare: isAdmin || permissions.canShare || item.permissions?.canShare,
+  }
 
   // Adjust position to stay within viewport
   useEffect(() => {
@@ -199,18 +219,19 @@ export const DocumentContextMenu: FC<DocumentContextMenuProps> = ({
         icon={<EyeIcon className="w-4 h-4" />}
         label="Preview"
         onClick={() => onAction('preview', item)}
+        disabled={!effectivePermissions.canView}
       />
       <MenuItem
         icon={<ArrowDownTrayIcon className="w-4 h-4" />}
         label="Download"
         onClick={() => onAction('download', item)}
-        disabled={!item.permissions?.canDownload}
+        disabled={!effectivePermissions.canDownload}
       />
       <MenuItem
         icon={<ShareIcon className="w-4 h-4" />}
         label="Share"
         onClick={() => onAction('share', item)}
-        disabled={!item.permissions?.canShare}
+        disabled={!effectivePermissions.canShare}
       />
 
       {/* Rename option (only for non-shortcuts) */}
@@ -219,7 +240,7 @@ export const DocumentContextMenu: FC<DocumentContextMenuProps> = ({
           icon={<PencilIcon className="w-4 h-4" />}
           label="Rename"
           onClick={() => onAction('rename', item)}
-          disabled={!item.permissions?.canEdit}
+          disabled={!effectivePermissions.canEdit}
         />
       )}
 
@@ -229,7 +250,7 @@ export const DocumentContextMenu: FC<DocumentContextMenuProps> = ({
           icon={<ArrowRightIcon className="w-4 h-4" />}
           label="Move to..."
           onClick={() => onAction('move', item)}
-          disabled={!item.permissions?.canEdit}
+          disabled={!effectivePermissions.canEdit}
         />
       )}
 
@@ -264,15 +285,22 @@ export const DocumentContextMenu: FC<DocumentContextMenuProps> = ({
         icon={<Cog6ToothIcon className="w-4 h-4" />}
         label={isShortcut ? 'Edit Original' : 'Edit Metadata'}
         onClick={() => onAction('edit', item)}
-        disabled={!item.permissions?.canEdit}
+        disabled={!effectivePermissions.canEdit}
       />
       <MenuItem
         icon={<TrashIcon className="w-4 h-4" />}
         label={isShortcut ? 'Remove Shortcut' : 'Delete'}
         onClick={() => onAction('delete', item)}
         variant="danger"
-        disabled={!item.permissions?.canDelete}
+        disabled={!effectivePermissions.canDelete}
       />
+
+      {/* Show loading indicator while checking permissions */}
+      {permissions.isLoading && (
+        <div className="px-3 py-1 text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1">
+          <span className="animate-pulse">Checking permissions...</span>
+        </div>
+      )}
     </div>
   )
 }

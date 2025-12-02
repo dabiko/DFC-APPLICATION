@@ -17,6 +17,9 @@ import {
   Scale,
   Server,
   CreditCard,
+  GitBranch,
+  Zap,
+  KeyRound,
 } from 'lucide-react'
 import { TopNavigationBar } from '@components/Navigation/TopNavigationBar'
 import { useTheme } from '@hooks/useTheme'
@@ -244,7 +247,7 @@ export function DashboardHeader({
                     className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3"
                   >
                     <Building2 className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                    <span>Departments</span>
+                    <span>Organization Settings</span>
                   </button>
 
                   <button
@@ -256,6 +259,17 @@ export function DashboardHeader({
                   >
                     <ClipboardList className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                     <span>Audit Logs</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowAdminMenu(false)
+                      navigate('/permission-audit')
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3"
+                  >
+                    <KeyRound className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                    <span>Permission Audit</span>
                   </button>
 
                   <button
@@ -278,6 +292,28 @@ export function DashboardHeader({
                   >
                     <Scale className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                     <span>Legal Holds</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowAdminMenu(false)
+                      navigate('/workflows')
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3"
+                  >
+                    <GitBranch className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                    <span>Workflows</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowAdminMenu(false)
+                      navigate('/automation')
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3"
+                  >
+                    <Zap className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                    <span>Automation</span>
                   </button>
                 </div>
 

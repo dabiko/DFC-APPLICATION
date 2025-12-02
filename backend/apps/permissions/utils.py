@@ -277,6 +277,7 @@ class PermissionChecker:
             QuerySet of accessible documents
         """
         from apps.documents.models import Document
+        from apps.permissions.models import DocumentPermission
 
         if base_queryset is None:
             base_queryset = Document.objects.filter(is_deleted=False)
@@ -287,17 +288,149 @@ class PermissionChecker:
         # Get accessible folders
         accessible_folders = self.get_accessible_folders()
 
-        # Filter documents in accessible folders
+        # Get documents with explicit permissions for this user
+        docs_with_explicit_access = DocumentPermission.objects.filter(
+            Q(user=self.user) | Q(department=self.user.department),
+            permission_level__in=[
+                DocumentPermission.VIEW_ONLY,
+                DocumentPermission.VIEW_DOWNLOAD,
+                DocumentPermission.EDIT,
+                DocumentPermission.FULL_CONTROL
+            ]
+        ).filter(
+            Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now())
+        ).values_list('document_id', flat=True)
+
+        # Filter documents in accessible folders OR with explicit document permissions
         accessible_documents = base_queryset.filter(
             Q(owner=self.user) |
             Q(department=self.user.department) |
-            Q(folder__in=accessible_folders)
+            Q(folder__in=accessible_folders) |
+            Q(id__in=docs_with_explicit_access)
         ).distinct()
 
         return accessible_documents
 
+    def has_document_permission(self, document, permission):
+        """
+        Check if user has permission on a specific document.
 
-def check_permission(user, permission, obj=None):
+        Priority order:
+        1. Document owner always has full control
+        2. Superuser always has access
+        3. Explicit document-level permission (overrides folder permissions)
+        4. Folder-level permission (with inheritance)
+        5. Global role permission
+
+        Args:
+            document: Document instance
+            permission (str): Permission to check
+
+        Returns:
+            bool: True if user has permission
+        """
+        has_perm, _, _ = self.has_document_permission_with_reason(document, permission)
+        return has_perm
+
+    def has_document_permission_with_reason(self, document, permission):
+        """
+        Check if user has permission on a document and return reason.
+
+        Args:
+            document: Document instance
+            permission (str): Permission to check
+
+        Returns:
+            tuple: (has_permission: bool, reason: str, source: str)
+        """
+        from apps.permissions.models import DocumentPermission
+
+        # Superuser always has permission
+        if self.user.is_superuser:
+            return True, "User is superuser", "SUPERUSER"
+
+        # Document owner always has full control
+        if document.owner_id == self.user.id:
+            return True, "User is document owner", "OWNER"
+
+        # Check explicit document-level permission first
+        doc_perm = self._get_document_permission(document)
+        if doc_perm:
+            if doc_perm.override_folder_permissions:
+                # Document permission overrides folder
+                effective_perms = doc_perm.get_effective_permissions()
+                if effective_perms.get(permission, False):
+                    return True, "User has explicit document permission", "DOCUMENT_PERMISSION"
+                elif doc_perm.permission_level == DocumentPermission.NO_ACCESS:
+                    return False, "Access explicitly denied at document level", "DOCUMENT_DENIED"
+                else:
+                    return False, "Document permission does not grant required access", "INSUFFICIENT_DOCUMENT_PERMISSION"
+            else:
+                # Document permission adds to folder permission
+                effective_perms = doc_perm.get_effective_permissions()
+                if effective_perms.get(permission, False):
+                    return True, "User has explicit document permission", "DOCUMENT_PERMISSION"
+                # Fall through to check folder permission
+
+        # Check folder-level permission
+        if document.folder:
+            has_folder_perm = self.has_folder_permission(document.folder, permission)
+            if has_folder_perm:
+                # Determine more specific reason
+                if self.has_global_permission(permission):
+                    return True, "User has global permission via role", "GLOBAL_ROLE"
+                if document.folder.department_id and document.folder.department_id == self.user.department_id:
+                    if self.has_department_permission(document.folder.department, permission):
+                        return True, "User has department-level permission", "DEPARTMENT"
+                return True, "User has folder-level permission", "FOLDER_PERMISSION"
+
+        # Check global permission as fallback
+        if self.has_global_permission(permission):
+            return True, "User has global permission via role", "GLOBAL_ROLE"
+
+        return False, "User does not have required permission", "NO_PERMISSION"
+
+    def _get_document_permission(self, document):
+        """
+        Get the effective document permission for this user.
+
+        Checks user-specific permission first, then department permission.
+
+        Args:
+            document: Document instance
+
+        Returns:
+            DocumentPermission or None
+        """
+        from apps.permissions.models import DocumentPermission
+
+        # Check user-specific permission first
+        user_perm = DocumentPermission.objects.filter(
+            document=document,
+            user=self.user
+        ).filter(
+            Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now())
+        ).first()
+
+        if user_perm:
+            return user_perm
+
+        # Check department permission
+        if self.user.department:
+            dept_perm = DocumentPermission.objects.filter(
+                document=document,
+                department=self.user.department
+            ).filter(
+                Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now())
+            ).first()
+
+            if dept_perm:
+                return dept_perm
+
+        return None
+
+
+def check_permission(user, permission, obj=None, context=None):
     """
     Convenience function to check permissions.
 
@@ -305,6 +438,7 @@ def check_permission(user, permission, obj=None):
         user: User instance
         permission (str): Permission to check
         obj: Optional folder/document instance
+        context (dict): Optional context for permission checks (e.g., action type)
 
     Returns:
         bool: True if user has permission
@@ -315,14 +449,63 @@ def check_permission(user, permission, obj=None):
         return checker.has_global_permission(permission)
 
     # Check based on object type
-    if hasattr(obj, 'parent'):  # It's a folder
+    if hasattr(obj, 'parent') and not hasattr(obj, 'folder'):  # It's a folder
         return checker.has_folder_permission(obj, permission)
     elif hasattr(obj, 'folder'):  # It's a document
-        if obj.owner_id == user.id:
-            return True
-        return checker.has_folder_permission(obj.folder, permission)
+        return checker.has_document_permission(obj, permission)
 
     return False
+
+
+def check_permission_with_reason(user, permission, obj=None):
+    """
+    Check permission and return reason for decision.
+
+    Args:
+        user: User instance
+        permission (str): Permission to check
+        obj: Optional folder/document instance
+
+    Returns:
+        tuple: (has_permission: bool, reason: str, source: str)
+    """
+    checker = PermissionChecker(user)
+
+    # Superuser always has permission
+    if user.is_superuser:
+        return True, "User is superuser", "SUPERUSER"
+
+    if obj is None:
+        has_perm = checker.has_global_permission(permission)
+        if has_perm:
+            return True, "User has global permission via role", "GLOBAL_ROLE"
+        return False, "User does not have required global permission", "NO_PERMISSION"
+
+    # Check based on object type
+    if hasattr(obj, 'parent') and not hasattr(obj, 'folder'):  # It's a folder
+        # Folder owner always has permission
+        if hasattr(obj, 'owner_id') and obj.owner_id == user.id:
+            return True, "User is folder owner", "OWNER"
+
+        has_perm = checker.has_folder_permission(obj, permission)
+        if has_perm:
+            # Determine source
+            if checker.has_global_permission(permission):
+                return True, "User has global permission via role", "GLOBAL_ROLE"
+            if obj.department_id and obj.department_id == user.department_id:
+                return True, "User has department-level permission", "DEPARTMENT"
+            return True, "User has explicit folder permission", "FOLDER_PERMISSION"
+        return False, "User does not have required folder permission", "NO_PERMISSION"
+
+    elif hasattr(obj, 'folder'):  # It's a document
+        # Document owner always has permission
+        if obj.owner_id == user.id:
+            return True, "User is document owner", "OWNER"
+
+        has_perm, reason, source = checker.has_document_permission_with_reason(obj, permission)
+        return has_perm, reason, source
+
+    return False, "Unknown object type", "UNKNOWN"
 
 
 def clear_permission_cache(user=None, folder=None):

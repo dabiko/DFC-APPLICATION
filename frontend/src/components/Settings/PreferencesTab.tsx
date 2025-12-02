@@ -27,6 +27,7 @@ import {
   Loader2,
 } from 'lucide-react'
 import { cn } from '@/utils/cn'
+import { useTheme } from '@/hooks/useTheme'
 import type { UserPreferences } from '@/services/settingsService'
 
 interface PreferencesTabProps {
@@ -85,6 +86,9 @@ export function PreferencesTab({
   const [isSaving, setIsSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
   const [localPrefs, setLocalPrefs] = useState<Partial<UserPreferences>>({})
+
+  // Use the theme hook to apply theme changes immediately
+  const { theme: currentTheme, setTheme } = useTheme()
 
   // Initialize local state when preferences load
   useEffect(() => {
@@ -149,16 +153,21 @@ export function PreferencesTab({
           </label>
           <div className="grid grid-cols-3 gap-3">
             {[
-              { value: 'light', icon: Sun, label: 'Light' },
-              { value: 'dark', icon: Moon, label: 'Dark' },
-              { value: 'system', icon: Monitor, label: 'System' },
+              { value: 'light' as const, icon: Sun, label: 'Light' },
+              { value: 'dark' as const, icon: Moon, label: 'Dark' },
+              { value: 'system' as const, icon: Monitor, label: 'System' },
             ].map(({ value, icon: Icon, label }) => (
               <button
                 key={value}
-                onClick={() => handleChange('theme', value)}
+                onClick={() => {
+                  // Apply theme immediately using the hook
+                  setTheme(value)
+                  // Also update local prefs to save to backend
+                  handleChange('theme', value)
+                }}
                 className={cn(
                   'flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-colors',
-                  localPrefs.theme === value
+                  currentTheme === value
                     ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
                     : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                 )}
@@ -166,13 +175,13 @@ export function PreferencesTab({
                 <Icon
                   className={cn(
                     'w-6 h-6',
-                    localPrefs.theme === value ? 'text-blue-500' : 'text-gray-400'
+                    currentTheme === value ? 'text-blue-500' : 'text-gray-400'
                   )}
                 />
                 <span
                   className={cn(
                     'text-sm font-medium',
-                    localPrefs.theme === value
+                    currentTheme === value
                       ? 'text-blue-600 dark:text-blue-400'
                       : 'text-gray-600 dark:text-gray-400'
                   )}

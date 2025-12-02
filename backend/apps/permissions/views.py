@@ -18,7 +18,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q, Count
 from django.utils import timezone
 
-from apps.permissions.models import Role, UserRole, FolderPermission
+from apps.permissions.models import Role, UserRole, FolderPermission, DocumentPermission, PermissionAuditLog
 from apps.permissions.serializers import (
     RoleSerializer,
     RoleListSerializer,
@@ -31,6 +31,13 @@ from apps.permissions.serializers import (
     FolderPermissionCheckSerializer,
     BulkPermissionAssignSerializer,
     PermissionInheritanceTreeSerializer,
+    DocumentPermissionSerializer,
+    DocumentPermissionCreateSerializer,
+    DocumentPermissionListSerializer,
+    DocumentPermissionCheckSerializer,
+    BulkDocumentPermissionSerializer,
+    PermissionAuditLogSerializer,
+    PermissionAuditLogListSerializer,
 )
 from apps.permissions.decorators import (
     CanManagePermissions,
@@ -559,3 +566,381 @@ class ClearPermissionCacheView(APIView):
         )
 
         return Response({'message': message})
+
+
+class DocumentPermissionViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for DocumentPermission management.
+
+    Allows managing document-level permissions for users and departments.
+    Document permissions can override folder-level permissions.
+    """
+    queryset = DocumentPermission.objects.all()
+    permission_classes = [drf_permissions.IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return DocumentPermissionCreateSerializer
+        elif self.action == 'list':
+            return DocumentPermissionListSerializer
+        return DocumentPermissionSerializer
+
+    def get_queryset(self):
+        """Filter document permissions based on query parameters"""
+        queryset = DocumentPermission.objects.select_related(
+            'document', 'user', 'department', 'granted_by'
+        ).order_by('-granted_at')
+
+        # Filter by document
+        document_id = self.request.query_params.get('document_id')
+        if document_id:
+            queryset = queryset.filter(document_id=document_id)
+
+        # Filter by user
+        user_id = self.request.query_params.get('user_id')
+        if user_id:
+            queryset = queryset.filter(user_id=user_id)
+
+        # Filter by department
+        department_id = self.request.query_params.get('department_id')
+        if department_id:
+            queryset = queryset.filter(department_id=department_id)
+
+        # Filter by permission level
+        permission_level = self.request.query_params.get('permission_level')
+        if permission_level:
+            queryset = queryset.filter(permission_level=permission_level)
+
+        # Filter expired/non-expired
+        include_expired = self.request.query_params.get('include_expired', 'false')
+        if include_expired.lower() != 'true':
+            queryset = queryset.filter(
+                Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now())
+            )
+
+        return queryset
+
+    def check_object_permissions(self, request, obj):
+        """Check if user can manage permissions for this document"""
+        super().check_object_permissions(request, obj)
+
+        # User must have can_manage_permissions on the document
+        if not check_permission(request.user, 'can_manage_permissions', obj.document):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("You do not have permission to manage permissions for this document")
+
+    def perform_create(self, serializer):
+        """Create document permission"""
+        from apps.documents.models import Document
+
+        # Check if user can manage permissions for this document
+        document = serializer.validated_data['document']
+        if not check_permission(self.request.user, 'can_manage_permissions', document):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("You do not have permission to manage permissions for this document")
+
+        doc_permission = serializer.save()
+
+        # Log permission audit
+        self._log_permission_audit(
+            action='GRANT',
+            resource_type='DOCUMENT',
+            resource_id=doc_permission.document_id,
+            target_user=doc_permission.user,
+            target_department=doc_permission.department,
+            new_permission_level=doc_permission.permission_level,
+            reason=doc_permission.reason
+        )
+
+        # Log general audit event
+        log_audit_event(
+            user=self.request.user,
+            action='GRANT_DOCUMENT_PERMISSION',
+            resource_type='DocumentPermission',
+            resource_id=str(doc_permission.id),
+            details={
+                'document': doc_permission.document.title,
+                'target': doc_permission.user.username if doc_permission.user else doc_permission.department.name,
+                'permission_level': doc_permission.permission_level,
+            }
+        )
+
+    def perform_update(self, serializer):
+        """Update document permission"""
+        old_level = serializer.instance.permission_level
+        doc_permission = serializer.save()
+
+        self._log_permission_audit(
+            action='MODIFY',
+            resource_type='DOCUMENT',
+            resource_id=doc_permission.document_id,
+            target_user=doc_permission.user,
+            target_department=doc_permission.department,
+            old_permission_level=old_level,
+            new_permission_level=doc_permission.permission_level,
+            reason=doc_permission.reason
+        )
+
+        log_audit_event(
+            user=self.request.user,
+            action='UPDATE_DOCUMENT_PERMISSION',
+            resource_type='DocumentPermission',
+            resource_id=str(doc_permission.id),
+            details={'permission_level': doc_permission.permission_level}
+        )
+
+    def perform_destroy(self, instance):
+        """Delete document permission"""
+        self._log_permission_audit(
+            action='REVOKE',
+            resource_type='DOCUMENT',
+            resource_id=instance.document_id,
+            target_user=instance.user,
+            target_department=instance.department,
+            old_permission_level=instance.permission_level,
+            reason='Permission revoked'
+        )
+
+        log_audit_event(
+            user=self.request.user,
+            action='REVOKE_DOCUMENT_PERMISSION',
+            resource_type='DocumentPermission',
+            resource_id=str(instance.id),
+            details={'document': instance.document.title}
+        )
+
+        instance.delete()
+
+    def _log_permission_audit(self, action, resource_type, resource_id, target_user=None,
+                               target_department=None, old_permission_level='',
+                               new_permission_level='', reason=''):
+        """Log permission change to audit log"""
+        PermissionAuditLog.objects.create(
+            actor=self.request.user,
+            action=action,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            target_user=target_user,
+            target_department=target_department,
+            old_permission_level=old_permission_level,
+            new_permission_level=new_permission_level,
+            reason=reason,
+            ip_address=self._get_client_ip(),
+            user_agent=self.request.META.get('HTTP_USER_AGENT', '')[:500]
+        )
+
+    def _get_client_ip(self):
+        """Get client IP address from request"""
+        x_forwarded_for = self.request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            return x_forwarded_for.split(',')[0].strip()
+        return self.request.META.get('REMOTE_ADDR')
+
+    @action(detail=False, methods=['post'])
+    def bulk_assign(self, request):
+        """Bulk assign permissions to multiple users/departments"""
+        from apps.documents.models import Document
+
+        serializer = BulkDocumentPermissionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        document_id = serializer.validated_data['document_id']
+        assignments = serializer.validated_data['assignments']
+
+        document = get_object_or_404(Document, id=document_id)
+
+        # Check permission
+        if not check_permission(request.user, 'can_manage_permissions', document):
+            return Response(
+                {'error': 'You do not have permission to manage permissions for this document'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        created_permissions = []
+        for assignment in assignments:
+            user_id = assignment.get('user_id')
+            department_id = assignment.get('department_id')
+            permission_level = assignment['permission_level']
+            override_folder = assignment.get('override_folder_permissions', True)
+            expires_at = assignment.get('expires_at')
+            reason = assignment.get('reason', '')
+
+            # Create or update permission
+            if user_id:
+                perm, created = DocumentPermission.objects.update_or_create(
+                    document=document,
+                    user_id=user_id,
+                    defaults={
+                        'permission_level': permission_level,
+                        'override_folder_permissions': override_folder,
+                        'expires_at': expires_at,
+                        'reason': reason,
+                        'granted_by': request.user,
+                    }
+                )
+            else:
+                perm, created = DocumentPermission.objects.update_or_create(
+                    document=document,
+                    department_id=department_id,
+                    defaults={
+                        'permission_level': permission_level,
+                        'override_folder_permissions': override_folder,
+                        'expires_at': expires_at,
+                        'reason': reason,
+                        'granted_by': request.user,
+                    }
+                )
+
+            created_permissions.append(perm)
+
+        # Log audit event
+        log_audit_event(
+            user=request.user,
+            action='BULK_ASSIGN_DOCUMENT_PERMISSIONS',
+            resource_type='DocumentPermission',
+            resource_id=str(document.id),
+            details={'count': len(created_permissions)}
+        )
+
+        serializer = DocumentPermissionListSerializer(created_permissions, many=True)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class DocumentPermissionCheckView(APIView):
+    """
+    View for checking if a user has a specific permission on a document.
+    """
+    permission_classes = [drf_permissions.IsAuthenticated]
+
+    def post(self, request):
+        """Check permission for user on document"""
+        from apps.documents.models import Document
+        from apps.permissions.utils import check_permission_with_reason
+
+        serializer = DocumentPermissionCheckSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        document_id = serializer.validated_data['document_id']
+        user_id = serializer.validated_data['user_id']
+        permission = serializer.validated_data['permission']
+
+        document = get_object_or_404(Document, id=document_id)
+        user = get_object_or_404(User, id=user_id)
+
+        # Check permission with reason
+        has_perm, reason, source = check_permission_with_reason(user, permission, document)
+
+        return Response({
+            'has_permission': has_perm,
+            'reason': reason,
+            'source': source,
+            'document': document.title,
+            'user': user.username,
+            'permission': permission,
+        })
+
+
+class PermissionAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for viewing permission audit logs.
+    Read-only as audit logs are immutable.
+    """
+    queryset = PermissionAuditLog.objects.all()
+    permission_classes = [drf_permissions.IsAuthenticated, CanManagePermissions]
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return PermissionAuditLogListSerializer
+        return PermissionAuditLogSerializer
+
+    def get_queryset(self):
+        """Filter audit logs based on query parameters"""
+        queryset = PermissionAuditLog.objects.select_related(
+            'actor', 'target_user', 'target_department'
+        ).order_by('-timestamp')
+
+        # Filter by actor
+        actor_id = self.request.query_params.get('actor_id')
+        if actor_id:
+            queryset = queryset.filter(actor_id=actor_id)
+
+        # Filter by target user
+        target_user_id = self.request.query_params.get('target_user_id')
+        if target_user_id:
+            queryset = queryset.filter(target_user_id=target_user_id)
+
+        # Filter by target department
+        target_department_id = self.request.query_params.get('target_department_id')
+        if target_department_id:
+            queryset = queryset.filter(target_department_id=target_department_id)
+
+        # Filter by action
+        action = self.request.query_params.get('action')
+        if action:
+            queryset = queryset.filter(action=action)
+
+        # Filter by resource type
+        resource_type = self.request.query_params.get('resource_type')
+        if resource_type:
+            queryset = queryset.filter(resource_type=resource_type)
+
+        # Filter by resource ID
+        resource_id = self.request.query_params.get('resource_id')
+        if resource_id:
+            queryset = queryset.filter(resource_id=resource_id)
+
+        # Filter by date range
+        from_date = self.request.query_params.get('from_date')
+        if from_date:
+            queryset = queryset.filter(timestamp__gte=from_date)
+
+        to_date = self.request.query_params.get('to_date')
+        if to_date:
+            queryset = queryset.filter(timestamp__lte=to_date)
+
+        return queryset
+
+    @action(detail=False, methods=['get'])
+    def summary(self, request):
+        """Get summary of permission activities"""
+        from django.db.models.functions import TruncDate
+        from datetime import timedelta
+
+        # Get date range (default last 30 days)
+        days = int(request.query_params.get('days', 30))
+        start_date = timezone.now() - timedelta(days=days)
+
+        queryset = self.get_queryset().filter(timestamp__gte=start_date)
+
+        # Action counts
+        action_counts = queryset.values('action').annotate(
+            count=Count('id')
+        ).order_by('-count')
+
+        # Resource type counts
+        resource_counts = queryset.values('resource_type').annotate(
+            count=Count('id')
+        ).order_by('-count')
+
+        # Daily activity
+        daily_activity = queryset.annotate(
+            date=TruncDate('timestamp')
+        ).values('date').annotate(
+            count=Count('id')
+        ).order_by('date')
+
+        # Top actors
+        top_actors = queryset.values(
+            'actor__id', 'actor__username'
+        ).annotate(
+            count=Count('id')
+        ).order_by('-count')[:10]
+
+        return Response({
+            'period_days': days,
+            'total_events': queryset.count(),
+            'action_counts': list(action_counts),
+            'resource_counts': list(resource_counts),
+            'daily_activity': list(daily_activity),
+            'top_actors': list(top_actors),
+        })

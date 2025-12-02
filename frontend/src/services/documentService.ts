@@ -972,7 +972,7 @@ export const getDocumentVersions = async (
 ): Promise<DocumentVersionFromBackend[]> => {
   const response = await apiClient.get<
     DocumentVersionFromBackend[] | { results: DocumentVersionFromBackend[] }
-  >(`/documents/${documentId}/versions/`)
+  >(`/documents/${documentId}/versions/list/`)
 
   // Handle both paginated and direct array response
   if (Array.isArray(response.data)) {
@@ -1025,21 +1025,62 @@ export interface DocumentAccessFromBackend {
 
 /**
  * Get access list for a document
+ * Uses the new RBAC permissions API
  */
 export const getDocumentAccess = async (
   documentId: string
 ): Promise<DocumentAccessFromBackend[]> => {
-  const response = await apiClient.get<
-    DocumentAccessFromBackend[] | { results: DocumentAccessFromBackend[] }
-  >(`/documents/${documentId}/permissions/`)
+  try {
+    const response = await apiClient.get(`/permissions/document-permissions/`, {
+      params: { document_id: documentId },
+    })
 
-  // Handle both paginated and direct array response
-  if (Array.isArray(response.data)) {
-    return response.data
-  } else if (response.data && 'results' in response.data) {
-    return response.data.results
+    // Transform permission data to access list format
+    const permissions = response.data.results || response.data || []
+    return permissions.map(
+      (perm: {
+        id: string
+        user?: string
+        user_username?: string
+        user_email?: string
+        user_full_name?: string
+        department?: string
+        department_name?: string
+        permission_level: string
+        granted_at: string
+        granted_by_username?: string
+      }) => ({
+        id: perm.id,
+        user_id: perm.user,
+        user_name: perm.user_full_name || perm.user_username || perm.department_name || 'Unknown',
+        user_email: perm.user_email || '',
+        permission: mapPermissionLevel(perm.permission_level),
+        granted_at: perm.granted_at,
+        granted_by: perm.granted_by_username,
+      })
+    )
+  } catch {
+    // Return empty array if permissions API is not available
+    return []
   }
-  return []
+}
+
+/**
+ * Map backend permission level to frontend permission type
+ */
+const mapPermissionLevel = (level: string): 'view' | 'edit' | 'manage' | 'owner' => {
+  switch (level) {
+    case 'VIEW_ONLY':
+    case 'VIEW_DOWNLOAD':
+      return 'view'
+    case 'CONTRIBUTE':
+    case 'EDIT':
+      return 'edit'
+    case 'FULL_CONTROL':
+      return 'manage'
+    default:
+      return 'view'
+  }
 }
 
 // ============================================================================

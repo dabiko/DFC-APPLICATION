@@ -3,6 +3,7 @@ import { Provider } from 'react-redux'
 import { store } from '@store'
 import { ToastContainer, NetworkStatusBanner } from '@components/common'
 import { NetworkStatusProvider } from '@/contexts/NetworkStatusContext'
+import { PermissionProvider } from '@/contexts/PermissionContext'
 import { ProtectedRoute, PublicRoute } from '@components/Auth'
 import { NotFoundRouter } from '@components/NotFoundRouter'
 import { BillingDashboard } from './pages/BillingDashboard'
@@ -19,6 +20,7 @@ import { SharedWithMePage } from './pages/SharedWithMePage'
 import { MyDocumentsPage } from './pages/MyDocumentsPage'
 import SmartFolderResultsPage from './pages/SmartFolderResultsPage'
 import { AuditLogPage } from './pages/AuditLogPage'
+import { PermissionAuditPage } from './pages/PermissionAuditPage'
 import { UsersRolesPage } from './pages/UsersRolesPage'
 import { RetentionDashboardPage } from './pages/RetentionDashboardPage'
 import { WorkflowCenterPage } from './pages/WorkflowCenterPage'
@@ -35,267 +37,300 @@ function App() {
   return (
     <Provider store={store}>
       <NetworkStatusProvider>
-        <NetworkStatusBanner />
-        <Router>
-          <Routes>
-            {/* Landing Page */}
-            <Route path="/" element={<LandingPage />} />
+        <PermissionProvider>
+          <NetworkStatusBanner />
+          <Router>
+            <Routes>
+              {/* Landing Page */}
+              <Route path="/" element={<LandingPage />} />
 
-            {/* Authentication - Public Routes (redirect to dashboard if already logged in) */}
-            <Route
-              path="/register"
-              element={
-                <PublicRoute>
-                  <SignUp />
-                </PublicRoute>
-              }
-            />
-            <Route
-              path="/signup"
-              element={
-                <PublicRoute>
-                  <SignUp />
-                </PublicRoute>
-              }
-            />
-            <Route
-              path="/login"
-              element={
-                <PublicRoute>
-                  <Login />
-                </PublicRoute>
-              }
-            />
-            <Route
-              path="/forgot-password"
-              element={
-                <PublicRoute>
-                  <ForgotPassword />
-                </PublicRoute>
-              }
-            />
-            <Route
-              path="/reset-password"
-              element={
-                <PublicRoute>
-                  <ResetPassword />
-                </PublicRoute>
-              }
-            />
+              {/* Authentication - Public Routes (redirect to dashboard if already logged in) */}
+              <Route
+                path="/register"
+                element={
+                  <PublicRoute>
+                    <SignUp />
+                  </PublicRoute>
+                }
+              />
+              <Route
+                path="/signup"
+                element={
+                  <PublicRoute>
+                    <SignUp />
+                  </PublicRoute>
+                }
+              />
+              <Route
+                path="/login"
+                element={
+                  <PublicRoute>
+                    <Login />
+                  </PublicRoute>
+                }
+              />
+              <Route
+                path="/forgot-password"
+                element={
+                  <PublicRoute>
+                    <ForgotPassword />
+                  </PublicRoute>
+                }
+              />
+              <Route
+                path="/reset-password"
+                element={
+                  <PublicRoute>
+                    <ResetPassword />
+                  </PublicRoute>
+                }
+              />
 
-            {/* Dashboard - Protected Route */}
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
+              {/* Dashboard - Protected Route */}
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Trash - Protected Route */}
-            <Route
-              path="/trash"
-              element={
-                <ProtectedRoute>
-                  <TrashPage />
-                </ProtectedRoute>
-              }
-            />
+              {/* Trash - Protected Route */}
+              <Route
+                path="/trash"
+                element={
+                  <ProtectedRoute>
+                    <TrashPage />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Favorites - Protected Route */}
-            <Route
-              path="/favorites"
-              element={
-                <ProtectedRoute>
-                  <FavoritesPage />
-                </ProtectedRoute>
-              }
-            />
+              {/* Favorites - Protected Route */}
+              <Route
+                path="/favorites"
+                element={
+                  <ProtectedRoute>
+                    <FavoritesPage />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Recent Files - Protected Route */}
-            <Route
-              path="/recent"
-              element={
-                <ProtectedRoute>
-                  <RecentPage />
-                </ProtectedRoute>
-              }
-            />
+              {/* Recent Files - Protected Route */}
+              <Route
+                path="/recent"
+                element={
+                  <ProtectedRoute>
+                    <RecentPage />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Shared With Me - Protected Route */}
-            <Route
-              path="/shared-with-me"
-              element={
-                <ProtectedRoute>
-                  <SharedWithMePage />
-                </ProtectedRoute>
-              }
-            />
+              {/* Shared With Me - Protected Route */}
+              <Route
+                path="/shared-with-me"
+                element={
+                  <ProtectedRoute>
+                    <SharedWithMePage />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* My Documents - Protected Route */}
-            <Route
-              path="/my-documents"
-              element={
-                <ProtectedRoute>
-                  <MyDocumentsPage />
-                </ProtectedRoute>
-              }
-            />
+              {/* My Documents - Protected Route */}
+              <Route
+                path="/my-documents"
+                element={
+                  <ProtectedRoute>
+                    <MyDocumentsPage />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Smart Folder Results - Protected Route */}
-            <Route
-              path="/smart-folder/:id"
-              element={
-                <ProtectedRoute>
-                  <SmartFolderResultsPage />
-                </ProtectedRoute>
-              }
-            />
+              {/* Smart Folder Results - Protected Route */}
+              <Route
+                path="/smart-folder/:id"
+                element={
+                  <ProtectedRoute>
+                    <SmartFolderResultsPage />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Audit Logs - Protected Route */}
-            <Route
-              path="/audit"
-              element={
-                <ProtectedRoute>
-                  <AuditLogPage />
-                </ProtectedRoute>
-              }
-            />
+              {/* Audit Logs - Requires can_view_audit_log permission */}
+              <Route
+                path="/audit"
+                element={
+                  <ProtectedRoute requiredPermission="can_view_audit_log" pageName="Audit Logs">
+                    <AuditLogPage />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Users & Roles - Protected Route */}
-            <Route
-              path="/users"
-              element={
-                <ProtectedRoute>
-                  <UsersRolesPage />
-                </ProtectedRoute>
-              }
-            />
+              {/* Permission Audit - Requires can_view_audit_log permission */}
+              <Route
+                path="/permission-audit"
+                element={
+                  <ProtectedRoute
+                    requiredPermission="can_view_audit_log"
+                    pageName="Permission Audit"
+                  >
+                    <PermissionAuditPage />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Retention Management - Protected Route */}
-            <Route
-              path="/retention"
-              element={
-                <ProtectedRoute>
-                  <RetentionDashboardPage />
-                </ProtectedRoute>
-              }
-            />
+              {/* Users & Roles - Requires can_manage_permissions permission */}
+              <Route
+                path="/users"
+                element={
+                  <ProtectedRoute
+                    requiredPermission="can_manage_permissions"
+                    pageName="Users & Roles"
+                  >
+                    <UsersRolesPage />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Schedules - Redirect to Retention tab for backwards compatibility */}
-            <Route path="/schedules" element={<Navigate to="/retention?tab=schedules" replace />} />
+              {/* Retention Management - Requires can_manage_retention permission */}
+              <Route
+                path="/retention"
+                element={
+                  <ProtectedRoute
+                    requiredPermission="can_manage_retention"
+                    pageName="Retention Management"
+                  >
+                    <RetentionDashboardPage />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Workflows - Protected Route */}
-            <Route
-              path="/workflows"
-              element={
-                <ProtectedRoute>
-                  <WorkflowCenterPage />
-                </ProtectedRoute>
-              }
-            />
+              {/* Schedules - Redirect to Retention tab for backwards compatibility */}
+              <Route
+                path="/schedules"
+                element={<Navigate to="/retention?tab=schedules" replace />}
+              />
 
-            {/* Workflow Designer - Protected Route */}
-            <Route
-              path="/workflows/designer"
-              element={
-                <ProtectedRoute>
-                  <WorkflowDesignerPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/workflows/designer/:templateId"
-              element={
-                <ProtectedRoute>
-                  <WorkflowDesignerPage />
-                </ProtectedRoute>
-              }
-            />
+              {/* Workflows - Requires can_edit permission (manage workflows) */}
+              <Route
+                path="/workflows"
+                element={
+                  <ProtectedRoute requiredRole={['admin', 'manager']} pageName="Workflow Center">
+                    <WorkflowCenterPage />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Automation Center - Protected Route */}
-            <Route
-              path="/automation"
-              element={
-                <ProtectedRoute>
-                  <AutomationPage />
-                </ProtectedRoute>
-              }
-            />
+              {/* Workflow Designer - Requires admin or manager role */}
+              <Route
+                path="/workflows/designer"
+                element={
+                  <ProtectedRoute requiredRole={['admin', 'manager']} pageName="Workflow Designer">
+                    <WorkflowDesignerPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/workflows/designer/:templateId"
+                element={
+                  <ProtectedRoute requiredRole={['admin', 'manager']} pageName="Workflow Designer">
+                    <WorkflowDesignerPage />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Compliance Center - Protected Route */}
-            <Route
-              path="/compliance"
-              element={
-                <ProtectedRoute>
-                  <ComplianceCenterPage />
-                </ProtectedRoute>
-              }
-            />
+              {/* Automation Center - Requires admin or manager role */}
+              <Route
+                path="/automation"
+                element={
+                  <ProtectedRoute requiredRole={['admin', 'manager']} pageName="Automation">
+                    <AutomationPage />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Settings - Protected Route */}
-            <Route
-              path="/settings"
-              element={
-                <ProtectedRoute>
-                  <SettingsPage />
-                </ProtectedRoute>
-              }
-            />
+              {/* Compliance Center - Requires can_manage_classification permission */}
+              <Route
+                path="/compliance"
+                element={
+                  <ProtectedRoute
+                    requiredPermission="can_manage_classification"
+                    pageName="Compliance Center"
+                  >
+                    <ComplianceCenterPage />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Organization Settings - Protected Route */}
-            <Route
-              path="/organization-settings"
-              element={
-                <ProtectedRoute>
-                  <OrganizationSettingsPage />
-                </ProtectedRoute>
-              }
-            />
+              {/* Settings - Protected Route */}
+              <Route
+                path="/settings"
+                element={
+                  <ProtectedRoute>
+                    <SettingsPage />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Integrations - Protected Route */}
-            <Route
-              path="/integrations"
-              element={
-                <ProtectedRoute>
-                  <IntegrationsPage />
-                </ProtectedRoute>
-              }
-            />
+              {/* Organization Settings - Requires can_manage_permissions (admin level) */}
+              <Route
+                path="/organization-settings"
+                element={
+                  <ProtectedRoute
+                    requiredPermission="can_manage_permissions"
+                    pageName="Organization Settings"
+                  >
+                    <OrganizationSettingsPage />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* System Settings (Super Admin) - Protected Route */}
-            <Route
-              path="/admin/system"
-              element={
-                <ProtectedRoute>
-                  <SystemSettingsPage />
-                </ProtectedRoute>
-              }
-            />
+              {/* Integrations - Requires can_manage_permissions (admin level) */}
+              <Route
+                path="/integrations"
+                element={
+                  <ProtectedRoute
+                    requiredPermission="can_manage_permissions"
+                    pageName="Integrations"
+                  >
+                    <IntegrationsPage />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Billing Dashboard - Protected Route */}
-            <Route
-              path="/billing"
-              element={
-                <ProtectedRoute>
-                  <BillingDashboard />
-                </ProtectedRoute>
-              }
-            />
+              {/* System Settings (Super Admin) - Requires admin role */}
+              <Route
+                path="/admin/system"
+                element={
+                  <ProtectedRoute requiredRole="admin" pageName="System Settings">
+                    <SystemSettingsPage />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Other pages */}
-            <Route path="/demo" element={<div className="p-8">Demo page (coming soon)</div>} />
-            <Route
-              path="/contact"
-              element={<div className="p-8">Contact page (coming soon)</div>}
-            />
+              {/* Billing Dashboard - Requires admin role */}
+              <Route
+                path="/billing"
+                element={
+                  <ProtectedRoute requiredRole="admin" pageName="Billing">
+                    <BillingDashboard />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* 404 - Catch all undefined routes */}
-            <Route path="*" element={<NotFoundRouter />} />
-          </Routes>
-        </Router>
-        <ToastContainer />
+              {/* Other pages */}
+              <Route path="/demo" element={<div className="p-8">Demo page (coming soon)</div>} />
+              <Route
+                path="/contact"
+                element={<div className="p-8">Contact page (coming soon)</div>}
+              />
+
+              {/* 404 - Catch all undefined routes */}
+              <Route path="*" element={<NotFoundRouter />} />
+            </Routes>
+          </Router>
+          <ToastContainer />
+        </PermissionProvider>
       </NetworkStatusProvider>
     </Provider>
   )
