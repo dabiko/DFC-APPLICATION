@@ -244,6 +244,14 @@ class Document(models.Model):
     # Soft delete
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='documents_deleted',
+        help_text='User who deleted the document'
+    )
 
     # Document State / Lifecycle
     state = models.CharField(

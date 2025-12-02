@@ -5,6 +5,7 @@ from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth.password_validation import validate_password
 from django.core import exceptions as django_exceptions
+from django.utils import timezone
 from apps.users.models import CustomUser, Department
 
 
@@ -277,7 +278,48 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         # Get the authenticated user (set by parent's validate method)
         user = self.user
 
-        # Record successful login
+        # Check if MFA is enabled for this user
+        if user.mfa_enabled:
+            # Don't issue full tokens yet - require MFA verification
+            # Generate a temporary MFA token that expires in 5 minutes
+            import jwt
+            from datetime import timedelta
+            from django.conf import settings
+
+            mfa_token_payload = {
+                'user_id': user.id,
+                'type': 'mfa_pending',
+                'exp': timezone.now() + timedelta(minutes=5),
+                'iat': timezone.now(),
+            }
+
+            # Use Django's SECRET_KEY to sign the MFA token
+            mfa_token = jwt.encode(
+                {
+                    'user_id': user.id,
+                    'type': 'mfa_pending',
+                    'exp': (timezone.now() + timedelta(minutes=5)).timestamp(),
+                    'iat': timezone.now().timestamp(),
+                },
+                settings.SECRET_KEY,
+                algorithm='HS256'
+            )
+
+            # Return partial response requiring MFA
+            return {
+                'mfa_required': True,
+                'mfa_token': mfa_token,
+                'user': {
+                    'id': user.id,
+                    'email': user.email,
+                    'first_name': user.first_name,
+                    'last_name': user.last_name,
+                    'mfa_enabled': True,
+                },
+                'remember_me': remember_me,
+            }
+
+        # No MFA required - record successful login and return full tokens
         user.record_successful_login()
 
         # If remember_me is True, generate longer-lived refresh token

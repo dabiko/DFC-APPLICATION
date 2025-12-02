@@ -11,23 +11,28 @@ export interface LoginCredentials {
 }
 
 export interface LoginResponse {
-  access: string
-  refresh: string
+  // Full login response (no MFA or MFA not enabled)
+  access?: string
+  refresh?: string
   user: {
     id: number
-    username: string
+    username?: string
     email: string
     first_name: string
     last_name: string
-    employee_id: string
-    department: string | null
-    is_staff: boolean
-    is_superuser: boolean
+    employee_id?: string
+    department?: string | null
+    is_staff?: boolean
+    is_superuser?: boolean
     mfa_enabled: boolean
-    organization_id: string | null
-    organization_name: string | null
-    organization_domain: string | null
+    organization_id?: string | null
+    organization_name?: string | null
+    organization_domain?: string | null
   }
+  // MFA required response
+  mfa_required?: boolean
+  mfa_token?: string
+  remember_me?: boolean
 }
 
 export interface PasswordResetRequest {

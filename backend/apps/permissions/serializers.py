@@ -323,7 +323,7 @@ class UserPermissionSummarySerializer(serializers.Serializer):
     Serializer for user's permission summary.
     Shows all roles and permissions for a user.
     """
-    user_id = serializers.UUIDField()
+    user_id = serializers.IntegerField()  # User model uses integer IDs
     username = serializers.CharField()
     email = serializers.EmailField()
     full_name = serializers.CharField()
@@ -343,7 +343,7 @@ class FolderPermissionCheckSerializer(serializers.Serializer):
     Serializer for checking if user has permission on a folder.
     """
     folder_id = serializers.UUIDField()
-    user_id = serializers.UUIDField()
+    user_id = serializers.IntegerField()  # User model uses integer IDs
     permission = serializers.ChoiceField(choices=[
         'can_view',
         'can_download',
@@ -591,7 +591,7 @@ class DocumentPermissionCheckSerializer(serializers.Serializer):
     Serializer for checking if user has permission on a document.
     """
     document_id = serializers.UUIDField()
-    user_id = serializers.UUIDField()
+    user_id = serializers.IntegerField()  # User model uses integer IDs
     permission = serializers.ChoiceField(choices=[
         'can_view',
         'can_download',

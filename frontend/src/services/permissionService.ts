@@ -384,12 +384,18 @@ export const bulkAssignDocumentPermissions = async (
 
 export const checkFolderPermission = async (
   folderId: string,
-  userId: string,
+  userId: string | number,
   permission: string
 ): Promise<PermissionCheckResult> => {
+  // Convert userId to number, handle empty string or invalid values
+  const numericUserId = typeof userId === 'string' ? parseInt(userId, 10) : userId
+  if (!numericUserId || isNaN(numericUserId)) {
+    throw new Error('Invalid user ID for permission check')
+  }
+
   const response = await api.post('/permissions/check/', {
     folder_id: folderId,
-    user_id: userId,
+    user_id: numericUserId,
     permission,
   })
   return response.data
@@ -397,12 +403,18 @@ export const checkFolderPermission = async (
 
 export const checkDocumentPermission = async (
   documentId: string,
-  userId: string,
+  userId: string | number,
   permission: string
 ): Promise<PermissionCheckResult> => {
+  // Convert userId to number, handle empty string or invalid values
+  const numericUserId = typeof userId === 'string' ? parseInt(userId, 10) : userId
+  if (!numericUserId || isNaN(numericUserId)) {
+    throw new Error('Invalid user ID for permission check')
+  }
+
   const response = await api.post('/permissions/documents/check/', {
     document_id: documentId,
-    user_id: userId,
+    user_id: numericUserId,
     permission,
   })
   return response.data

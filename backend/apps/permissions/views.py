@@ -430,6 +430,8 @@ class PermissionCheckView(APIView):
 
     def post(self, request):
         """Check permission for user on folder"""
+        from apps.permissions.utils import check_permission_with_reason
+
         serializer = FolderPermissionCheckSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -440,32 +442,13 @@ class PermissionCheckView(APIView):
         folder = get_object_or_404(Folder, id=folder_id)
         user = get_object_or_404(User, id=user_id)
 
-        # Check permission
-        has_perm = check_permission(user, permission, folder)
-
-        # Determine reason
-        if has_perm:
-            if user.is_superuser:
-                reason = "User is superuser"
-            elif folder.owner_id == user.id:
-                reason = "User is folder owner"
-            else:
-                checker = PermissionChecker(user)
-                if checker.has_global_permission(permission):
-                    reason = "User has global permission via role"
-                elif folder.department_id and folder.department_id == user.department_id:
-                    if checker.has_department_permission(folder.department, permission):
-                        reason = "User has department-level permission"
-                    else:
-                        reason = "User has explicit folder permission"
-                else:
-                    reason = "User has explicit folder permission"
-        else:
-            reason = "User does not have required permission"
+        # Check permission with reason and source
+        has_perm, reason, source = check_permission_with_reason(user, permission, folder)
 
         return Response({
             'has_permission': has_perm,
             'reason': reason,
+            'source': source,
             'folder': folder.name,
             'user': user.username,
             'permission': permission,

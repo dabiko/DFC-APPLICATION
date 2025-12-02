@@ -5,6 +5,7 @@ export { MFASettings } from './MFASettings'
 export { MFABackupCodes } from './MFABackupCodes'
 export { MFAStatus } from './MFAStatus'
 export { TrustedDevices } from './TrustedDevices'
+export { MFAStatusBadge, MFASetupPrompt } from './MFAStatusBadge'
 
 // Re-export all MFA types
 export type {

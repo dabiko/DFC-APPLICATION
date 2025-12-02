@@ -3,7 +3,7 @@
  * API service for folder operations
  */
 
-import axios from 'axios'
+import api from './apiClient'
 import type {
   Folder,
   CreateFolderData,
@@ -11,48 +11,6 @@ import type {
   FolderFilterOptions,
   FolderSortOptions,
 } from '@/types/folder'
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
-
-// Axios instance with auth interceptor
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-})
-
-// Request interceptor to add auth token
-api.interceptors.request.use(
-  (config) => {
-    // Check both localStorage and sessionStorage for token
-    const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
-  (error) => Promise.reject(error)
-)
-
-// Response interceptor for error handling
-api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    if (error.response?.status === 401) {
-      // Only redirect if not already on login page
-      if (!window.location.pathname.includes('/login')) {
-        // Token expired or invalid - clear tokens and redirect to login
-        localStorage.removeItem('access_token')
-        localStorage.removeItem('refresh_token')
-        sessionStorage.removeItem('access_token')
-        sessionStorage.removeItem('refresh_token')
-        window.location.href = '/login'
-      }
-    }
-    return Promise.reject(error)
-  }
-)
 
 /**
  * Folder Service API

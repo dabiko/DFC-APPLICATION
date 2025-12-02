@@ -411,25 +411,47 @@ class DocumentDeleteView(generics.DestroyAPIView):
 
     The document is marked as deleted but not removed from storage.
     This allows for recovery and maintains audit trail.
+
+    Permission checks:
+    1. User must be authenticated
+    2. User must be owner, superuser, or have can_delete permission via RBAC
+    3. Document must not be under legal hold
     """
     permission_classes = [permissions.IsAuthenticated]
     lookup_field = 'id'
 
     def get_queryset(self):
-        """Filter documents by user permissions"""
-        user = self.request.user
-        queryset = Document.objects.filter(is_deleted=False)
-
-        # Only owner or staff can delete
-        if not user.is_staff:
-            queryset = queryset.filter(owner=user)
-
-        return queryset
+        """Filter documents - permission check done in perform_destroy"""
+        return Document.objects.filter(is_deleted=False)
 
     def perform_destroy(self, instance):
-        """Soft delete instead of hard delete - with legal hold protection"""
+        """Soft delete instead of hard delete - with permission and legal hold protection"""
         from django.utils import timezone
         from rest_framework.exceptions import PermissionDenied
+        from apps.permissions.utils import PermissionChecker
+
+        user = self.request.user
+
+        # Check permissions using RBAC
+        checker = PermissionChecker(user)
+
+        # Allow if: superuser, owner, or has can_delete permission
+        has_permission = (
+            user.is_superuser or
+            instance.owner == user or
+            checker.has_global_permission('can_delete')
+        )
+
+        # Also check folder-level permission if document is in a folder
+        if not has_permission and instance.folder:
+            has_permission = checker.has_folder_permission(instance.folder, 'can_delete')
+
+        # Check department permission if document has a department
+        if not has_permission and instance.department:
+            has_permission = checker.has_department_permission(instance.department, 'can_delete')
+
+        if not has_permission:
+            raise PermissionDenied("You do not have permission to delete this document.")
 
         # Check for active legal holds
         active_holds = instance.legal_holds.filter(is_active=True)
@@ -441,10 +463,11 @@ class DocumentDeleteView(generics.DestroyAPIView):
 
         instance.is_deleted = True
         instance.deleted_at = timezone.now()
+        instance.deleted_by = user
         instance.save()
 
         logger.info(
-            f"Document soft deleted: {instance.id} by user {self.request.user.username}"
+            f"Document soft deleted: {instance.id} by user {user.username}"
         )
 
 
@@ -2235,7 +2258,8 @@ class BulkDeleteDocumentsView(APIView):
                     for doc in documents:
                         doc.is_deleted = True
                         doc.deleted_at = timezone.now()
-                        doc.save(update_fields=['is_deleted', 'deleted_at', 'updated_at'])
+                        doc.deleted_by = request.user
+                        doc.save(update_fields=['is_deleted', 'deleted_at', 'deleted_by', 'updated_at'])
                         deleted_count += 1
                         logger.info(
                             f"Document {doc.id} soft deleted by user {request.user.id}"
@@ -4460,4 +4484,232 @@ class DocumentAllowedTransitionsView(APIView):
             'current_state': document.state,
             'current_state_label': document.get_state_display(),
             'allowed_transitions': allowed
+        })
+
+
+# ============================================================================
+# TRASH DOCUMENT VIEWS
+# ============================================================================
+
+@extend_schema(
+    tags=['Documents - Trash'],
+    responses={
+        200: OpenApiResponse(description='List of trashed documents'),
+    }
+)
+class DocumentTrashListView(generics.ListAPIView):
+    """
+    List all documents in trash for the current user.
+
+    Returns documents that have been soft-deleted.
+    Includes deleted_by information for audit purposes.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_serializer_class(self):
+        from apps.documents.serializers import TrashDocumentSerializer
+        return TrashDocumentSerializer
+
+    def get_queryset(self):
+        """Get deleted documents accessible to user"""
+        from apps.permissions.utils import PermissionChecker
+
+        user = self.request.user
+        queryset = Document.objects.filter(is_deleted=True).select_related(
+            'owner', 'department', 'folder', 'deleted_by'
+        )
+
+        # Superusers can see all deleted documents
+        if user.is_superuser:
+            return queryset.order_by('-deleted_at')
+
+        # Regular users can see their own deleted documents
+        # or documents in their department
+        return queryset.filter(
+            Q(owner=user) | Q(department=user.department)
+        ).order_by('-deleted_at')
+
+
+@extend_schema(
+    tags=['Documents - Trash'],
+    responses={
+        200: OpenApiResponse(description='Document restored successfully'),
+        403: OpenApiResponse(description='Permission denied'),
+        404: OpenApiResponse(description='Document not found'),
+    }
+)
+class DocumentRestoreView(APIView):
+    """
+    Restore a deleted document from trash.
+
+    The document will be restored to its original folder if it still exists.
+    If the folder was deleted, the document will be moved to root.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, id):
+        """Restore a document from trash"""
+        from apps.permissions.utils import PermissionChecker
+
+        user = request.user
+
+        try:
+            document = Document.objects.select_related('folder', 'owner', 'department').get(
+                pk=id, is_deleted=True
+            )
+        except Document.DoesNotExist:
+            return Response(
+                {'error': 'Document not found in trash'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Check permissions
+        checker = PermissionChecker(user)
+        has_permission = (
+            user.is_superuser or
+            document.owner == user or
+            checker.has_global_permission('can_delete')
+        )
+
+        if not has_permission and document.folder:
+            has_permission = checker.has_folder_permission(document.folder, 'can_delete')
+
+        if not has_permission and document.department:
+            has_permission = checker.has_department_permission(document.department, 'can_delete')
+
+        if not has_permission:
+            return Response(
+                {'error': 'You do not have permission to restore this document'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Check if folder still exists and is not deleted
+        if document.folder and document.folder.is_deleted:
+            document.folder = None  # Move to root if folder was deleted
+
+        # Restore the document
+        document.is_deleted = False
+        document.deleted_at = None
+        document.deleted_by = None
+        document.save()
+
+        logger.info(
+            f"Document restored from trash: {document.id} by user {user.username}"
+        )
+
+        return Response({
+            'message': f'Document "{document.title}" has been restored',
+            'document_id': str(document.id),
+            'folder_id': str(document.folder.id) if document.folder else None
+        })
+
+
+@extend_schema(
+    tags=['Documents - Trash'],
+    responses={
+        204: OpenApiResponse(description='Document permanently deleted'),
+        403: OpenApiResponse(description='Permission denied'),
+        404: OpenApiResponse(description='Document not found'),
+    }
+)
+class DocumentPermanentDeleteView(APIView):
+    """
+    Permanently delete a document from trash.
+
+    WARNING: This action is irreversible!
+    The document and all its files will be permanently removed.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, id):
+        """Permanently delete a document from trash"""
+        from apps.permissions.utils import PermissionChecker
+
+        user = request.user
+
+        try:
+            document = Document.objects.select_related('folder', 'owner', 'department').get(
+                pk=id, is_deleted=True
+            )
+        except Document.DoesNotExist:
+            return Response(
+                {'error': 'Document not found in trash'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Check permissions - only owner, superuser, or admin can permanently delete
+        checker = PermissionChecker(user)
+        has_permission = (
+            user.is_superuser or
+            document.owner == user or
+            checker.has_global_permission('can_delete')
+        )
+
+        if not has_permission:
+            return Response(
+                {'error': 'You do not have permission to permanently delete this document'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        document_id = str(document.id)
+        document_title = document.title
+
+        # Permanently delete the document
+        document.delete()
+
+        logger.warning(
+            f"Document permanently deleted: {document_id} ({document_title}) by user {user.username}"
+        )
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@extend_schema(
+    tags=['Documents - Trash'],
+    responses={
+        200: OpenApiResponse(description='Trash emptied successfully'),
+    }
+)
+class DocumentEmptyTrashView(APIView):
+    """
+    Permanently delete all documents in trash.
+
+    WARNING: This action is irreversible!
+    All trashed documents will be permanently removed.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        """Empty trash - permanently delete all trashed documents"""
+        from apps.permissions.utils import PermissionChecker
+
+        user = request.user
+
+        # Get all trashed documents accessible to user
+        if user.is_superuser:
+            queryset = Document.objects.filter(is_deleted=True)
+        else:
+            queryset = Document.objects.filter(
+                is_deleted=True
+            ).filter(
+                Q(owner=user) | Q(department=user.department)
+            )
+
+        deleted_count = queryset.count()
+
+        # Permanently delete all
+        for doc in queryset:
+            try:
+                doc.delete()
+            except Exception as e:
+                logger.error(f"Failed to permanently delete document {doc.id}: {e}")
+
+        logger.warning(
+            f"Document trash emptied: {deleted_count} documents permanently deleted "
+            f"by user {user.username}"
+        )
+
+        return Response({
+            'message': f'{deleted_count} documents permanently deleted',
+            'deleted_count': deleted_count
         })

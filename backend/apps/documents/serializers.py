@@ -1102,20 +1102,40 @@ class BulkDeleteSerializer(serializers.Serializer):
                 'document_ids': 'Some documents do not exist'
             })
 
-        # Check permissions for each document
-        if not user.is_staff:
-            for doc in documents:
-                if doc.owner != user and doc.department != user.department:
-                    raise serializers.ValidationError({
-                        'document_ids': f'You do not have permission to delete document {doc.id}'
-                    })
+        # Check permissions for each document using RBAC
+        from apps.permissions.utils import PermissionChecker
+        checker = PermissionChecker(user)
 
-        # Check for legal hold (future feature - placeholder)
-        # for doc in documents:
-        #     if hasattr(doc, 'legal_hold') and doc.legal_hold:
-        #         raise serializers.ValidationError({
-        #             'document_ids': f'Document {doc.id} is under legal hold and cannot be deleted'
-        #         })
+        for doc in documents:
+            # Allow if: superuser, owner, or has can_delete permission via RBAC
+            has_permission = (
+                user.is_superuser or
+                doc.owner == user or
+                checker.has_global_permission('can_delete')
+            )
+
+            # Check folder-level permission if document is in a folder
+            if not has_permission and doc.folder:
+                has_permission = checker.has_folder_permission(doc.folder, 'can_delete')
+
+            # Check department permission if document has a department
+            if not has_permission and doc.department:
+                has_permission = checker.has_department_permission(doc.department, 'can_delete')
+
+            if not has_permission:
+                raise serializers.ValidationError({
+                    'document_ids': f'You do not have permission to delete document "{doc.title}"'
+                })
+
+        # Check for legal holds
+        for doc in documents:
+            if hasattr(doc, 'legal_holds'):
+                active_holds = doc.legal_holds.filter(is_active=True)
+                if active_holds.exists():
+                    hold_cases = ', '.join([h.case_number for h in active_holds])
+                    raise serializers.ValidationError({
+                        'document_ids': f'Document "{doc.title}" is under legal hold (cases: {hold_cases}) and cannot be deleted'
+                    })
 
         attrs['documents'] = documents
 
@@ -2533,3 +2553,48 @@ class DocumentStateStatsSerializer(serializers.Serializer):
     my_in_review = serializers.IntegerField(
         help_text='User\'s documents currently in review'
     )
+
+
+# ============================================================================
+# TRASH DOCUMENT SERIALIZERS
+# ============================================================================
+
+class TrashDocumentSerializer(serializers.ModelSerializer):
+    """
+    Serializer for documents in trash with deleted_by information.
+    """
+    owner_name = serializers.SerializerMethodField()
+    department_name = serializers.CharField(source='department.name', read_only=True)
+    folder_name = serializers.CharField(source='folder.name', read_only=True)
+    folder_path = serializers.CharField(source='folder.path', read_only=True)
+    deleted_by_name = serializers.SerializerMethodField()
+    deleted_by_email = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Document
+        fields = [
+            'id', 'title', 'file_name', 'file_size', 'file_type',
+            'document_type', 'confidentiality_level',
+            'owner', 'owner_name', 'department', 'department_name',
+            'folder', 'folder_name', 'folder_path',
+            'created_at', 'updated_at',
+            'deleted_at', 'deleted_by', 'deleted_by_name', 'deleted_by_email',
+        ]
+
+    def get_owner_name(self, obj):
+        """Get the name of the document owner"""
+        if obj.owner:
+            return obj.owner.get_full_name() or obj.owner.username
+        return None
+
+    def get_deleted_by_name(self, obj):
+        """Get the name of the user who deleted the document"""
+        if obj.deleted_by:
+            return obj.deleted_by.get_full_name() or obj.deleted_by.username
+        return None
+
+    def get_deleted_by_email(self, obj):
+        """Get the email of the user who deleted the document"""
+        if obj.deleted_by:
+            return obj.deleted_by.email
+        return None

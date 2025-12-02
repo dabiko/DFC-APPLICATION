@@ -39,8 +39,38 @@ class LoginView(TokenObtainPairView):
     - Failed login attempt tracking
     - Account lockout after 5 failed attempts
     - Returns user information with tokens
+    - MFA verification flow (returns mfa_required if user has MFA enabled)
     """
     serializer_class = CustomTokenObtainPairSerializer
+
+    def post(self, request, *args, **kwargs):
+        """
+        Override post to handle MFA response properly.
+        The serializer returns different data based on whether MFA is required.
+        """
+        serializer = self.get_serializer(data=request.data)
+
+        try:
+            serializer.is_valid(raise_exception=True)
+        except Exception as e:
+            # Re-raise to let DRF handle the error response
+            raise
+
+        # Get the validated data from serializer
+        validated_data = serializer.validated_data
+
+        # Check if this is an MFA required response
+        if validated_data.get('mfa_required'):
+            # Return MFA required response without tokens
+            return Response({
+                'mfa_required': True,
+                'mfa_token': validated_data.get('mfa_token'),
+                'user': validated_data.get('user'),
+                'remember_me': validated_data.get('remember_me', False),
+            }, status=status.HTTP_200_OK)
+
+        # Normal login response with tokens
+        return Response(validated_data, status=status.HTTP_200_OK)
 
 
 @extend_schema(

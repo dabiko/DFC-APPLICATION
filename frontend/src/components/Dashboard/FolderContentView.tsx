@@ -32,6 +32,7 @@ import {
   ShareDocumentModal,
   CreateShortcutModal,
   RenameDocumentModal,
+  DeleteDocumentModal,
 } from '@components/Document'
 import { CreateFolderModal } from '@components/Folder/CreateFolderModal'
 import { RenameFolderModal } from '@components/Folder/RenameFolderModal'
@@ -62,6 +63,8 @@ import {
   getDocumentPreview,
   createShortcut,
   renameDocument,
+  deleteDocument,
+  deleteShortcut,
   getDocumentVersions,
   downloadDocumentVersion,
   restoreDocumentVersion,
@@ -134,6 +137,7 @@ export const FolderContentView: FC = () => {
     null
   )
   const [documentToRename, setDocumentToRename] = useState<FileListItem | null>(null)
+  const [documentToDelete, setDocumentToDelete] = useState<FileListItem | null>(null)
 
   // File details drawer state
   const [fileDetailsDrawerOpen, setFileDetailsDrawerOpen] = useState(false)
@@ -705,10 +709,8 @@ export const FolderContentView: FC = () => {
           break
 
         case 'delete':
-          // Delete document or shortcut
-          // TODO: Implement delete with confirmation
-          console.log('Delete:', item.id)
-          toast.info('Delete feature coming soon')
+          // Open delete confirmation modal
+          setDocumentToDelete(item)
           break
 
         case 'create-shortcut':
@@ -774,10 +776,62 @@ export const FolderContentView: FC = () => {
     // TODO: Implement bulk copy
   }, [selectedIds])
 
-  const handleBulkDelete = useCallback(() => {
-    console.log('Bulk delete:', Array.from(selectedIds))
-    // TODO: Implement bulk delete modal
-  }, [selectedIds])
+  const handleBulkDelete = useCallback(async () => {
+    // Get selected documents (not folders - folder delete is handled separately)
+    const selectedDocuments = fileListItems.filter(
+      (item) => selectedIds.has(item.id) && item.type === 'file'
+    )
+
+    if (selectedDocuments.length === 0) {
+      toast.warning('No documents selected for deletion')
+      return
+    }
+
+    // Confirm deletion
+    const confirmMessage =
+      selectedDocuments.length === 1
+        ? `Are you sure you want to delete "${selectedDocuments[0].name}"?`
+        : `Are you sure you want to delete ${selectedDocuments.length} documents?`
+
+    if (!window.confirm(confirmMessage)) {
+      return
+    }
+
+    setIsNavigating(true)
+    try {
+      // Separate shortcuts from regular documents
+      const shortcuts = selectedDocuments.filter((doc) => doc.isShortcut)
+      const regularDocs = selectedDocuments.filter((doc) => !doc.isShortcut)
+
+      // Delete shortcuts one by one (they use a different endpoint)
+      for (const shortcut of shortcuts) {
+        await deleteShortcut(shortcut.id)
+      }
+
+      // Delete regular documents using bulk delete
+      if (regularDocs.length > 0) {
+        const { bulkDeleteDocuments } = await import('@/services/documentService')
+        await bulkDeleteDocuments(regularDocs.map((doc) => doc.id))
+      }
+
+      toast.success(`Deleted ${selectedDocuments.length} item(s)`)
+      setSelectedIds(new Set())
+
+      // Refresh the view
+      const [docs, shortcutItems] = await Promise.all([
+        getDocumentsInFolder(folderId),
+        getShortcutsInFolder(folderId),
+      ])
+      setDocuments(docs)
+      setShortcuts(shortcutItems)
+    } catch (error: any) {
+      console.error('Failed to delete items:', error)
+      const errorMessage = error?.response?.data?.detail || 'Failed to delete items'
+      toast.error(errorMessage)
+    } finally {
+      setIsNavigating(false)
+    }
+  }, [selectedIds, fileListItems, folderId])
 
   const handleBulkDownload = useCallback(() => {
     console.log('Bulk download:', Array.from(selectedIds))
@@ -945,6 +999,44 @@ export const FolderContentView: FC = () => {
     setFolderToShare(null)
     toast.info('Folder sharing configured! (Backend integration pending)')
   }, [])
+
+  // Handle delete document or shortcut
+  const handleDeleteDocument = useCallback(
+    async (documentId: string, isShortcut: boolean) => {
+      try {
+        if (isShortcut) {
+          await deleteShortcut(documentId)
+          toast.success('Shortcut removed successfully')
+        } else {
+          await deleteDocument(documentId)
+          toast.success('Document moved to trash')
+        }
+        setDocumentToDelete(null)
+
+        // Refresh the view after deleting
+        setIsNavigating(true)
+        try {
+          const [docs, shortcutItems] = await Promise.all([
+            getDocumentsInFolder(folderId),
+            getShortcutsInFolder(folderId),
+          ])
+          setDocuments(docs)
+          setShortcuts(shortcutItems)
+        } catch (error) {
+          console.error('Failed to refresh documents:', error)
+        } finally {
+          setTimeout(() => {
+            setIsNavigating(false)
+          }, 300)
+        }
+      } catch (error: any) {
+        console.error('Failed to delete document:', error)
+        // Re-throw so the modal can display the error
+        throw error
+      }
+    },
+    [folderId]
+  )
 
   // Handle rename document
   const handleRenameDocument = useCallback(
@@ -1194,61 +1286,23 @@ export const FolderContentView: FC = () => {
           <Breadcrumbs items={breadcrumbItems} showHomeIcon={true} maxItems={5} />
 
           <div className="flex items-center gap-3">
-            {/* New Folder button - requires edit permission on folder or global edit permission */}
-            <PermissionGate
-              permission="can_edit"
-              folder={
-                currentFolder
-                  ? { id: currentFolder.id, owner_id: currentFolder.ownerId }
-                  : undefined
-              }
-              fallback={
-                <button
-                  disabled
-                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-400 dark:text-gray-600 rounded-lg cursor-not-allowed opacity-50"
-                  title="You don't have permission to create folders here"
-                >
-                  <FolderPlus className="w-4 h-4" />
-                  New Folder
-                </button>
-              }
+            {/* New Folder button - backend enforces permissions on actual creation */}
+            <button
+              onClick={() => setShowCreateFolder(true)}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
             >
-              <button
-                onClick={() => setShowCreateFolder(true)}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-              >
-                <FolderPlus className="w-4 h-4" />
-                New Folder
-              </button>
-            </PermissionGate>
+              <FolderPlus className="w-4 h-4" />
+              New Folder
+            </button>
 
-            {/* Upload button - requires upload permission on folder or global upload permission */}
-            <PermissionGate
-              permission="can_upload"
-              folder={
-                currentFolder
-                  ? { id: currentFolder.id, owner_id: currentFolder.ownerId }
-                  : undefined
-              }
-              fallback={
-                <button
-                  disabled
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-300 dark:bg-blue-800 text-white rounded-lg font-medium text-sm cursor-not-allowed opacity-50"
-                  title="You don't have permission to upload files here"
-                >
-                  <Upload className="w-4 h-4" />
-                  Upload
-                </button>
-              }
+            {/* Upload button - backend enforces permissions on actual upload */}
+            <button
+              onClick={() => setShowUploadModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
             >
-              <button
-                onClick={() => setShowUploadModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
-              >
-                <Upload className="w-4 h-4" />
-                Upload
-              </button>
-            </PermissionGate>
+              <Upload className="w-4 h-4" />
+              Upload
+            </button>
           </div>
         </div>
       </div>
@@ -1585,8 +1639,12 @@ export const FolderContentView: FC = () => {
             // TODO: Implement edit
           }}
           onDelete={(docId) => {
-            console.log('Delete document:', docId)
-            // TODO: Implement delete
+            // Close preview and open delete modal
+            const item = fileListItems.find((i) => i.id === docId && i.type === 'file')
+            if (item) {
+              setPreviewFile(null)
+              setDocumentToDelete(item)
+            }
           }}
           onDownload={async (docId) => {
             try {
@@ -1663,6 +1721,14 @@ export const FolderContentView: FC = () => {
         onRename={handleRenameDocument}
       />
 
+      {/* Delete Document Modal */}
+      <DeleteDocumentModal
+        isOpen={!!documentToDelete}
+        item={documentToDelete}
+        onClose={() => setDocumentToDelete(null)}
+        onDelete={handleDeleteDocument}
+      />
+
       {/* Share Document Modal */}
       <ShareDocumentModal
         isOpen={!!documentToShare}
@@ -1719,9 +1785,13 @@ export const FolderContentView: FC = () => {
             setDocumentToMove(item)
           }
         }}
-        onDelete={() => {
-          // TODO: Implement delete with confirmation
-          toast.info('Delete feature coming soon')
+        onDelete={(fileId) => {
+          // Close drawer and open delete modal
+          const item = fileListItems.find((i) => i.id === fileId && i.type === 'file')
+          if (item) {
+            setFileDetailsDrawerOpen(false)
+            setDocumentToDelete(item)
+          }
         }}
         onToggleFavorite={async (fileId) => {
           // Toggle document favorite status

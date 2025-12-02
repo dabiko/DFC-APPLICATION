@@ -7,6 +7,7 @@ import {
   CheckIcon,
   EyeIcon,
   EyeSlashIcon,
+  ExclamationCircleIcon,
 } from '@heroicons/react/24/outline'
 import type { MFASetupProps, MFASetupState } from '@/types/mfa'
 import {
@@ -16,11 +17,12 @@ import {
   downloadBackupCodes,
   printBackupCodes,
 } from '@/types/mfa'
+import { mfaService } from '@/services/mfaService'
 
 export const MFASetup: React.FC<MFASetupProps> = ({
   onComplete,
   onCancel,
-  loading = false,
+  loading: externalLoading = false,
   method = 'totp',
 }) => {
   const [state, setState] = useState<MFASetupState>({
@@ -31,32 +33,72 @@ export const MFASetup: React.FC<MFASetupProps> = ({
   const [showPassword, setShowPassword] = useState(false)
   const [showSecret, setShowSecret] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+
+  const loading = externalLoading || isLoading
 
   const handlePasswordSubmit = async () => {
-    // Simulate API call to initiate MFA setup
-    const mockSetupData = {
-      secret: 'JBSWY3DPEHPK3PXP',
-      qrCodeUrl: 'otpauth://totp/DFC:user@example.com?secret=JBSWY3DPEHPK3PXP&issuer=DFC',
-      backupCodes: [
-        'ABCD1234',
-        'EFGH5678',
-        'IJKL9012',
-        'MNOP3456',
-        'QRST7890',
-        'UVWX1234',
-        'YZAB5678',
-        'CDEF9012',
-        'GHIJ3456',
-        'KLMN7890',
-      ],
-      setupToken: 'setup_token_123',
+    if (!password.trim()) {
+      setPasswordError('Password is required')
+      return
     }
 
-    setState({
-      ...state,
-      step: 'qrcode',
-      setupData: mockSetupData,
-    })
+    setIsLoading(true)
+    setPasswordError(null)
+
+    try {
+      const response = await mfaService.setup(password)
+
+      if (response.success && response.data) {
+        setState({
+          ...state,
+          step: 'qrcode',
+          setupData: {
+            secret: response.data.secret,
+            qrCodeUrl: response.data.qr_code,
+            backupCodes: [], // Will be provided after confirmation
+            setupToken: '',
+          },
+        })
+      } else {
+        setPasswordError(response.message || 'Failed to initiate MFA setup')
+      }
+    } catch (error: any) {
+      console.error('MFA Setup Error:', error.response?.data || error.message)
+
+      const responseData = error.response?.data
+
+      // Handle specific error responses from the backend
+      // Check for nested errors structure: { errors: { password: [...] } }
+      if (responseData?.errors?.password) {
+        const passwordErrors = responseData.errors.password
+        setPasswordError(Array.isArray(passwordErrors) ? passwordErrors[0] : passwordErrors)
+      } else if (responseData?.password) {
+        // Direct password validation error from serializer
+        const passwordErrors = responseData.password
+        setPasswordError(Array.isArray(passwordErrors) ? passwordErrors[0] : passwordErrors)
+      } else if (responseData?.errors?.non_field_errors) {
+        const errors = responseData.errors.non_field_errors
+        setPasswordError(Array.isArray(errors) ? errors[0] : errors)
+      } else if (responseData?.non_field_errors) {
+        // Non-field errors
+        const errors = responseData.non_field_errors
+        setPasswordError(Array.isArray(errors) ? errors[0] : errors)
+      } else if (responseData?.detail) {
+        setPasswordError(responseData.detail)
+      } else if (responseData?.message) {
+        setPasswordError(responseData.message)
+      } else if (error.response?.status === 401) {
+        setPasswordError('Session expired. Please log in again.')
+      } else if (error.response?.status === 403) {
+        setPasswordError('You do not have permission to perform this action.')
+      } else {
+        setPasswordError('Failed to verify password. Please try again.')
+      }
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleCopySecret = async () => {
@@ -69,14 +111,53 @@ export const MFASetup: React.FC<MFASetupProps> = ({
     }
   }
 
-  const handleVerificationSubmit = () => {
+  const handleVerificationSubmit = async () => {
     if (!validateMFACode(state.verificationCode)) {
       setState({ ...state, error: 'Invalid code format' })
       return
     }
 
-    // Move to backup codes step
-    setState({ ...state, step: 'backup_codes', error: undefined })
+    setIsLoading(true)
+    setState({ ...state, error: undefined })
+
+    try {
+      const response = await mfaService.confirm({ token: state.verificationCode })
+
+      if (response.success && response.data) {
+        // Update state with backup codes from the confirmation response
+        setState({
+          ...state,
+          step: 'backup_codes',
+          error: undefined,
+          setupData: {
+            ...state.setupData!,
+            backupCodes: response.data.backup_codes || [],
+          },
+        })
+      } else {
+        setState({
+          ...state,
+          error: response.message || 'Failed to verify code',
+        })
+      }
+    } catch (error: any) {
+      // Handle specific error responses from the backend
+      if (error.response?.data?.token) {
+        const tokenErrors = error.response.data.token
+        setState({
+          ...state,
+          error: Array.isArray(tokenErrors) ? tokenErrors[0] : tokenErrors,
+        })
+      } else if (error.response?.data?.detail) {
+        setState({ ...state, error: error.response.data.detail })
+      } else if (error.response?.data?.message) {
+        setState({ ...state, error: error.response.data.message })
+      } else {
+        setState({ ...state, error: 'Invalid verification code. Please try again.' })
+      }
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleComplete = () => {
@@ -132,10 +213,23 @@ export const MFASetup: React.FC<MFASetupProps> = ({
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500"
+                  onChange={(e) => {
+                    setPassword(e.target.value)
+                    setPasswordError(null)
+                  }}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && password) {
+                      handlePasswordSubmit()
+                    }
+                  }}
+                  className={`w-full px-4 py-2 border rounded-lg dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 ${
+                    passwordError
+                      ? 'border-red-500 dark:border-red-500'
+                      : 'border-gray-300 dark:border-gray-600'
+                  }`}
                   placeholder="Enter your password"
                   autoFocus
+                  disabled={loading}
                 />
                 <button
                   type="button"
@@ -149,6 +243,12 @@ export const MFASetup: React.FC<MFASetupProps> = ({
                   )}
                 </button>
               </div>
+              {passwordError && (
+                <div className="mt-2 flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
+                  <ExclamationCircleIcon className="w-4 h-4" />
+                  {passwordError}
+                </div>
+              )}
             </div>
 
             <div className="flex gap-3">
@@ -181,14 +281,15 @@ export const MFASetup: React.FC<MFASetupProps> = ({
           </p>
 
           <div className="flex flex-col items-center">
-            {/* QR Code Placeholder */}
+            {/* QR Code Display */}
             <div className="bg-white p-4 rounded-lg border-2 border-gray-300 dark:border-gray-600 mb-4">
-              <div className="w-64 h-64 bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-                <QrCodeIcon className="w-32 h-32 text-gray-400" />
-                <div className="absolute text-xs text-gray-500 dark:text-gray-400">
-                  QR Code for {state.setupData.qrCodeUrl}
+              {state.setupData.qrCodeUrl ? (
+                <img src={state.setupData.qrCodeUrl} alt="MFA QR Code" className="w-64 h-64" />
+              ) : (
+                <div className="w-64 h-64 bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                  <QrCodeIcon className="w-32 h-32 text-gray-400" />
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Manual Entry Option */}

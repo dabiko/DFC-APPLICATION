@@ -28,6 +28,7 @@ import {
 import { MFASettings, MFASetup, MFABackupCodes } from '@/components/MFA'
 import type { MFAConfig, MFADisableRequest } from '@/types/mfa'
 import type { SecuritySettings, Session } from '@/services/settingsService'
+import { mfaService } from '@/services/mfaService'
 import { cn } from '@/utils/cn'
 
 interface SecurityTabProps {
@@ -82,10 +83,67 @@ export function SecurityTab({
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   })
+  const [loadingMFA, setLoadingMFA] = useState(true)
 
   // Sessions state
   const [sessions, setSessions] = useState<Session[]>([])
   const [loadingSessions, setLoadingSessions] = useState(false)
+
+  // Load MFA status from backend
+  useEffect(() => {
+    const loadMFAStatus = async () => {
+      setLoadingMFA(true)
+      try {
+        const response = await mfaService.getStatus()
+        console.log('[SecurityTab] MFA status response:', JSON.stringify(response, null, 2))
+
+        if (response.success && response.data) {
+          const { data } = response
+          console.log('[SecurityTab] MFA data:', JSON.stringify(data, null, 2))
+
+          // Backend MFAStatusSerializer returns: is_enabled, is_configured, is_enforced, totp_enabled
+          // Use the correctly typed fields from the updated interface
+          const isEnabled = data.is_enabled
+          const isConfigured = data.is_configured
+          const backupCodesRemaining = data.backup_codes_remaining ?? 0
+          const lastVerifiedAt = data.last_verified_at || undefined
+          const enabledAt = data.enabled_at || new Date().toISOString()
+
+          console.log('[SecurityTab] Parsed MFA status:', {
+            isEnabled,
+            isConfigured,
+            backupCodesRemaining,
+            lastVerifiedAt,
+            enabledAt,
+          })
+
+          const newConfig = {
+            enabled: Boolean(isEnabled),
+            method: 'totp' as const,
+            setupCompleted: Boolean(isConfigured),
+            backupCodesGenerated: backupCodesRemaining > 0,
+            backupCodesRemaining: backupCodesRemaining,
+            lastVerifiedAt: lastVerifiedAt,
+            createdAt: enabledAt,
+            updatedAt: new Date().toISOString(),
+          }
+
+          console.log('[SecurityTab] Setting mfaConfig to:', JSON.stringify(newConfig, null, 2))
+          setMfaConfig(newConfig)
+        } else {
+          console.warn(
+            '[SecurityTab] MFA status response was not successful or had no data:',
+            response
+          )
+        }
+      } catch (error) {
+        console.error('[SecurityTab] Error loading MFA status:', error)
+      } finally {
+        setLoadingMFA(false)
+      }
+    }
+    loadMFAStatus()
+  }, [])
 
   // Load sessions
   useEffect(() => {
@@ -182,7 +240,10 @@ export function SecurityTab({
     }
   }
 
-  if (isLoading) {
+  // Debug log for mfaConfig state
+  console.log('[SecurityTab] Rendering with mfaConfig:', JSON.stringify(mfaConfig, null, 2))
+
+  if (isLoading || loadingMFA) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="w-8 h-8 animate-spin text-blue-500" />

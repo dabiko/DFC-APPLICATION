@@ -11,7 +11,13 @@ Handles serialization for:
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django_otp.plugins.otp_totp.models import TOTPDevice
-from apps.users.mfa_models import MFABackupCode, MFASettings
+from apps.users.mfa_models import (
+    MFABackupCode,
+    MFASettings,
+    TrustedDevice,
+    MFAEnforcementPolicy,
+    LoginRiskAssessment
+)
 import io
 import qrcode
 import base64
@@ -22,8 +28,14 @@ User = get_user_model()
 class MFASetupSerializer(serializers.Serializer):
     """
     Serializer for MFA setup initiation.
-    Generates TOTP secret and QR code.
+    Requires password verification before generating TOTP secret and QR code.
+    Implements account lockout after 5 failed password attempts.
     """
+    password = serializers.CharField(
+        write_only=True,
+        required=True,
+        help_text="Current password for verification"
+    )
     secret = serializers.CharField(read_only=True)
     qr_code = serializers.CharField(read_only=True, help_text="Base64-encoded QR code image")
     backup_codes = serializers.ListField(
@@ -31,6 +43,39 @@ class MFASetupSerializer(serializers.Serializer):
         read_only=True,
         required=False
     )
+
+    def validate_password(self, value):
+        """
+        Verify the user's password before allowing MFA setup.
+        Implements account lockout after 5 failed attempts.
+        """
+        user = self.context['request'].user
+
+        # Check if account is already locked
+        if user.is_account_locked:
+            raise serializers.ValidationError(
+                f"Your account is locked due to too many failed attempts. "
+                f"Please try again later or contact your administrator."
+            )
+
+        # Verify password
+        if not user.check_password(value):
+            # Record failed attempt and get lockout status
+            lockout_result = user.record_failed_login()
+
+            if lockout_result['locked']:
+                raise serializers.ValidationError(lockout_result['message'])
+            else:
+                raise serializers.ValidationError(
+                    f"Invalid password. {lockout_result['remaining_attempts']} attempt(s) remaining."
+                )
+
+        # Password is correct - reset failed attempts counter
+        user.failed_login_attempts = 0
+        user.last_failed_login = None
+        user.save(update_fields=['failed_login_attempts', 'last_failed_login', 'updated_at'])
+
+        return value
 
     def create(self, validated_data):
         """Generate TOTP device and QR code"""
@@ -115,6 +160,11 @@ class MFAConfirmSerializer(serializers.Serializer):
         mfa_settings.totp_enabled = True
         mfa_settings.confirm_totp()
         mfa_settings.enable_mfa()
+
+        # IMPORTANT: Also set mfa_enabled on the user model
+        # This is checked during login to determine if MFA verification is required
+        user.mfa_enabled = True
+        user.save(update_fields=['mfa_enabled'])
 
         # Generate backup codes
         codes = MFABackupCode.generate_codes_for_user(user, count=10)
@@ -236,8 +286,12 @@ class MFADisableSerializer(serializers.Serializer):
                 "Cannot disable MFA - it is enforced for your account"
             )
 
-        # Disable MFA
+        # Disable MFA on settings model
         mfa_settings.disable_mfa()
+
+        # IMPORTANT: Also set mfa_enabled = False on the user model
+        user.mfa_enabled = False
+        user.save(update_fields=['mfa_enabled'])
 
         # Delete TOTP devices
         TOTPDevice.objects.filter(user=user).delete()
@@ -282,3 +336,274 @@ class BackupCodeRegenerateSerializer(serializers.Serializer):
         return {
             'backup_codes': plain_codes
         }
+
+
+# ============================================================================
+# Trusted Device Serializers
+# ============================================================================
+
+class TrustedDeviceSerializer(serializers.ModelSerializer):
+    """Serializer for trusted device list and details"""
+    is_current = serializers.SerializerMethodField()
+    expires_in_days = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TrustedDevice
+        fields = [
+            'id',
+            'device_id',
+            'device_name',
+            'device_type',
+            'location',
+            'trusted_at',
+            'expires_at',
+            'last_used_at',
+            'is_revoked',
+            'is_valid',
+            'is_current',
+            'expires_in_days',
+        ]
+        read_only_fields = ['device_id', 'trusted_at', 'last_used_at']
+
+    def get_is_current(self, obj):
+        """Check if this is the current device"""
+        request = self.context.get('request')
+        if not request:
+            return False
+        device_fingerprint = request.META.get('HTTP_X_DEVICE_FINGERPRINT', '')
+        if not device_fingerprint:
+            return False
+        import hashlib
+        current_device_id = hashlib.sha256(device_fingerprint.encode()).hexdigest()
+        return obj.device_id == current_device_id
+
+    def get_expires_in_days(self, obj):
+        """Get number of days until trust expires"""
+        from django.utils import timezone
+        if obj.is_expired:
+            return 0
+        delta = obj.expires_at - timezone.now()
+        return max(0, delta.days)
+
+
+class TrustDeviceSerializer(serializers.Serializer):
+    """Serializer for trusting a new device"""
+    device_fingerprint = serializers.CharField(
+        max_length=256,
+        help_text="Device fingerprint from client"
+    )
+    device_name = serializers.CharField(
+        max_length=255,
+        required=False,
+        default='',
+        help_text="User-friendly device name"
+    )
+    device_type = serializers.ChoiceField(
+        choices=TrustedDevice.DEVICE_TYPE_CHOICES,
+        default='other'
+    )
+    trust_days = serializers.IntegerField(
+        default=30,
+        min_value=1,
+        max_value=365,
+        help_text="Number of days to trust this device"
+    )
+
+    def create(self, validated_data):
+        """Create a trusted device"""
+        request = self.context['request']
+        user = request.user
+
+        device = TrustedDevice.create_trusted_device(
+            user=user,
+            device_fingerprint=validated_data['device_fingerprint'],
+            device_name=validated_data.get('device_name', ''),
+            device_type=validated_data.get('device_type', 'other'),
+            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            ip_address=request.META.get('REMOTE_ADDR'),
+            trust_days=validated_data.get('trust_days', 30)
+        )
+
+        return TrustedDeviceSerializer(device, context=self.context).data
+
+
+class RevokeDeviceSerializer(serializers.Serializer):
+    """Serializer for revoking device trust"""
+    reason = serializers.CharField(
+        max_length=255,
+        required=False,
+        default='',
+        help_text="Reason for revoking trust"
+    )
+
+
+# ============================================================================
+# MFA Enforcement Policy Serializers
+# ============================================================================
+
+class MFAEnforcementPolicySerializer(serializers.ModelSerializer):
+    """Serializer for MFA enforcement policies"""
+    created_by_email = serializers.EmailField(
+        source='created_by.email',
+        read_only=True
+    )
+    affected_users_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MFAEnforcementPolicy
+        fields = [
+            'id',
+            'name',
+            'description',
+            'is_active',
+            'enforcement_level',
+            'scope',
+            'scope_criteria',
+            'grace_period_days',
+            'enforcement_start_date',
+            'allowed_methods',
+            'send_reminders',
+            'reminder_days_before',
+            'created_at',
+            'updated_at',
+            'created_by',
+            'created_by_email',
+            'is_in_grace_period',
+            'affected_users_count',
+        ]
+        read_only_fields = ['created_at', 'updated_at', 'created_by']
+
+    def get_affected_users_count(self, obj):
+        """Get count of users affected by this policy"""
+        if not obj.is_active:
+            return 0
+        User = get_user_model()
+        count = 0
+        for user in User.objects.filter(is_active=True):
+            if obj.applies_to_user(user):
+                count += 1
+        return count
+
+
+class MFAEnforcementPolicyCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating MFA enforcement policies"""
+
+    class Meta:
+        model = MFAEnforcementPolicy
+        fields = [
+            'name',
+            'description',
+            'is_active',
+            'enforcement_level',
+            'scope',
+            'scope_criteria',
+            'grace_period_days',
+            'enforcement_start_date',
+            'allowed_methods',
+            'send_reminders',
+            'reminder_days_before',
+        ]
+
+    def create(self, validated_data):
+        """Create policy with current user as creator"""
+        validated_data['created_by'] = self.context['request'].user
+        return super().create(validated_data)
+
+
+# ============================================================================
+# Risk Assessment Serializers
+# ============================================================================
+
+class LoginRiskAssessmentSerializer(serializers.ModelSerializer):
+    """Serializer for login risk assessment"""
+    user_email = serializers.EmailField(source='user.email', read_only=True)
+
+    class Meta:
+        model = LoginRiskAssessment
+        fields = [
+            'id',
+            'user',
+            'user_email',
+            'ip_address',
+            'risk_level',
+            'risk_score',
+            'risk_factors',
+            'is_new_device',
+            'is_new_location',
+            'is_unusual_time',
+            'failed_attempts_24h',
+            'mfa_required',
+            'login_blocked',
+            'additional_verification_required',
+            'login_successful',
+            'assessed_at',
+        ]
+        read_only_fields = ['user', 'assessed_at']
+
+
+class AssessLoginRiskSerializer(serializers.Serializer):
+    """Serializer for assessing login risk"""
+    device_fingerprint = serializers.CharField(
+        max_length=256,
+        required=False,
+        default='',
+        help_text="Device fingerprint for risk assessment"
+    )
+
+    def create(self, validated_data):
+        """Perform risk assessment"""
+        request = self.context['request']
+        user = self.context['user']
+
+        assessment = LoginRiskAssessment.assess_login_risk(
+            user=user,
+            ip_address=request.META.get('REMOTE_ADDR', ''),
+            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            device_fingerprint=validated_data.get('device_fingerprint', '')
+        )
+
+        return LoginRiskAssessmentSerializer(assessment).data
+
+
+# ============================================================================
+# MFA Compliance Dashboard Serializers
+# ============================================================================
+
+class MFAComplianceStatsSerializer(serializers.Serializer):
+    """Serializer for MFA compliance statistics"""
+    total_users = serializers.IntegerField()
+    mfa_enabled_count = serializers.IntegerField()
+    mfa_enabled_percentage = serializers.FloatField()
+    mfa_enforced_count = serializers.IntegerField()
+    totp_enabled_count = serializers.IntegerField()
+    users_needing_setup = serializers.IntegerField()
+    recent_verifications_24h = serializers.IntegerField()
+    failed_verifications_24h = serializers.IntegerField()
+    active_trusted_devices = serializers.IntegerField()
+
+
+class UserMFAStatusSerializer(serializers.Serializer):
+    """Serializer for individual user MFA status in admin view"""
+    id = serializers.IntegerField()
+    email = serializers.EmailField()
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+    is_active = serializers.BooleanField()
+    mfa_enabled = serializers.BooleanField()
+    mfa_enforced = serializers.BooleanField()
+    totp_confirmed = serializers.BooleanField()
+    backup_codes_remaining = serializers.IntegerField()
+    last_verified_at = serializers.DateTimeField(allow_null=True)
+    trusted_devices_count = serializers.IntegerField()
+
+
+class EnforceMFASerializer(serializers.Serializer):
+    """Serializer for enforcing MFA on a user"""
+    enforce = serializers.BooleanField(
+        default=True,
+        help_text="Whether to enforce or un-enforce MFA"
+    )
+    notify_user = serializers.BooleanField(
+        default=True,
+        help_text="Send email notification to user"
+    )

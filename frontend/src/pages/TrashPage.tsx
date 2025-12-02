@@ -28,10 +28,36 @@ import {
 import { DashboardSidebar } from '@/components/Dashboard/DashboardSidebar'
 import { DashboardHeader } from '@/components/Dashboard/DashboardHeader'
 import { folderService } from '@/services/folderService'
+import {
+  getTrashDocuments,
+  restoreDocument,
+  permanentlyDeleteDocument,
+  emptyDocumentTrash,
+  type TrashedDocument,
+} from '@/services/documentService'
 import { authService } from '@/services/auth.service'
 import { toast } from '@/utils/toast'
 import { cn } from '@/utils/cn'
 import type { Folder as FolderType } from '@/types/folder'
+
+// Unified trash item type
+interface TrashItem {
+  id: string
+  name: string
+  type: 'folder' | 'document'
+  path?: string
+  deletedAt: string | null
+  deletedByName: string | null
+  deletedByEmail?: string | null
+  totalSize?: number
+  fileSize?: number
+  fileType?: string
+  childrenCount?: number
+  documentCount?: number
+  // Original data for operations
+  originalFolder?: FolderType
+  originalDocument?: TrashedDocument
+}
 
 // Retention period in days (configurable)
 const TRASH_RETENTION_DAYS = 30
@@ -46,13 +72,14 @@ type ModalType = 'restore' | 'delete' | 'empty' | 'preview' | null
 
 interface ModalState {
   type: ModalType
-  item?: FolderType | null
+  item?: TrashItem | null
   confirmText?: string
 }
 
 export function TrashPage() {
   const navigate = useNavigate()
   const [trashedFolders, setTrashedFolders] = useState<FolderType[]>([])
+  const [trashedDocuments, setTrashedDocuments] = useState<TrashedDocument[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isRestoring, setIsRestoring] = useState<string | null>(null)
@@ -96,12 +123,16 @@ export function TrashPage() {
     }
   }
 
-  // Fetch trashed items
+  // Fetch trashed items (both folders and documents)
   const fetchTrashedItems = useCallback(async () => {
     setIsLoading(true)
     try {
-      const folders = await folderService.getTrashFolders()
+      const [folders, documents] = await Promise.all([
+        folderService.getTrashFolders(),
+        getTrashDocuments(),
+      ])
       setTrashedFolders(folders)
+      setTrashedDocuments(documents)
     } catch (error) {
       console.error('Failed to fetch trash:', error)
       toast.error('Failed to load trash items')
@@ -114,9 +145,46 @@ export function TrashPage() {
     fetchTrashedItems()
   }, [fetchTrashedItems])
 
+  // Transform folders and documents into unified TrashItem format
+  const allTrashItems = useMemo((): TrashItem[] => {
+    const folderItems: TrashItem[] = trashedFolders.map((folder) => ({
+      id: folder.id,
+      name: folder.name,
+      type: 'folder' as const,
+      path: folder.path,
+      deletedAt: folder.deletedAt || null,
+      deletedByName: folder.deletedByName || null,
+      deletedByEmail: folder.deletedByEmail || null,
+      totalSize: folder.totalSize,
+      childrenCount: folder.childrenCount,
+      documentCount: folder.documentCount,
+      originalFolder: folder,
+    }))
+
+    const documentItems: TrashItem[] = trashedDocuments.map((doc) => ({
+      id: doc.id,
+      name: doc.title,
+      type: 'document' as const,
+      path: doc.folder_path || '/',
+      deletedAt: doc.deleted_at,
+      deletedByName: doc.deleted_by_name,
+      deletedByEmail: doc.deleted_by_email || null,
+      fileSize: doc.file_size,
+      fileType: doc.file_type,
+      originalDocument: doc,
+    }))
+
+    // Combine and sort by deleted date (most recent first)
+    return [...folderItems, ...documentItems].sort((a, b) => {
+      const dateA = a.deletedAt ? new Date(a.deletedAt).getTime() : 0
+      const dateB = b.deletedAt ? new Date(b.deletedAt).getTime() : 0
+      return dateB - dateA
+    })
+  }, [trashedFolders, trashedDocuments])
+
   // Filter and search logic
   const filteredItems = useMemo(() => {
-    let items = trashedFolders
+    let items = allTrashItems
 
     // Apply search filter
     if (searchQuery.trim()) {
@@ -129,14 +197,16 @@ export function TrashPage() {
       )
     }
 
-    // Apply type filter (for now, all items are folders - can extend for documents)
+    // Apply type filter
     if (filterType === 'documents') {
-      items = [] // No documents in trash yet - extend when document trash is implemented
+      items = items.filter((item) => item.type === 'document')
+    } else if (filterType === 'folders') {
+      items = items.filter((item) => item.type === 'folder')
     }
-    // filterType === 'folders' or 'all' keeps all items (all are folders currently)
+    // filterType === 'all' keeps all items
 
     return items
-  }, [trashedFolders, searchQuery, filterType])
+  }, [allTrashItems, searchQuery, filterType])
 
   // Pagination logic
   const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE)
@@ -153,14 +223,14 @@ export function TrashPage() {
   // Item counts for filter badges
   const itemCounts = useMemo(() => {
     return {
-      all: trashedFolders.length,
+      all: trashedFolders.length + trashedDocuments.length,
       folders: trashedFolders.length,
-      documents: 0, // Extend when document trash is implemented
+      documents: trashedDocuments.length,
     }
-  }, [trashedFolders])
+  }, [trashedFolders, trashedDocuments])
 
   // Open modal
-  const openModal = (type: ModalType, item?: FolderType | null) => {
+  const openModal = (type: ModalType, item?: TrashItem | null) => {
     setModal({ type, item })
     setConfirmInput('')
   }
@@ -171,56 +241,72 @@ export function TrashPage() {
     setConfirmInput('')
   }
 
-  // Restore a folder
-  const handleRestore = async (folderId: string, folderName: string) => {
-    setIsRestoring(folderId)
+  // Restore an item (folder or document)
+  const handleRestore = async (item: TrashItem) => {
+    setIsRestoring(item.id)
     try {
-      await folderService.restoreFolder(folderId)
-      toast.success(`"${folderName}" has been restored successfully`)
-      setTrashedFolders((prev) => prev.filter((f) => f.id !== folderId))
+      if (item.type === 'folder') {
+        await folderService.restoreFolder(item.id)
+        setTrashedFolders((prev) => prev.filter((f) => f.id !== item.id))
+      } else {
+        await restoreDocument(item.id)
+        setTrashedDocuments((prev) => prev.filter((d) => d.id !== item.id))
+      }
+      toast.success(`"${item.name}" has been restored successfully`)
       setSelectedIds((prev) => {
         const newSet = new Set(prev)
-        newSet.delete(folderId)
+        newSet.delete(item.id)
         return newSet
       })
       closeModal()
     } catch (error: any) {
-      console.error('Failed to restore folder:', error)
-      const message = error?.response?.data?.error || 'Failed to restore folder'
+      console.error('Failed to restore item:', error)
+      const message = error?.response?.data?.error || 'Failed to restore item'
       toast.error(message)
     } finally {
       setIsRestoring(null)
     }
   }
 
-  // Permanently delete a folder
-  const handlePermanentDelete = async (folderId: string, folderName: string) => {
-    setIsDeleting(folderId)
+  // Permanently delete an item (folder or document)
+  const handlePermanentDelete = async (item: TrashItem) => {
+    setIsDeleting(item.id)
     try {
-      await folderService.permanentlyDeleteFolder(folderId)
-      toast.success(`"${folderName}" has been permanently deleted`)
-      setTrashedFolders((prev) => prev.filter((f) => f.id !== folderId))
+      if (item.type === 'folder') {
+        await folderService.permanentlyDeleteFolder(item.id)
+        setTrashedFolders((prev) => prev.filter((f) => f.id !== item.id))
+      } else {
+        await permanentlyDeleteDocument(item.id)
+        setTrashedDocuments((prev) => prev.filter((d) => d.id !== item.id))
+      }
+      toast.success(`"${item.name}" has been permanently deleted`)
       setSelectedIds((prev) => {
         const newSet = new Set(prev)
-        newSet.delete(folderId)
+        newSet.delete(item.id)
         return newSet
       })
       closeModal()
     } catch (error) {
-      console.error('Failed to permanently delete folder:', error)
-      toast.error('Failed to permanently delete folder')
+      console.error('Failed to permanently delete item:', error)
+      toast.error('Failed to permanently delete item')
     } finally {
       setIsDeleting(null)
     }
   }
 
-  // Empty trash
+  // Empty trash (both folders and documents)
   const handleEmptyTrash = async () => {
     setIsEmptyingTrash(true)
     try {
-      const result = await folderService.emptyTrash()
-      toast.success(result.message || 'Trash emptied successfully')
+      // Empty both folder and document trash
+      const [folderResult, documentResult] = await Promise.all([
+        folderService.emptyTrash(),
+        emptyDocumentTrash(),
+      ])
+      const totalDeleted = (folderResult.deleted_count || 0) + (documentResult.deleted_count || 0)
+      toast.success(`Trash emptied: ${totalDeleted} item(s) permanently deleted`)
       setTrashedFolders([])
+      setTrashedDocuments([])
       setSelectedIds(new Set())
       closeModal()
     } catch (error) {
@@ -233,13 +319,17 @@ export function TrashPage() {
 
   // Bulk restore
   const handleBulkRestore = async () => {
-    const selectedFolders = trashedFolders.filter((f) => selectedIds.has(f.id))
+    const selectedItems = allTrashItems.filter((item) => selectedIds.has(item.id))
     let restored = 0
     let failed = 0
 
-    for (const folder of selectedFolders) {
+    for (const item of selectedItems) {
       try {
-        await folderService.restoreFolder(folder.id)
+        if (item.type === 'folder') {
+          await folderService.restoreFolder(item.id)
+        } else {
+          await restoreDocument(item.id)
+        }
         restored++
       } catch {
         failed++
@@ -540,14 +630,15 @@ export function TrashPage() {
 
                 {/* Table Body */}
                 <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {paginatedItems.map((folder) => {
-                    const daysRemaining = getDaysRemaining(folder.deletedAt)
-                    const isSelected = selectedIds.has(folder.id)
-                    const isProcessing = isRestoring === folder.id || isDeleting === folder.id
+                  {paginatedItems.map((item) => {
+                    const daysRemaining = getDaysRemaining(item.deletedAt)
+                    const isSelected = selectedIds.has(item.id)
+                    const isProcessing = isRestoring === item.id || isDeleting === item.id
+                    const itemSize = item.type === 'folder' ? item.totalSize : item.fileSize
 
                     return (
                       <div
-                        key={folder.id}
+                        key={item.id}
                         className={cn(
                           'grid grid-cols-12 gap-4 px-4 py-3 items-center hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors',
                           isSelected && 'bg-blue-50 dark:bg-blue-900/10'
@@ -558,7 +649,7 @@ export function TrashPage() {
                           <input
                             type="checkbox"
                             checked={isSelected}
-                            onChange={() => toggleSelection(folder.id)}
+                            onChange={() => toggleSelection(item.id)}
                             disabled={isProcessing}
                             className="w-4 h-4 text-blue-600 rounded border-gray-300 dark:border-gray-600 focus:ring-blue-500"
                           />
@@ -567,17 +658,21 @@ export function TrashPage() {
                         {/* Name */}
                         <div className="col-span-3 flex items-center gap-3">
                           <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
-                            <Folder className="w-5 h-5 text-amber-500" />
+                            {item.type === 'folder' ? (
+                              <Folder className="w-5 h-5 text-amber-500" />
+                            ) : (
+                              <FileText className="w-5 h-5 text-blue-500" />
+                            )}
                           </div>
                           <div className="min-w-0">
                             <p className="font-medium text-gray-900 dark:text-gray-100 truncate">
-                              {folder.name}
+                              {item.name}
                             </p>
                             <p
                               className="text-xs text-gray-500 dark:text-gray-400 truncate"
-                              title={folder.path}
+                              title={item.path}
                             >
-                              {folder.path || '/'}
+                              {item.path || '/'}
                             </p>
                           </div>
                         </div>
@@ -590,7 +685,7 @@ export function TrashPage() {
                             </div>
                             <div className="min-w-0">
                               <p className="text-sm text-gray-900 dark:text-gray-100 truncate">
-                                {folder.deletedByName || 'Unknown'}
+                                {item.deletedByName || 'Unknown'}
                               </p>
                             </div>
                           </div>
@@ -599,12 +694,12 @@ export function TrashPage() {
                         {/* Deleted Date */}
                         <div className="col-span-2 flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
                           <Clock className="w-4 h-4 flex-shrink-0" />
-                          <span className="truncate">{formatDate(folder.deletedAt)}</span>
+                          <span className="truncate">{formatDate(item.deletedAt)}</span>
                         </div>
 
                         {/* Size */}
                         <div className="col-span-1 text-sm text-gray-600 dark:text-gray-400">
-                          {formatSize(folder.totalSize)}
+                          {formatSize(itemSize)}
                         </div>
 
                         {/* Days Remaining */}
@@ -626,31 +721,31 @@ export function TrashPage() {
                         {/* Actions */}
                         <div className="col-span-2 flex items-center justify-end gap-1">
                           <button
-                            onClick={() => openModal('preview', folder)}
+                            onClick={() => openModal('preview', item)}
                             className="p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                             title="Preview"
                           >
                             <Eye className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => openModal('restore', folder)}
+                            onClick={() => openModal('restore', item)}
                             disabled={isProcessing}
                             className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors disabled:opacity-50"
                             title="Restore"
                           >
-                            {isRestoring === folder.id ? (
+                            {isRestoring === item.id ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
                             ) : (
                               <RotateCcw className="w-4 h-4" />
                             )}
                           </button>
                           <button
-                            onClick={() => openModal('delete', folder)}
+                            onClick={() => openModal('delete', item)}
                             disabled={isProcessing}
                             className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
                             title="Delete permanently"
                           >
-                            {isDeleting === folder.id ? (
+                            {isDeleting === item.id ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
                             ) : (
                               <Trash2 className="w-4 h-4" />
@@ -717,14 +812,15 @@ export function TrashPage() {
             ) : (
               /* Grid View */
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {paginatedItems.map((folder) => {
-                  const daysRemaining = getDaysRemaining(folder.deletedAt)
-                  const isSelected = selectedIds.has(folder.id)
-                  const isProcessing = isRestoring === folder.id || isDeleting === folder.id
+                {paginatedItems.map((item) => {
+                  const daysRemaining = getDaysRemaining(item.deletedAt)
+                  const isSelected = selectedIds.has(item.id)
+                  const isProcessing = isRestoring === item.id || isDeleting === item.id
+                  const itemSize = item.type === 'folder' ? item.totalSize : item.fileSize
 
                   return (
                     <div
-                      key={folder.id}
+                      key={item.id}
                       className={cn(
                         'p-4 bg-white dark:bg-gray-800 rounded-xl border transition-all',
                         isSelected
@@ -736,7 +832,7 @@ export function TrashPage() {
                         <input
                           type="checkbox"
                           checked={isSelected}
-                          onChange={() => toggleSelection(folder.id)}
+                          onChange={() => toggleSelection(item.id)}
                           disabled={isProcessing}
                           className="w-4 h-4 text-blue-600 rounded border-gray-300 dark:border-gray-600 focus:ring-blue-500"
                         />
@@ -754,31 +850,35 @@ export function TrashPage() {
 
                       <div className="flex flex-col items-center text-center mb-4">
                         <div className="p-3 bg-gray-100 dark:bg-gray-700 rounded-xl mb-3">
-                          <Folder className="w-8 h-8 text-amber-500" />
+                          {item.type === 'folder' ? (
+                            <Folder className="w-8 h-8 text-amber-500" />
+                          ) : (
+                            <FileText className="w-8 h-8 text-blue-500" />
+                          )}
                         </div>
                         <p className="font-medium text-gray-900 dark:text-gray-100 truncate w-full">
-                          {folder.name}
+                          {item.name}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          {formatSize(folder.totalSize)}
+                          {formatSize(itemSize)}
                         </p>
                       </div>
 
                       <div className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                        <p className="truncate">Deleted by: {folder.deletedByName || 'Unknown'}</p>
-                        <p>{formatDate(folder.deletedAt)}</p>
+                        <p className="truncate">Deleted by: {item.deletedByName || 'Unknown'}</p>
+                        <p>{formatDate(item.deletedAt)}</p>
                       </div>
 
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => openModal('restore', folder)}
+                          onClick={() => openModal('restore', item)}
                           disabled={isProcessing}
                           className="flex-1 px-3 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors disabled:opacity-50"
                         >
                           Restore
                         </button>
                         <button
-                          onClick={() => openModal('delete', folder)}
+                          onClick={() => openModal('delete', item)}
                           disabled={isProcessing}
                           className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
                         >
@@ -839,7 +939,9 @@ export function TrashPage() {
               Are you sure you want to restore <strong>"{modal.item.name}"</strong>?
             </p>
             <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">
-              The folder and all its contents will be restored to its original location.
+              {modal.item.type === 'folder'
+                ? 'The folder and all its contents will be restored to its original location.'
+                : 'The document will be restored to its original folder.'}
             </p>
             <div className="flex justify-end gap-3">
               <button
@@ -850,7 +952,7 @@ export function TrashPage() {
                 Cancel
               </button>
               <button
-                onClick={() => handleRestore(modal.item!.id, modal.item!.name)}
+                onClick={() => handleRestore(modal.item!)}
                 disabled={isRestoring === modal.item.id}
                 className="px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
               >
@@ -896,8 +998,9 @@ export function TrashPage() {
               <div className="flex gap-2">
                 <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0" />
                 <p className="text-sm text-red-700 dark:text-red-300">
-                  This action cannot be undone. The folder and all its contents will be permanently
-                  deleted.
+                  This action cannot be undone. The{' '}
+                  {modal.item.type === 'folder' ? 'folder and all its contents' : 'document'} will
+                  be permanently deleted.
                 </p>
               </div>
             </div>
@@ -909,7 +1012,7 @@ export function TrashPage() {
                 type="text"
                 value={confirmInput}
                 onChange={(e) => setConfirmInput(e.target.value)}
-                placeholder="Enter folder name"
+                placeholder={`Enter ${modal.item.type === 'folder' ? 'folder' : 'document'} name`}
                 className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500"
               />
             </div>
@@ -922,7 +1025,7 @@ export function TrashPage() {
                 Cancel
               </button>
               <button
-                onClick={() => handlePermanentDelete(modal.item!.id, modal.item!.name)}
+                onClick={() => handlePermanentDelete(modal.item!)}
                 disabled={isDeleting === modal.item.id || confirmInput !== modal.item.name}
                 className="px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -962,8 +1065,9 @@ export function TrashPage() {
               </h3>
             </div>
             <p className="text-gray-600 dark:text-gray-400 mb-4">
-              This will permanently delete all <strong>{trashedFolders.length}</strong> item(s) in
-              the trash.
+              This will permanently delete all{' '}
+              <strong>{trashedFolders.length + trashedDocuments.length}</strong> item(s) in the
+              trash ({trashedFolders.length} folder(s), {trashedDocuments.length} document(s)).
             </p>
             <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg mb-4">
               <div className="flex gap-2">

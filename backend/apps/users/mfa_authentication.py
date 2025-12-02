@@ -16,7 +16,7 @@ class MFAJWTAuthentication(JWTAuthentication):
 
     After successful JWT validation, checks if:
     1. User has MFA enabled
-    2. User has completed MFA verification in current session
+    2. User has completed MFA verification (checked via JWT claim)
 
     If MFA is required but not verified, raises AuthenticationFailed.
     """
@@ -40,16 +40,19 @@ class MFAJWTAuthentication(JWTAuthentication):
             # No MFA settings, allow access
             return result
 
-        # If MFA is not configured, allow access
+        # If MFA is not configured/enabled, allow access
         if not mfa_settings.requires_mfa:
             return result
 
-        # MFA is required - check if verified in current session
-        if not request.session.get('mfa_verified', False):
+        # MFA is required - check if verified via JWT claim
+        # The mfa_verified claim is added to the token after successful MFA verification
+        mfa_verified = validated_token.get('mfa_verified', False)
+
+        if not mfa_verified:
             raise AuthenticationFailed({
                 'detail': 'MFA verification required',
                 'code': 'mfa_required',
-                'user_id': user.id
+                'user_id': str(user.id)
             })
 
         # MFA verified, allow access
@@ -75,11 +78,11 @@ class MFAOptionalJWTAuthentication(JWTAuthentication):
 
         user, validated_token = result
 
-        # Add MFA status to user object
+        # Add MFA status to user object (from JWT claim)
         try:
             mfa_settings = MFASettings.objects.get(user=user)
             user.mfa_configured = mfa_settings.requires_mfa
-            user.mfa_verified = request.session.get('mfa_verified', False)
+            user.mfa_verified = validated_token.get('mfa_verified', False)
         except MFASettings.DoesNotExist:
             user.mfa_configured = False
             user.mfa_verified = False

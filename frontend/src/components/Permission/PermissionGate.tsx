@@ -93,6 +93,7 @@ export function PermissionGate({
     checkDocumentPermission,
     checkFolderPermission,
     isLoading: permissionsLoading,
+    isAdmin,
   } = usePermissions()
 
   const [hasPermission, setHasPermission] = useState<boolean | null>(null)
@@ -125,8 +126,16 @@ export function PermissionGate({
 
       setIsLoading(true)
 
-      // SECURITY: No client-side admin/owner bypasses
-      // Backend will handle admin and owner checks server-side
+      // ADMIN BYPASS: If user is admin/superuser (from server-validated permissionSummary),
+      // grant all permissions immediately without API calls
+      // This is safe because isAdmin is derived from server-validated permissionSummary
+      if (isAdmin) {
+        if (mountedRef.current) {
+          setHasPermission(true)
+          setIsLoading(false)
+        }
+        return
+      }
 
       // Resource-level permission check via backend API
       if (document?.id) {
@@ -203,6 +212,7 @@ export function PermissionGate({
     hasAllGlobalPermissions,
     checkDocumentPermission,
     checkFolderPermission,
+    isAdmin,
   ])
 
   // Loading state

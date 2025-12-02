@@ -370,8 +370,17 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
    */
   const checkDocumentPermission = useCallback(
     async (documentId: string, permission: PermissionAction): Promise<PermissionCheckResult> => {
+      // If user is not available, deny access
+      if (!user?.id) {
+        return {
+          allowed: false,
+          reason: 'User not authenticated',
+          serverValidated: false,
+        }
+      }
+
       const sessionId = sessionIdRef.current
-      const cacheKey = `doc:${documentId}:${permission}:${user?.id}:${sessionId}`
+      const cacheKey = `doc:${documentId}:${permission}:${user.id}:${sessionId}`
 
       // Check cache (with session validation)
       const cached = permissionCache.get(cacheKey)
@@ -381,7 +390,7 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
 
       try {
         // SECURITY: Always call backend API for permission check
-        const result = await apiCheckDocumentPermission(documentId, user?.id || '', permission)
+        const result = await apiCheckDocumentPermission(documentId, user.id, permission)
         const checkResult: PermissionCheckResult = {
           allowed: result.has_permission,
           reason: result.reason,
@@ -416,8 +425,17 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
    */
   const checkFolderPermission = useCallback(
     async (folderId: string, permission: PermissionAction): Promise<PermissionCheckResult> => {
+      // If user is not available, deny access
+      if (!user?.id) {
+        return {
+          allowed: false,
+          reason: 'User not authenticated',
+          serverValidated: false,
+        }
+      }
+
       const sessionId = sessionIdRef.current
-      const cacheKey = `folder:${folderId}:${permission}:${user?.id}:${sessionId}`
+      const cacheKey = `folder:${folderId}:${permission}:${user.id}:${sessionId}`
 
       // Check cache (with session validation)
       const cached = permissionCache.get(cacheKey)
@@ -427,7 +445,7 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
 
       try {
         // SECURITY: Always call backend API for permission check
-        const result = await apiCheckFolderPermission(folderId, user?.id || '', permission)
+        const result = await apiCheckFolderPermission(folderId, user.id, permission)
         const checkResult: PermissionCheckResult = {
           allowed: result.has_permission,
           reason: result.reason,

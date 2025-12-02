@@ -84,6 +84,16 @@ export function ProtectedRoute({
   resetActivityRef.current = resetActivity
 
   if (!isAuthenticated) {
+    // DEBUG: Log instead of redirecting
+    console.error('🔴 ProtectedRoute: Not authenticated!', {
+      hasAccessToken: !!(
+        localStorage.getItem('access_token') || sessionStorage.getItem('access_token')
+      ),
+      hasRefreshToken: !!(
+        localStorage.getItem('refresh_token') || sessionStorage.getItem('refresh_token')
+      ),
+      hasUser: !!(localStorage.getItem('user') || sessionStorage.getItem('user')),
+    })
     // Redirect to login page if not authenticated
     return <Navigate to="/login" replace />
   }

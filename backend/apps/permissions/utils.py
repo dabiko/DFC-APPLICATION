@@ -109,6 +109,7 @@ class PermissionChecker:
         2. Department roles (if folder belongs to user's department)
         3. Explicit folder permissions with inheritance
         4. Folder owner always has full control
+        5. Department membership grants basic contribute permissions
 
         Args:
             folder: Folder instance
@@ -139,6 +140,13 @@ class PermissionChecker:
         # Check department permissions if folder is in user's department
         if folder.department_id and folder.department_id == self.user.department_id:
             if self.has_department_permission(folder.department, permission):
+                self._cache_permission(folder, permission, True)
+                return True
+
+            # Department members get default contribute-level permissions
+            # This allows them to view, download, upload, and edit within their department folders
+            contribute_permissions = ['can_view', 'can_download', 'can_upload', 'can_edit']
+            if permission in contribute_permissions:
                 self._cache_permission(folder, permission, True)
                 return True
 
@@ -493,7 +501,13 @@ def check_permission_with_reason(user, permission, obj=None):
             if checker.has_global_permission(permission):
                 return True, "User has global permission via role", "GLOBAL_ROLE"
             if obj.department_id and obj.department_id == user.department_id:
-                return True, "User has department-level permission", "DEPARTMENT"
+                # Check if it's default department permissions or explicit role
+                if checker.has_department_permission(obj.department, permission):
+                    return True, "User has department-level role permission", "DEPARTMENT_ROLE"
+                # Default contribute permissions for department members
+                contribute_permissions = ['can_view', 'can_download', 'can_upload', 'can_edit']
+                if permission in contribute_permissions:
+                    return True, "User is department member with default access", "DEPARTMENT_MEMBER"
             return True, "User has explicit folder permission", "FOLDER_PERMISSION"
         return False, "User does not have required folder permission", "NO_PERMISSION"
 

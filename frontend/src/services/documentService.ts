@@ -289,10 +289,35 @@ export const getDocumentPreview = async (
 }
 
 /**
- * Delete document
+ * Delete document (soft delete)
  */
 export const deleteDocument = async (documentId: string): Promise<void> => {
-  await apiClient.delete(`/documents/${documentId}/`)
+  await apiClient.delete(`/documents/${documentId}/delete/`)
+}
+
+/**
+ * Bulk delete result
+ */
+export interface BulkDeleteResult {
+  successful: number
+  failed: number
+  errors: Array<{ id: string; error: string }>
+}
+
+/**
+ * Bulk delete documents
+ * @param documentIds - Array of document IDs to delete
+ * @param permanent - If true, permanently delete (admin only). Otherwise soft delete.
+ */
+export const bulkDeleteDocuments = async (
+  documentIds: string[],
+  permanent: boolean = false
+): Promise<BulkDeleteResult> => {
+  const response = await apiClient.post<BulkDeleteResult>('/documents/bulk-delete/', {
+    document_ids: documentIds,
+    permanent,
+  })
+  return response.data
 }
 
 /**
@@ -1175,6 +1200,85 @@ export const checkDuplicates = async (checksums: string[]): Promise<CheckDuplica
   return response.data
 }
 
+// ============================================================================
+// TRASH DOCUMENT FUNCTIONS
+// ============================================================================
+
+/**
+ * Trashed document interface
+ */
+export interface TrashedDocument {
+  id: string
+  title: string
+  file_name: string
+  file_size: number
+  file_type: string
+  document_type: string
+  confidentiality_level: string
+  owner: string
+  owner_name: string | null
+  department: number | null
+  department_name: string | null
+  folder: string | null
+  folder_name: string | null
+  folder_path: string | null
+  created_at: string
+  updated_at: string
+  deleted_at: string | null
+  deleted_by: string | null
+  deleted_by_name: string | null
+  deleted_by_email: string | null
+}
+
+/**
+ * Get all trashed documents for the current user
+ */
+export const getTrashDocuments = async (): Promise<TrashedDocument[]> => {
+  const response = await apiClient.get<TrashedDocument[] | { results: TrashedDocument[] }>(
+    '/documents/trash/'
+  )
+  // Handle both paginated and non-paginated responses
+  if (Array.isArray(response.data)) {
+    return response.data
+  }
+  // Paginated response
+  return response.data.results || []
+}
+
+/**
+ * Restore a document from trash
+ * @param documentId - The ID of the document to restore
+ */
+export const restoreDocument = async (
+  documentId: string
+): Promise<{
+  message: string
+  document_id: string
+  folder_id: string | null
+}> => {
+  const response = await apiClient.post(`/documents/trash/${documentId}/restore/`)
+  return response.data
+}
+
+/**
+ * Permanently delete a document from trash
+ * @param documentId - The ID of the document to permanently delete
+ */
+export const permanentlyDeleteDocument = async (documentId: string): Promise<void> => {
+  await apiClient.delete(`/documents/trash/${documentId}/delete/`)
+}
+
+/**
+ * Empty all documents from trash
+ */
+export const emptyDocumentTrash = async (): Promise<{
+  message: string
+  deleted_count: number
+}> => {
+  const response = await apiClient.post('/documents/trash/empty/')
+  return response.data
+}
+
 // Export default service object
 const documentService = {
   uploadDocument,
@@ -1182,6 +1286,7 @@ const documentService = {
   getDocument,
   downloadDocument,
   deleteDocument,
+  bulkDeleteDocuments,
   getDocumentsInFolder,
   searchDocuments,
   validateFile,
@@ -1213,6 +1318,11 @@ const documentService = {
   getResourceActivity,
   getDocumentActivity,
   getFolderActivity,
+  // Trash functions
+  getTrashDocuments,
+  restoreDocument,
+  permanentlyDeleteDocument,
+  emptyDocumentTrash,
 }
 
 export default documentService

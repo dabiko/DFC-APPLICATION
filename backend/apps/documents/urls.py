@@ -70,6 +70,11 @@ from apps.documents.views import (
     DocumentStateHistoryView,
     DocumentStateChangeView,
     DocumentAllowedTransitionsView,
+    # Document Trash views
+    DocumentTrashListView,
+    DocumentRestoreView,
+    DocumentPermanentDeleteView,
+    DocumentEmptyTrashView,
 )
 from apps.classification.views import ApplyClassificationManuallyView
 
@@ -170,4 +175,10 @@ urlpatterns = [
     path('<uuid:id>/state-history/', DocumentStateHistoryView.as_view(), name='state_history'),
     path('<uuid:id>/change-state/', DocumentStateChangeView.as_view(), name='change_state'),
     path('<uuid:id>/allowed-transitions/', DocumentAllowedTransitionsView.as_view(), name='allowed_transitions'),
+
+    # Document Trash endpoints
+    path('trash/', DocumentTrashListView.as_view(), name='document_trash_list'),
+    path('trash/empty/', DocumentEmptyTrashView.as_view(), name='document_empty_trash'),
+    path('trash/<uuid:id>/restore/', DocumentRestoreView.as_view(), name='document_restore'),
+    path('trash/<uuid:id>/delete/', DocumentPermanentDeleteView.as_view(), name='document_permanent_delete'),
 ]

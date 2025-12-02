@@ -8,3 +8,4 @@ export { MoveDocumentModal, type MoveDocumentModalProps } from './MoveDocumentMo
 export { ShareDocumentModal, type ShareDocumentModalProps } from './ShareDocumentModal'
 export { CreateShortcutModal, type CreateShortcutModalProps } from './CreateShortcutModal'
 export { RenameDocumentModal, type RenameDocumentModalProps } from './RenameDocumentModal'
+export { DeleteDocumentModal, type DeleteDocumentModalProps } from './DeleteDocumentModal'

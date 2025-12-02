@@ -4,7 +4,9 @@ import { Input } from '@components/Input/Input'
 import { Button } from '@components/Button/Button'
 import { Checkbox } from '@components/Checkbox/Checkbox'
 import { AuthHeader } from '@components/Auth/AuthHeader'
+import { MFAVerification } from '@/components/MFA/MFAVerification'
 import { EnvelopeIcon, LockClosedIcon } from '@heroicons/react/24/outline'
+import { mfaService } from '@/services/mfaService'
 
 interface LoginFormData {
   email: string
@@ -26,6 +28,15 @@ interface Particle {
   type: 'file' | 'folder' | 'lock' | 'check'
 }
 
+// MFA verification state
+interface MFAState {
+  required: boolean
+  userId: number | null
+  mfaToken: string | null
+  rememberMe: boolean
+  tempUser: any | null
+}
+
 export function Login() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -42,6 +53,16 @@ export function Login() {
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [successMessage, setSuccessMessage] = useState<string>('')
+
+  // MFA State
+  const [mfaState, setMfaState] = useState<MFAState>({
+    required: false,
+    userId: null,
+    mfaToken: null,
+    rememberMe: false,
+    tempUser: null,
+  })
+  const [mfaLoading, setMfaLoading] = useState(false)
 
   // Check if user just registered
   useEffect(() => {
@@ -246,7 +267,27 @@ export function Login() {
         formData.rememberMe
       )
 
-      // Store tokens and user data based on Remember Me preference
+      // Check if MFA is required (new response structure)
+      if (response.mfa_required) {
+        // Clear any stale tokens from previous sessions before MFA flow
+        authService.clearTokens()
+
+        // Backend returned partial response requiring MFA verification
+        setMfaState({
+          required: true,
+          userId: response.user.id,
+          mfaToken: response.mfa_token || null,
+          rememberMe: response.remember_me || formData.rememberMe,
+          tempUser: response.user,
+        })
+        setLoading(false)
+        return
+      }
+
+      // No MFA required - proceed with login (full tokens received)
+      if (!response.access || !response.refresh) {
+        throw new Error('Invalid login response - missing tokens')
+      }
       authService.storeTokens(response.access, response.refresh, formData.rememberMe)
       authService.storeUser(response.user, formData.rememberMe)
 
@@ -286,6 +327,161 @@ export function Login() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Handle MFA verification
+  const handleMFAVerify = async (data: {
+    code: string
+    method: string
+    trustDevice: boolean
+    deviceFingerprint?: string
+  }) => {
+    if (!mfaState.userId) {
+      return { verified: false, message: 'Invalid session' }
+    }
+
+    setMfaLoading(true)
+
+    try {
+      const response = await mfaService.verify({
+        token: data.code,
+        user_id: mfaState.userId,
+        trust_device: data.trustDevice,
+        device_fingerprint: data.deviceFingerprint,
+        mfa_token: mfaState.mfaToken || undefined,
+        remember_me: mfaState.rememberMe,
+      })
+
+      if (response.success && response.data?.verified) {
+        // MFA verification successful - now we have full tokens
+        const { authService } = await import('@/services/auth.service')
+
+        // Get the tokens from MFA verify response
+        const accessToken = response.data.access
+        const refreshToken = response.data.refresh
+        const userData = response.data.user || mfaState.tempUser
+
+        // Debug logging
+        console.log('MFA Verify Response:', {
+          success: response.success,
+          hasAccess: !!accessToken,
+          hasRefresh: !!refreshToken,
+          accessTokenPreview: accessToken ? accessToken.substring(0, 50) + '...' : 'MISSING',
+          refreshTokenPreview: refreshToken ? refreshToken.substring(0, 50) + '...' : 'MISSING',
+          userData: userData,
+        })
+
+        if (accessToken && refreshToken && userData) {
+          // Clear any stale tokens first
+          authService.clearTokens()
+
+          // Store new tokens
+          authService.storeTokens(accessToken, refreshToken, mfaState.rememberMe)
+          authService.storeUser(userData, mfaState.rememberMe)
+
+          // Verify tokens were stored correctly
+          const storedAccess = authService.getAccessToken()
+          const storedRefresh = authService.getRefreshToken()
+          console.log('Tokens stored successfully:', {
+            accessStored: storedAccess === accessToken,
+            refreshStored: storedRefresh === refreshToken,
+            storage: mfaState.rememberMe ? 'localStorage' : 'sessionStorage',
+          })
+
+          // Small delay to ensure storage is complete before navigation
+          await new Promise((resolve) => setTimeout(resolve, 100))
+
+          // Double-check tokens are still there
+          const verifyAccess = authService.getAccessToken()
+          const verifyRefresh = authService.getRefreshToken()
+          console.log('Pre-navigation token check:', {
+            hasAccess: !!verifyAccess,
+            hasRefresh: !!verifyRefresh,
+            accessMatch: verifyAccess === accessToken,
+          })
+
+          // Navigate to dashboard
+          navigate('/dashboard')
+          return { verified: true }
+        } else {
+          console.error('Missing tokens in MFA response:', { accessToken, refreshToken, userData })
+          return {
+            verified: false,
+            message: 'Invalid MFA response - missing tokens',
+          }
+        }
+      } else {
+        return {
+          verified: false,
+          message: response.message || 'Invalid verification code',
+          remainingAttempts: response.data?.backup_codes_remaining,
+        }
+      }
+    } catch (error: any) {
+      console.error('MFA verification failed:', error)
+      const errorMessage =
+        error.response?.data?.message || error.message || 'Verification failed. Please try again.'
+      return {
+        verified: false,
+        message: errorMessage,
+      }
+    } finally {
+      setMfaLoading(false)
+    }
+  }
+
+  // Handle MFA cancel
+  const handleMFACancel = () => {
+    setMfaState({
+      required: false,
+      userId: null,
+      mfaToken: null,
+      rememberMe: false,
+      tempUser: null,
+    })
+    setErrors({})
+  }
+
+  // Show MFA verification screen
+  if (mfaState.required) {
+    return (
+      <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-4">
+        {/* Animated Background Canvas */}
+        <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" style={{ zIndex: 0 }} />
+
+        {/* Gradient Overlay */}
+        <div
+          className="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-transparent to-purple-50/30 dark:from-blue-950/20 dark:via-transparent dark:to-purple-950/20"
+          style={{ zIndex: 1 }}
+        />
+
+        {/* MFA Verification Form */}
+        <div className="relative z-10 w-full max-w-md">
+          <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-2xl shadow-2xl p-8">
+            {/* Navigation Header */}
+            <AuthHeader title="Verify Identity" showBack showLogo />
+
+            {/* User Info */}
+            <div className="text-center mb-6">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Logging in as{' '}
+                <span className="font-medium text-gray-900 dark:text-white">{formData.email}</span>
+              </p>
+            </div>
+
+            {/* MFA Verification Component */}
+            <MFAVerification
+              onVerify={handleMFAVerify}
+              onCancel={handleMFACancel}
+              method="totp"
+              allowBackupCode={true}
+              allowTrustDevice={true}
+              loading={mfaLoading}
+            />
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -338,7 +534,7 @@ export function Login() {
           <div className="relative">
             <Input
               label="Password"
-              type={showPassword ? 'password' : 'password'}
+              type={showPassword ? 'text' : 'password'}
               placeholder="Enter your password"
               value={formData.password}
               onChange={(e) => handleChange('password', e.target.value)}
@@ -354,7 +550,7 @@ export function Login() {
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-3 top-9 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 cursor-pointer"
             >
-              {showPassword ? '' : ''}
+              {showPassword ? 'Hide' : 'Show'}
             </button>
           </div>
 
@@ -377,7 +573,9 @@ export function Login() {
           {/* Submit Error */}
           {errors.submit && (
             <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-              <p className="text-sm text-red-600 dark:text-red-400">{errors.submit}</p>
+              <p className="text-sm text-red-600 dark:text-red-400 whitespace-pre-line">
+                {errors.submit}
+              </p>
             </div>
           )}
 
