@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 import uuid
 
@@ -7,13 +8,21 @@ class Folder(models.Model):
     """
     Hierarchical folder structure for organizing documents.
 
+    In the Department-as-Root architecture, folders MUST belong to a department.
+    The department acts as the implicit root container, and folder paths include
+    the department code as a prefix.
+
     Features:
     - Unlimited nested folder structure (parent-child relationships)
-    - Materialized path for efficient tree traversal
-    - Depth tracking for UI rendering
+    - Materialized path for efficient tree traversal (includes department prefix)
+    - Depth tracking for UI rendering (0 = root within department)
     - Confidentiality level inheritance
-    - Unique folder names within same parent
+    - Unique folder names within same parent AND department
     - Multi-tenant organization support
+    - Department-enforced data isolation
+
+    Path Format: /{DEPARTMENT_CODE}/{FolderName}/{SubFolderName}/
+    Example: /ENGAGEMENTS/Clients/ClientA/Documents/
     """
 
     CONFIDENTIALITY_CHOICES = [
@@ -44,25 +53,31 @@ class Folder(models.Model):
         related_name='children'
     )
 
-    # Materialized path for efficient querying
-    # Example: /engineering/projects/2024/
-    path = models.TextField(
-        help_text='Full folder path for efficient tree queries'
+    # CRITICAL: Department is REQUIRED - this is the core of Department-as-Root architecture
+    # All folders must belong to exactly one department
+    department = models.ForeignKey(
+        'users.Department',
+        on_delete=models.PROTECT,
+        related_name='folders',
+        help_text='Department this folder belongs to (required - acts as root container)'
     )
 
-    # Depth level in the hierarchy (0 for root folders)
+    # Materialized path for efficient querying
+    # Format: /{DEPARTMENT_CODE}/{FolderName}/.../
+    # Example: /ENGAGEMENTS/Clients/ClientA/
+    path = models.TextField(
+        db_index=True,
+        help_text='Full folder path including department code prefix'
+    )
+
+    # Depth level in the hierarchy (0 for root folders within department)
     depth = models.IntegerField(default=0)
 
-    # Ownership and department
+    # Ownership
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         related_name='owned_folders'
-    )
-    department = models.ForeignKey(
-        'users.Department',
-        on_delete=models.PROTECT,
-        related_name='folders'
     )
 
     # Security
@@ -121,23 +136,63 @@ class Folder(models.Model):
             models.Index(fields=['created_at']),
             models.Index(fields=['is_deleted']),
             models.Index(fields=['deleted_at']),
+            # New indexes for department-based queries
+            models.Index(fields=['department', 'parent']),
+            models.Index(fields=['department', 'is_deleted']),
         ]
-        unique_together = ['parent', 'name']
+        # Unique folder names within same parent AND department
+        # This allows same folder name in different departments when parent is null
+        unique_together = [['parent', 'name', 'department']]
         ordering = ['path', 'name']
 
     def __str__(self):
         return self.path or self.name
 
+    def clean(self):
+        """
+        Validate folder data before saving.
+
+        Ensures:
+        1. Department consistency: child folders must have same department as parent
+        2. No circular references in the folder hierarchy
+        """
+        # Validate department consistency with parent
+        if self.parent and self.parent.department_id != self.department_id:
+            raise ValidationError({
+                'department': 'Folder must belong to the same department as its parent folder.'
+            })
+
+        # Prevent circular references
+        if self.parent:
+            current = self.parent
+            visited = {self.pk} if self.pk else set()
+            while current:
+                if current.pk in visited:
+                    raise ValidationError({
+                        'parent': 'Circular reference detected in folder hierarchy.'
+                    })
+                visited.add(current.pk)
+                current = current.parent
+
     def save(self, *args, **kwargs):
         """
         Override save to automatically update path and depth.
+
+        Path format: /{DEPARTMENT_CODE}/{FolderName}/.../
+        The department code is always the first element in the path.
         """
+        # Compute path with department prefix BEFORE validation
+        # This ensures the path is available during full_clean()
         if self.parent:
             self.depth = self.parent.depth + 1
             self.path = f"{self.parent.path}{self.name}/"
         else:
+            # Root folder within department - path starts with department code
             self.depth = 0
-            self.path = f"/{self.name}/"
+            self.path = f"/{self.department.code}/{self.name}/"
+
+        # Run validation after path is computed
+        self.full_clean()
 
         super().save(*args, **kwargs)
 

@@ -8,45 +8,57 @@ def migrate_data_forward(apps, schema_editor):
     from django.db import connection
 
     with connection.cursor() as cursor:
-        # Update retention_days from retention_period_years (years to days)
+        # Check if retention_period_years column exists before using it
         cursor.execute("""
-            UPDATE retention_policies
-            SET retention_days = retention_period_years * 365
-            WHERE retention_days IS NULL OR retention_days = 0
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'retention_policies' AND column_name = 'retention_period_years'
+            )
         """)
+        has_retention_period_years = cursor.fetchone()[0]
 
-        # Set policy_type based on existing data
-        cursor.execute("""
-            UPDATE retention_policies
-            SET policy_type = CASE
-                WHEN applies_to_document_type IS NOT NULL AND applies_to_document_type != ''
-                    THEN 'DOCUMENT_TYPE'
-                WHEN applies_to_folder_id IS NOT NULL
-                    THEN 'FOLDER'
-                ELSE 'CUSTOM'
-            END
-            WHERE policy_type IS NULL OR policy_type = ''
-        """)
+        if has_retention_period_years:
+            # Update retention_days from retention_period_years (years to days)
+            cursor.execute("""
+                UPDATE retention_policies
+                SET retention_days = retention_period_years * 365
+                WHERE retention_days IS NULL OR retention_days = 0
+            """)
 
-        # Set notify_before_days from notification_days_before
+        # Check if applies_to_document_type column exists
         cursor.execute("""
-            UPDATE retention_policies
-            SET notify_before_days = COALESCE(notification_days_before, 30)
-            WHERE notify_before_days IS NULL OR notify_before_days = 0
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'retention_policies' AND column_name = 'applies_to_document_type'
+            )
         """)
+        has_applies_to_document_type = cursor.fetchone()[0]
 
-        # Set criteria based on document type
+        # Check if applies_to_folder_id column exists
         cursor.execute("""
-            UPDATE retention_policies
-            SET criteria = CASE
-                WHEN applies_to_document_type IS NOT NULL AND applies_to_document_type != ''
-                    THEN jsonb_build_object('document_type', applies_to_document_type)
-                WHEN applies_to_folder_id IS NOT NULL
-                    THEN jsonb_build_object('folder_id', applies_to_folder_id::text)
-                ELSE '{}'::jsonb
-            END
-            WHERE criteria IS NULL OR criteria = '{}'::jsonb
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'retention_policies' AND column_name = 'applies_to_folder_id'
+            )
         """)
+        has_applies_to_folder_id = cursor.fetchone()[0]
+
+        # Check if notification_days_before column exists
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'retention_policies' AND column_name = 'notification_days_before'
+            )
+        """)
+        has_notification_days_before = cursor.fetchone()[0]
+
+        # Set notify_before_days from notification_days_before (if column exists)
+        if has_notification_days_before:
+            cursor.execute("""
+                UPDATE retention_policies
+                SET notify_before_days = COALESCE(notification_days_before, 30)
+                WHERE notify_before_days IS NULL OR notify_before_days = 0
+            """)
 
 
 def migrate_data_backward(apps, schema_editor):
@@ -54,17 +66,34 @@ def migrate_data_backward(apps, schema_editor):
     from django.db import connection
 
     with connection.cursor() as cursor:
-        # Set retention_period_years from retention_days
+        # Check if columns exist before using them
         cursor.execute("""
-            UPDATE retention_policies
-            SET retention_period_years = retention_days / 365
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'retention_policies' AND column_name = 'retention_period_years'
+            )
         """)
+        has_retention_period_years = cursor.fetchone()[0]
 
-        # Set notification_days_before from notify_before_days
+        if has_retention_period_years:
+            cursor.execute("""
+                UPDATE retention_policies
+                SET retention_period_years = retention_days / 365
+            """)
+
         cursor.execute("""
-            UPDATE retention_policies
-            SET notification_days_before = notify_before_days
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'retention_policies' AND column_name = 'notification_days_before'
+            )
         """)
+        has_notification_days_before = cursor.fetchone()[0]
+
+        if has_notification_days_before:
+            cursor.execute("""
+                UPDATE retention_policies
+                SET notification_days_before = notify_before_days
+            """)
 
 
 class Migration(migrations.Migration):

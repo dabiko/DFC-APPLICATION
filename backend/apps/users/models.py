@@ -23,7 +23,43 @@ def validate_company_email(value):
 
 
 class Department(models.Model):
-    """Organization departments with storage quota management"""
+    """
+    Organization departments with storage quota management.
+
+    In the Department-as-Root architecture, departments serve as the top-level
+    organizational containers for folders. All folders must belong to exactly
+    one department, and departments act as the primary RBAC boundary.
+
+    Features:
+    - Hierarchical department structure (parent-child)
+    - Storage quota management per department
+    - Visual customization (icon, color) for sidebar display
+    - Default confidentiality level for new documents
+    - Active/inactive status for soft-disable
+    """
+
+    CONFIDENTIALITY_CHOICES = [
+        ('PUBLIC', 'Public'),
+        ('INTERNAL', 'Internal'),
+        ('CONFIDENTIAL', 'Confidential'),
+        ('HIGHLY_CONFIDENTIAL', 'Highly Confidential'),
+    ]
+
+    ICON_CHOICES = [
+        ('folder', 'Folder'),
+        ('briefcase', 'Briefcase'),
+        ('calculator', 'Calculator'),
+        ('shield', 'Shield'),
+        ('alert-triangle', 'Alert Triangle'),
+        ('clipboard-check', 'Clipboard Check'),
+        ('server', 'Server'),
+        ('users', 'Users'),
+        ('file-text', 'File Text'),
+        ('archive', 'Archive'),
+        ('database', 'Database'),
+        ('lock', 'Lock'),
+    ]
+
     # Multi-tenant organization
     organization = models.ForeignKey(
         'organizations.Organization',
@@ -34,8 +70,15 @@ class Department(models.Model):
         help_text='Organization this department belongs to'
     )
 
+    # Basic Information
     name = models.CharField(max_length=100)
     code = models.CharField(max_length=20)  # Removed unique=True - will use unique_together
+    description = models.TextField(
+        blank=True,
+        help_text='Description of the department purpose and scope'
+    )
+
+    # Hierarchy
     parent = models.ForeignKey(
         'self',
         null=True,
@@ -43,10 +86,50 @@ class Department(models.Model):
         on_delete=models.CASCADE,
         related_name='children'
     )
+
+    # Storage Management
     storage_quota_gb = models.IntegerField(
         default=100,
         help_text='Storage quota in gigabytes for this department'
     )
+    storage_used_bytes = models.BigIntegerField(
+        default=0,
+        help_text='Current storage usage in bytes (updated by document operations)'
+    )
+
+    # Visual Customization (for sidebar display)
+    icon = models.CharField(
+        max_length=50,
+        choices=ICON_CHOICES,
+        default='folder',
+        help_text='Icon to display in sidebar navigation'
+    )
+    color = models.CharField(
+        max_length=7,
+        default='#3B82F6',
+        help_text='Hex color code for department visual identification'
+    )
+    display_order = models.IntegerField(
+        default=0,
+        db_index=True,
+        help_text='Order in which departments appear in sidebar'
+    )
+
+    # Status
+    is_active = models.BooleanField(
+        default=True,
+        help_text='Whether this department is active and accessible'
+    )
+
+    # Default Settings
+    default_confidentiality = models.CharField(
+        max_length=20,
+        choices=CONFIDENTIALITY_CHOICES,
+        default='INTERNAL',
+        help_text='Default confidentiality level for new documents in this department'
+    )
+
+    # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -54,12 +137,56 @@ class Department(models.Model):
         db_table = 'departments'
         verbose_name = 'Department'
         verbose_name_plural = 'Departments'
-        ordering = ['code']
+        ordering = ['display_order', 'code']
         # Department code must be unique within each organization
         unique_together = [['organization', 'code']]
+        indexes = [
+            models.Index(fields=['organization', 'is_active']),
+            models.Index(fields=['display_order']),
+        ]
 
     def __str__(self):
         return f"{self.code} - {self.name}"
+
+    @property
+    def root_path(self):
+        """Returns the department code as root path element for folder paths."""
+        return f"/{self.code}/"
+
+    @property
+    def storage_used_gb(self):
+        """Returns storage used in gigabytes."""
+        return self.storage_used_bytes / (1024 ** 3)
+
+    @property
+    def storage_percentage(self):
+        """Returns percentage of quota used."""
+        if self.storage_quota_gb == 0:
+            return 0
+        return (self.storage_used_gb / self.storage_quota_gb) * 100
+
+    @property
+    def storage_available_bytes(self):
+        """Returns available storage in bytes."""
+        quota_bytes = self.storage_quota_gb * (1024 ** 3)
+        return max(0, quota_bytes - self.storage_used_bytes)
+
+    def has_storage_capacity(self, required_bytes):
+        """Check if department has enough storage for the specified bytes."""
+        return self.storage_available_bytes >= required_bytes
+
+    def update_storage_used(self):
+        """
+        Recalculate storage used from all documents in the department.
+        Call this periodically or after bulk operations.
+        """
+        from apps.documents.models import Document
+        total = Document.objects.filter(
+            department=self,
+            is_deleted=False
+        ).aggregate(total=models.Sum('file_size'))['total'] or 0
+        self.storage_used_bytes = total
+        self.save(update_fields=['storage_used_bytes', 'updated_at'])
 
 
 class CustomUser(AbstractUser):
@@ -349,3 +476,10 @@ from apps.users.models_favorites import FavoriteFolder, FavoriteDocument
 
 # Import Settings models
 from apps.users.settings_models import UserPreferences, NotificationSettings, SecuritySettings
+
+# Import Department-related models (Department-as-Root architecture)
+from apps.users.models_department import (
+    DepartmentSettings,
+    CrossDepartmentAccess,
+    DepartmentAccessRequest
+)

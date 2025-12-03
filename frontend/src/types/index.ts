@@ -1,5 +1,8 @@
 // Global type definitions for the DFC application
 
+// Re-export department types
+export * from './department'
+
 // User types
 export interface User {
   id: string

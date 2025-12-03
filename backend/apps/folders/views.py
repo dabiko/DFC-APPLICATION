@@ -24,6 +24,8 @@ from apps.folders.serializers import (
 )
 from apps.permissions.decorators import HasFolderPermission, FolderPermissionMixin
 from apps.permissions.utils import PermissionChecker, check_permission
+from apps.permissions.department_resolver import DepartmentPermissionResolver
+from rest_framework.exceptions import PermissionDenied as DRFPermissionDenied
 import logging
 
 logger = logging.getLogger(__name__)
@@ -102,20 +104,56 @@ class FolderListCreateView(FolderPermissionMixin, generics.ListCreateAPIView):
         return queryset.order_by('path', 'name')
 
     def perform_create(self, serializer):
-        """Create folder with ownership and department info"""
-        # Get department from request data or user's department
+        """Create folder with ownership and department info with permission checks"""
+        user = self.request.user
+        parent_folder = serializer.validated_data.get('parent')
         department = serializer.validated_data.get('department')
-        if not department:
-            department = self.request.user.department
+
+        # Get department from parent folder, request data, or user's department
+        if parent_folder:
+            department = parent_folder.department
+        elif not department:
+            department = user.department
+
+        # Permission check using DepartmentPermissionResolver
+        resolver = DepartmentPermissionResolver(user)
+
+        # Check if user can access the target department
+        if department and not resolver.can_access_department(department.id):
+            raise DRFPermissionDenied(
+                f"You don't have access to department '{department.name}'"
+            )
+
+        # If creating inside a parent folder, check upload permission on parent
+        if parent_folder:
+            if not resolver.can_access_folder(parent_folder, 'upload'):
+                raise DRFPermissionDenied(
+                    f"You don't have permission to create folders in '{parent_folder.name}'"
+                )
+        else:
+            # Creating at department root level - check department role allows upload
+            dept_role = resolver.get_department_role(department.id) if department else None
+
+            # Superusers/global admins can always create at root level
+            if not user.is_superuser:
+                if not dept_role:
+                    raise DRFPermissionDenied(
+                        f"You don't have permission to create root folders in department '{department.name}'"
+                    )
+                # Check if role permits upload/create action
+                if not resolver._role_permits_action(dept_role, 'upload'):
+                    raise DRFPermissionDenied(
+                        f"Your role '{dept_role.name}' doesn't allow creating folders in department '{department.name}'"
+                    )
 
         folder = serializer.save(
-            owner=self.request.user,
-            created_by=self.request.user,
+            owner=user,
+            created_by=user,
             department=department
         )
 
         logger.info(
-            f"Folder created: {folder.id} ({folder.path}) by user {self.request.user.username}"
+            f"Folder created: {folder.id} ({folder.path}) by user {user.username} in department {department.name if department else 'None'}"
         )
 
 

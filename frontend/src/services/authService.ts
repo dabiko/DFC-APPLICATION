@@ -38,9 +38,12 @@ export const authService = {
    * Logout user (invalidate refresh token on server)
    */
   logout: async (): Promise<void> => {
-    const tokens = localStorage.getItem('auth_tokens')
-    if (tokens) {
-      const { refreshToken } = JSON.parse(tokens)
+    // Get refresh token from either localStorage or sessionStorage
+    const refreshToken =
+      localStorage.getItem('refresh_token') || sessionStorage.getItem('refresh_token')
+
+    // Only call API if we have a valid refresh token
+    if (refreshToken && refreshToken.trim() !== '') {
       try {
         await apiClient.post('/auth/logout/', { refresh: refreshToken })
       } catch (error) {
@@ -49,9 +52,17 @@ export const authService = {
       }
     }
 
-    // Clear local storage
+    // Clear all auth data from both storages regardless of API call result
+    localStorage.removeItem('access_token')
+    localStorage.removeItem('refresh_token')
+    localStorage.removeItem('user')
+    localStorage.removeItem('remember_me')
     localStorage.removeItem('auth_tokens')
     localStorage.removeItem('auth_user')
+
+    sessionStorage.removeItem('access_token')
+    sessionStorage.removeItem('refresh_token')
+    sessionStorage.removeItem('user')
   },
 
   /**

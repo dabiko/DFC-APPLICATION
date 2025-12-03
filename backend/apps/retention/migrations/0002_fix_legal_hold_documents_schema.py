@@ -20,12 +20,12 @@ class Migration(migrations.Migration):
             sql="DROP TABLE IF EXISTS legal_hold_documents CASCADE;",
             reverse_sql="",  # No reverse, will be handled by recreate
         ),
-        # Recreate with correct schema (legal_holds uses BIGINT, documents uses UUID)
+        # Recreate with correct schema (legal_holds uses UUID, documents uses UUID)
         migrations.RunSQL(
             sql="""
                 CREATE TABLE legal_hold_documents (
                     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                    legal_hold_id BIGINT NOT NULL REFERENCES legal_holds(id) ON DELETE CASCADE,
+                    legal_hold_id UUID NOT NULL REFERENCES legal_holds(id) ON DELETE CASCADE,
                     document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
                     added_by_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
                     added_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),

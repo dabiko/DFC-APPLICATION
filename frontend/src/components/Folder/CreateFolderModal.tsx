@@ -1,11 +1,18 @@
 /**
  * CreateFolderModal Component
- * Modal for creating new folders
+ * Modal for creating new folders with department context
  */
 
 import { type FC, useState, useEffect } from 'react'
-import { XMarkIcon, FolderPlusIcon, RectangleStackIcon } from '@heroicons/react/24/outline'
+import {
+  XMarkIcon,
+  FolderPlusIcon,
+  RectangleStackIcon,
+  BuildingOffice2Icon,
+} from '@heroicons/react/24/outline'
 import { FolderTemplateSelector } from './FolderTemplateSelector'
+import { useAppSelector } from '@/store'
+import { selectSelectedDepartment, selectNavigation } from '@/store/slices/departmentSlice'
 import type { Folder, CreateFolderData, ConfidentialityLevel } from '@/types/folder'
 import type { FolderTemplate } from '@/types/folderTemplate'
 
@@ -15,6 +22,7 @@ export interface CreateFolderModalProps {
   onClose: () => void
   onCreate: (data: CreateFolderData) => Promise<void>
   existingFolderNames?: string[]
+  departmentId?: number | string | null
 }
 
 export const CreateFolderModal: FC<CreateFolderModalProps> = ({
@@ -23,13 +31,24 @@ export const CreateFolderModal: FC<CreateFolderModalProps> = ({
   onClose,
   onCreate,
   existingFolderNames = [],
+  departmentId: propDepartmentId,
 }) => {
+  // Redux state for department context
+  const selectedDepartment = useAppSelector(selectSelectedDepartment)
+  const navigation = useAppSelector(selectNavigation)
+
   const [folderName, setFolderName] = useState('')
   const [confidentiality, setConfidentiality] = useState<ConfidentialityLevel>('internal')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showTemplateSelector, setShowTemplateSelector] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<FolderTemplate | null>(null)
+
+  // Get department info - use prop, parent folder's department, or selected department
+  const departmentId = propDepartmentId ?? parentFolder?.departmentId ?? selectedDepartment?.id
+  const departmentInfo = navigation.find(
+    (n) => n.department.id === departmentId || String(n.department.id) === String(departmentId)
+  )
 
   // Reset form when modal opens
   useEffect(() => {
@@ -154,6 +173,27 @@ export const CreateFolderModal: FC<CreateFolderModalProps> = ({
         {/* Body */}
         <form onSubmit={handleSubmit}>
           <div className="px-6 py-4 space-y-4">
+            {/* Department context display */}
+            {departmentInfo && (
+              <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <BuildingOffice2Icon className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                <div className="text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">Department: </span>
+                  <span className="font-medium text-blue-700 dark:text-blue-300">
+                    {departmentInfo.department.name}
+                  </span>
+                  <span className="text-gray-500 dark:text-gray-500 ml-1">
+                    ({departmentInfo.department.code})
+                  </span>
+                  {departmentInfo.accessType === 'granted' && departmentInfo.grantedRole && (
+                    <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                      ({departmentInfo.grantedRole} access)
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Parent folder display */}
             {parentFolder && (
               <div className="text-sm text-gray-600 dark:text-gray-400">

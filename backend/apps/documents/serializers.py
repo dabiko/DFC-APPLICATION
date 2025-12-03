@@ -230,30 +230,58 @@ class DocumentUploadSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         """
         Additional validation for folder, department, and permissions.
+        Uses DepartmentPermissionResolver for RBAC-based permission checks.
         """
+        from apps.permissions.department_resolver import DepartmentPermissionResolver
+
         request = self.context.get('request')
         folder = attrs.get('folder')
         department = attrs.get('department')
+        user = request.user
 
         # If department not specified, default to user's department
         if not department:
             if folder and folder.department:
                 # Use folder's department
                 attrs['department'] = folder.department
-            elif request.user.department:
+            elif user.department:
                 # Use user's department
-                attrs['department'] = request.user.department
+                attrs['department'] = user.department
             else:
                 raise serializers.ValidationError({
                     'department': 'Department is required. User has no assigned department.'
                 })
 
-        # Ensure user has access to the specified folder
-        if folder and folder.department != request.user.department:
-            if not request.user.is_staff:
+        # Get the resolved department
+        resolved_dept = attrs.get('department')
+
+        # Permission check using DepartmentPermissionResolver
+        resolver = DepartmentPermissionResolver(user)
+
+        # Check department access
+        if resolved_dept and not resolver.can_access_department(resolved_dept.id):
+            raise serializers.ValidationError({
+                'department': f"You don't have access to department '{resolved_dept.name}'"
+            })
+
+        # Check folder upload permission
+        if folder:
+            if not resolver.can_access_folder(folder, 'upload'):
                 raise serializers.ValidationError({
-                    'folder': 'You do not have permission to upload to this folder'
+                    'folder': f"You don't have permission to upload to folder '{folder.name}'"
                 })
+        else:
+            # Uploading to department root level (no folder) - check department role
+            if not user.is_superuser:
+                dept_role = resolver.get_department_role(resolved_dept.id) if resolved_dept else None
+                if not dept_role:
+                    raise serializers.ValidationError({
+                        'department': f"You don't have permission to upload documents in department '{resolved_dept.name}'"
+                    })
+                if not resolver._role_permits_action(dept_role, 'upload'):
+                    raise serializers.ValidationError({
+                        'folder': f"Your role '{dept_role.name}' doesn't allow uploading documents in department '{resolved_dept.name}'"
+                    })
 
         # Ensure department matches folder's department
         if folder and attrs.get('department') and folder.department != attrs.get('department'):

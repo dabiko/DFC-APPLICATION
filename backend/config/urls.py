@@ -37,6 +37,9 @@ urlpatterns = [
     path('api/v1/auth/', include('apps.users.urls', namespace='users')),
     path('api/v1/auth/mfa/', include('apps.users.mfa_urls', namespace='mfa')),
 
+    # API v1 - Departments (Department-as-Root Architecture)
+    path('api/v1/dept/', include('apps.users.urls_department', namespace='departments')),
+
     # API v1 - Organizations (Multi-tenant)
     path('api/v1/organizations/', include('apps.organizations.urls', namespace='organizations')),
 

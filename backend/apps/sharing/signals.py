@@ -83,14 +83,13 @@ def create_shared_item_access_from_folder_permission(sender, instance, created, 
         if instance.folder.created_by_id == instance.user_id:
             return
 
-    # Determine permission level from FolderPermission
-    if instance.can_manage:
+    # Determine permission level from FolderPermission.permission_level
+    # FolderPermission has permission levels: NO_ACCESS, VIEW_ONLY, VIEW_DOWNLOAD, CONTRIBUTE, EDIT, FULL_CONTROL
+    from apps.permissions.models import FolderPermission
+
+    if instance.permission_level == FolderPermission.FULL_CONTROL:
         permission_level = SharedItemAccess.PermissionLevel.FULL
-    elif instance.can_delete:
-        permission_level = SharedItemAccess.PermissionLevel.FULL
-    elif instance.can_edit:
-        permission_level = SharedItemAccess.PermissionLevel.EDIT
-    elif instance.can_share:
+    elif instance.permission_level in [FolderPermission.EDIT, FolderPermission.CONTRIBUTE]:
         permission_level = SharedItemAccess.PermissionLevel.EDIT
     else:
         permission_level = SharedItemAccess.PermissionLevel.VIEW

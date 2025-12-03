@@ -13,7 +13,10 @@
       "Bash(npm run lint:*)",
       "Bash(.env.example)",
       "Bash(npx prettier:*)",
-      "Bash(python manage.py shell:*)"
+      "Bash(python manage.py shell:*)",
+      "Bash(python manage.py makemigrations:*)",
+      "Bash(python manage.py migrate:*)",
+      "Bash(python:*)"
     ],
     "deny": [],
     "ask": []

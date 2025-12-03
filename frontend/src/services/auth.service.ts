@@ -95,31 +95,43 @@ class AuthService {
 
   /**
    * Logout user by blacklisting refresh token
+   * @param refreshToken - Optional refresh token. If not provided, will be retrieved from storage.
    */
-  async logout(refreshToken: string): Promise<void> {
-    const accessToken = this.getAccessToken()
+  async logout(refreshToken?: string): Promise<void> {
+    // Get refresh token from parameter or storage
+    const token = refreshToken || this.getRefreshToken()
 
-    if (!accessToken) {
-      throw new Error('No access token found')
+    // Always clear tokens, even if API call fails
+    try {
+      // Only call API if we have both tokens
+      if (token && token.trim() !== '') {
+        const accessToken = this.getAccessToken()
+
+        if (accessToken) {
+          const response = await fetch(`${API_BASE_URL}/api/v1/auth/logout/`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify({
+              refresh: token,
+            }),
+          })
+
+          if (!response.ok) {
+            // Log but don't throw - we still want to clear local tokens
+            const error = await response.json()
+            console.error('Logout API error:', error.detail || 'Logout failed')
+          }
+        }
+      }
+    } catch (error) {
+      // Log but don't throw - we still want to clear local tokens
+      console.error('Logout API call failed:', error)
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/v1/auth/logout/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({
-        refresh: refreshToken,
-      }),
-    })
-
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.detail || 'Logout failed')
-    }
-
-    // Clear all tokens from storage
+    // Always clear all tokens from storage
     this.clearTokens()
   }
 

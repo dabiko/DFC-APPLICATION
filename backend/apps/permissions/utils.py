@@ -107,9 +107,10 @@ class PermissionChecker:
         Considers:
         1. Global roles
         2. Department roles (if folder belongs to user's department)
-        3. Explicit folder permissions with inheritance
-        4. Folder owner always has full control
-        5. Department membership grants basic contribute permissions
+        3. Cross-department access grants
+        4. Explicit folder permissions with inheritance
+        5. Folder owner always has full control
+        6. Department membership grants basic contribute permissions
 
         Args:
             folder: Folder instance
@@ -119,6 +120,7 @@ class PermissionChecker:
             bool: True if user has permission
         """
         from apps.permissions.models import FolderPermission, PermissionCache
+        from apps.permissions.department_resolver import DepartmentPermissionResolver
 
         if self.user.is_superuser:
             return True
@@ -137,18 +139,33 @@ class PermissionChecker:
             self._cache_permission(folder, permission, True)
             return True
 
-        # Check department permissions if folder is in user's department
-        if folder.department_id and folder.department_id == self.user.department_id:
-            if self.has_department_permission(folder.department, permission):
-                self._cache_permission(folder, permission, True)
-                return True
+        # Check department access (primary department or cross-department access)
+        if folder.department_id:
+            resolver = DepartmentPermissionResolver(self.user)
 
-            # Department members get default contribute-level permissions
-            # This allows them to view, download, upload, and edit within their department folders
-            contribute_permissions = ['can_view', 'can_download', 'can_upload', 'can_edit']
-            if permission in contribute_permissions:
-                self._cache_permission(folder, permission, True)
-                return True
+            # Check if user has any role in the folder's department
+            dept_role = resolver.get_department_role(folder.department)
+            if dept_role:
+                # Map role permissions to the requested permission
+                role_permissions = {
+                    'can_view': dept_role.can_view,
+                    'can_download': dept_role.can_download,
+                    'can_upload': dept_role.can_upload,
+                    'can_edit': dept_role.can_edit,
+                    'can_delete': dept_role.can_delete,
+                    'can_share': dept_role.can_share,
+                    'can_manage_permissions': dept_role.can_manage_permissions,
+                }
+                if role_permissions.get(permission, False):
+                    self._cache_permission(folder, permission, True)
+                    return True
+
+            # Primary department members get default contribute-level permissions
+            if folder.department_id == self.user.department_id:
+                contribute_permissions = ['can_view', 'can_download', 'can_upload', 'can_edit']
+                if permission in contribute_permissions:
+                    self._cache_permission(folder, permission, True)
+                    return True
 
         # Check explicit folder permissions
         has_perm = self._check_folder_permissions(folder, permission)
@@ -249,6 +266,10 @@ class PermissionChecker:
         """
         Get all folders user has access to.
 
+        Uses DepartmentPermissionResolver to include:
+        - User's primary department
+        - Departments with cross-department access
+
         Args:
             base_queryset: Optional base queryset to filter
 
@@ -257,6 +278,7 @@ class PermissionChecker:
         """
         from apps.folders.models import Folder
         from apps.permissions.models import FolderPermission
+        from apps.permissions.department_resolver import DepartmentPermissionResolver
 
         if base_queryset is None:
             base_queryset = Folder.objects.filter(is_deleted=False)
@@ -264,12 +286,21 @@ class PermissionChecker:
         if self.user.is_superuser:
             return base_queryset
 
-        # Get folders with explicit permissions
+        # Use DepartmentPermissionResolver to get all accessible departments
+        resolver = DepartmentPermissionResolver(self.user)
+        accessible_departments = resolver.get_accessible_departments()
+        accessible_dept_ids = [d.id for d in accessible_departments]
+
+        # Get folders with access via:
+        # 1. User is owner
+        # 2. Folder is in an accessible department
+        # 3. User-specific explicit permission
+        # 4. Department-based explicit permission (for any department user can access)
         accessible_folders = base_queryset.filter(
             Q(owner=self.user) |  # User is owner
-            Q(department=self.user.department) |  # In user's department
+            Q(department_id__in=accessible_dept_ids) |  # In accessible department
             Q(permissions__user=self.user) |  # User-specific permission
-            Q(permissions__department=self.user.department)  # Department permission
+            Q(permissions__department_id__in=accessible_dept_ids)  # Department permission
         ).distinct()
 
         return accessible_folders
