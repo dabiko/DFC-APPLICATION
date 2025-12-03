@@ -23,8 +23,12 @@ export function Dashboard() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
 
-  // Check if a folder is selected via URL parameter
+  // Check if a folder or department is selected via URL parameter
   const selectedFolderId = searchParams.get('folder')
+  const selectedDepartmentId = searchParams.get('department')
+
+  // Show folder content view if folder or department is selected
+  const showFolderContentView = selectedFolderId || selectedDepartmentId
 
   // Get user data from auth service
   const userData = authService.getUser()
@@ -132,7 +136,7 @@ export function Dashboard() {
       leftPanelWidth="auto"
       collapsibleLeft={false}
       centerPanel={
-        selectedFolderId ? (
+        showFolderContentView ? (
           <FolderContentView />
         ) : (
           <div className="p-6 space-y-6">

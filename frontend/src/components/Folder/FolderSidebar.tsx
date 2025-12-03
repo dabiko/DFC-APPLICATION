@@ -5,8 +5,8 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { FolderPlus, RefreshCw, Search, X } from 'lucide-react'
+import { useEncodedNavigation } from '@/hooks/useEncodedNavigation'
 import { FolderTree } from './FolderTree'
 import { CreateFolderModal } from './CreateFolderModal'
 import { RenameFolderModal } from './RenameFolderModal'
@@ -37,7 +37,7 @@ interface FolderSidebarProps {
 
 export function FolderSidebar({ isCollapsed = false, className }: FolderSidebarProps) {
   const dispatch = useAppDispatch()
-  const navigate = useNavigate()
+  const { navigateToFolder } = useEncodedNavigation()
 
   // Redux state
   const folders = useAppSelector(selectFolders)
@@ -71,10 +71,10 @@ export function FolderSidebar({ isCollapsed = false, className }: FolderSidebarP
   const handleFolderSelect = useCallback(
     (folder: Folder) => {
       dispatch(selectFolder(folder.id))
-      // Update URL with folder parameter
-      navigate(`/dashboard?folder=${folder.id}`)
+      // Update URL with encoded folder parameter
+      navigateToFolder(folder.id, folder.departmentId)
     },
-    [dispatch, navigate]
+    [dispatch, navigateToFolder]
   )
 
   // Handle folder operations

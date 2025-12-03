@@ -378,13 +378,23 @@ export const getDocumentsInFolder = async (
     pageSize?: number
     sortBy?: string
     sortOrder?: 'asc' | 'desc'
+    departmentId?: string | null
   }
 ): Promise<DocumentFromBackend[]> => {
   const queryParams: Record<string, string> = {}
 
-  // Only add folder param if folderId is provided (for root level, we might want all docs or none)
+  // Add folder param if folderId is provided
   if (folderId) {
     queryParams.folder = folderId
+  }
+
+  // Add department param for filtering by department (at department root level)
+  if (params?.departmentId) {
+    queryParams.department = params.departmentId
+    // If at department root (no folder), only get root-level documents
+    if (!folderId) {
+      queryParams.folder__isnull = 'true'
+    }
   }
 
   if (params?.page) queryParams.page = params.page.toString()

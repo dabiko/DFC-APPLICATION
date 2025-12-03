@@ -277,6 +277,23 @@ class DocumentListView(generics.ListAPIView):
             logger.info(f"DocumentListView - After department filter: {queryset.count()}")
 
         # Apply filters from query parameters
+
+        # Filter by specific department (for department navigation)
+        # Only staff users can filter by any department; regular users are already filtered to their department
+        department_param = self.request.query_params.get('department')
+        if department_param:
+            if user.is_staff:
+                # Staff can filter by specific department
+                queryset = queryset.filter(department_id=department_param)
+                logger.info(f"DocumentListView - After department param filter: {queryset.count()}")
+            # Non-staff are already filtered to their department above
+
+        # Filter for root-level documents (no folder)
+        folder_isnull = self.request.query_params.get('folder__isnull')
+        if folder_isnull and folder_isnull.lower() == 'true':
+            queryset = queryset.filter(folder__isnull=True)
+            logger.info(f"DocumentListView - After folder__isnull filter: {queryset.count()}")
+
         folder_id = self.request.query_params.get('folder')
         if folder_id:
             queryset = queryset.filter(folder_id=folder_id)

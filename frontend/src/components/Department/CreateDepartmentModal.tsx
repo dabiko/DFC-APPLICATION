@@ -142,8 +142,8 @@ export function CreateDepartmentModal({ isOpen, onClose, onSuccess }: CreateDepa
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
-              <Building2 className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+              <Building2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             </div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
               Create Department
@@ -182,7 +182,7 @@ export function CreateDepartmentModal({ isOpen, onClose, onSuccess }: CreateDepa
               value={formData.name}
               onChange={handleNameChange}
               placeholder="e.g., Human Resources"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               disabled={loading}
               autoFocus
             />
@@ -204,7 +204,7 @@ export function CreateDepartmentModal({ isOpen, onClose, onSuccess }: CreateDepa
               onChange={handleChange}
               placeholder="e.g., HR"
               maxLength={20}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 uppercase"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
               disabled={loading}
             />
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -227,7 +227,7 @@ export function CreateDepartmentModal({ isOpen, onClose, onSuccess }: CreateDepa
               onChange={handleChange}
               placeholder="Optional description of the department"
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
               disabled={loading}
             />
           </div>
@@ -248,7 +248,7 @@ export function CreateDepartmentModal({ isOpen, onClose, onSuccess }: CreateDepa
               onChange={handleChange}
               min={1}
               max={10000}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               disabled={loading}
             />
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -271,7 +271,7 @@ export function CreateDepartmentModal({ isOpen, onClose, onSuccess }: CreateDepa
               disabled={loading}
               className={cn(
                 'px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors flex items-center gap-2',
-                loading ? 'bg-amber-400 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-700'
+                loading ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
               )}
             >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}

@@ -23,6 +23,7 @@ import {
   UserCog,
 } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/store'
+import { useEncodedNavigation } from '@/hooks/useEncodedNavigation'
 import {
   fetchNavigation,
   selectNavigation,
@@ -64,6 +65,7 @@ export function DepartmentSidebar({
 }: DepartmentSidebarProps) {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
+  const { navigateToDepartment, navigateToFolder, getDepartmentUrl } = useEncodedNavigation()
 
   // Redux state
   const navigation = useAppSelector(selectNavigation)
@@ -190,8 +192,10 @@ export function DepartmentSidebar({
       if (!expandedDepartmentIds.includes(departmentId)) {
         dispatch(toggleDepartmentExpansion(departmentId))
       }
+      // Navigate to department page with encoded URL
+      navigateToDepartment(departmentId)
     },
-    [dispatch, expandedDepartmentIds]
+    [dispatch, expandedDepartmentIds, navigateToDepartment]
   )
 
   // Handle department expansion toggle
@@ -206,9 +210,10 @@ export function DepartmentSidebar({
   const handleFolderSelect = useCallback(
     (folder: Folder) => {
       dispatch(selectFolder(folder.id))
-      navigate(`/dashboard?folder=${folder.id}`)
+      // Use encoded navigation for folder URLs
+      navigateToFolder(folder.id, folder.departmentId)
     },
-    [dispatch, navigate]
+    [dispatch, navigateToFolder]
   )
 
   // Handle folder operations
@@ -271,11 +276,13 @@ export function DepartmentSidebar({
   // Handle copy department link
   const handleCopyDeptLink = useCallback(() => {
     if (deptContextMenu.department) {
-      const url = `${window.location.origin}/dashboard?department=${deptContextMenu.department.department.id}`
+      // Use encoded URL for the copied link
+      const encodedPath = getDepartmentUrl(deptContextMenu.department.department.id)
+      const url = `${window.location.origin}${encodedPath}`
       navigator.clipboard.writeText(url)
       closeDeptContextMenu()
     }
-  }, [deptContextMenu.department, closeDeptContextMenu])
+  }, [deptContextMenu.department, closeDeptContextMenu, getDepartmentUrl])
 
   // Handle view department details
   const handleViewDeptDetails = useCallback(() => {
@@ -378,7 +385,7 @@ export function DepartmentSidebar({
             <Users className="w-3.5 h-3.5 text-gray-400" title="Cross-department access" />
           )}
           {item.accessType === 'admin' && (
-            <Settings className="w-3.5 h-3.5 text-amber-500" title="Administrator access" />
+            <Settings className="w-3.5 h-3.5 text-blue-500" title="Administrator access" />
           )}
         </div>
 
@@ -428,10 +435,10 @@ export function DepartmentSidebar({
         {isAdmin && onCreateDepartment && (
           <button
             onClick={onCreateDepartment}
-            className="p-2 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors group relative"
+            className="p-2 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors group relative"
             title="New Department"
           >
-            <Building2 className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            <Building2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
               New Department
             </div>
@@ -531,10 +538,10 @@ export function DepartmentSidebar({
                 // Admin with no department selected - show "New Department"
                 <button
                   onClick={onCreateDepartment}
-                  className="p-1 rounded hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+                  className="p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
                   title="New Department"
                 >
-                  <Building2 className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                  <Building2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                 </button>
               ) : selectedDepartmentId && canCreateFolderInSelected ? (
                 // Department selected and user can create folders
@@ -550,10 +557,10 @@ export function DepartmentSidebar({
                 <>
                   <button
                     onClick={onCreateDepartment}
-                    className="p-1 rounded hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+                    className="p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
                     title="New Department"
                   >
-                    <Building2 className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                    <Building2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                   </button>
                   <button
                     onClick={openCreateRootFolder}
@@ -638,10 +645,10 @@ export function DepartmentSidebar({
             {isAdmin && onCreateDepartment && (
               <button
                 onClick={onCreateDepartment}
-                className="p-1 rounded hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+                className="p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
                 title="New Department"
               >
-                <Building2 className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                <Building2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
               </button>
             )}
             {selectedDepartmentId && canCreateFolderInSelected && (
@@ -653,22 +660,22 @@ export function DepartmentSidebar({
                 <FolderPlus className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
               </button>
             )}
-            {/* Context Menu */}
-            <div className="relative">
-              <button
-                onClick={() => setShowContextMenu(!showContextMenu)}
-                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                title="More options"
-              >
-                <MoreHorizontal className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
-              </button>
-              {/* Dropdown Menu */}
-              {showContextMenu && (
-                <>
-                  {/* Backdrop to close menu */}
-                  <div className="fixed inset-0 z-40" onClick={() => setShowContextMenu(false)} />
-                  <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50">
-                    {onRequestAccess && (
+            {/* Context Menu - Only show for non-admin users who can request access */}
+            {!isAdmin && onRequestAccess && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowContextMenu(!showContextMenu)}
+                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  title="More options"
+                >
+                  <MoreHorizontal className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
+                </button>
+                {/* Dropdown Menu */}
+                {showContextMenu && (
+                  <>
+                    {/* Backdrop to close menu */}
+                    <div className="fixed inset-0 z-40" onClick={() => setShowContextMenu(false)} />
+                    <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50">
                       <button
                         onClick={() => {
                           onRequestAccess(0)
@@ -679,11 +686,11 @@ export function DepartmentSidebar({
                         <UserPlus className="w-4 h-4 text-blue-500" />
                         Request Department Access
                       </button>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -719,7 +726,7 @@ export function DepartmentSidebar({
         {isAdmin && adminDepartments.length > 0 && (
           <div className="mb-4">
             <div className="text-xs font-semibold text-gray-400 dark:text-gray-500 px-3 mb-1 flex items-center gap-1">
-              <Settings className="w-3 h-3 text-amber-500" />
+              <Settings className="w-3 h-3 text-blue-500" />
               ALL DEPARTMENTS
             </div>
             {adminDepartments.map(renderDepartmentItem)}
@@ -837,14 +844,14 @@ export function DepartmentSidebar({
                     onClick={handleManageMembers}
                     className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                   >
-                    <UserCog className="w-4 h-4 text-amber-500" />
+                    <UserCog className="w-4 h-4 text-blue-500" />
                     Manage Members
                   </button>
                   <button
                     onClick={handleDeptSettings}
                     className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                   >
-                    <Settings className="w-4 h-4 text-amber-500" />
+                    <Settings className="w-4 h-4 text-blue-500" />
                     Department Settings
                   </button>
                 </>

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Bell,
@@ -95,6 +95,12 @@ export function DashboardHeader({
   const initials =
     `${user.firstName?.charAt(0) || ''}${user.lastName?.charAt(0) || ''}`.toUpperCase() || 'U'
 
+  // Detect OS for keyboard shortcut display
+  const isMac = useMemo(() => {
+    return typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform)
+  }, [])
+  const searchShortcut = isMac ? '⌘K' : 'Ctrl+K'
+
   // Close dropdowns when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -135,13 +141,13 @@ export function DashboardHeader({
       <div className="flex items-center gap-4">
         <button
           onClick={openSearch}
-          className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+          className="flex items-center gap-3 min-w-[360px] px-4 py-2.5 text-sm text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 rounded-xl transition-all"
           aria-label="Global search"
         >
-          <Search className="w-4 h-4" />
-          <span className="hidden sm:inline">Search...</span>
-          <kbd className="hidden lg:inline-flex items-center gap-1 px-2 py-0.5 text-xs font-mono bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded">
-            ⌘K
+          <Search className="w-5 h-5 text-gray-400 dark:text-gray-500" />
+          <span className="flex-1 text-left">Search documents, folders...</span>
+          <kbd className="hidden sm:inline-flex items-center gap-1 px-2 py-1 text-xs font-mono text-gray-400 dark:text-gray-500 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm">
+            {searchShortcut}
           </kbd>
         </button>
       </div>

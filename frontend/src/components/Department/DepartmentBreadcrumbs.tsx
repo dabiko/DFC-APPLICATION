@@ -4,11 +4,11 @@
  */
 
 import { useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { ChevronRight, Building2, Folder, Home } from 'lucide-react'
 import { useAppSelector } from '@/store'
 import { selectSelectedDepartment } from '@/store/slices/departmentSlice'
 import { selectSelectedFolder, selectFolders } from '@/store/slices/folderSlice'
+import { useEncodedNavigation } from '@/hooks/useEncodedNavigation'
 import type { Department } from '@/types/department'
 import type { Folder as FolderType } from '@/types/folder'
 import { cn } from '@/utils/cn'
@@ -42,7 +42,7 @@ export function DepartmentBreadcrumbs({
   onFolderClick,
   onHomeClick,
 }: DepartmentBreadcrumbsProps) {
-  const navigate = useNavigate()
+  const { navigateToDashboard, navigateToDepartment, navigateToFolder } = useEncodedNavigation()
 
   // Redux state
   const selectedDepartment = useAppSelector(selectSelectedDepartment)
@@ -81,7 +81,7 @@ export function DepartmentBreadcrumbs({
       id: 'home',
       label: 'Home',
       type: 'home',
-      onClick: onHomeClick || (() => navigate('/dashboard')),
+      onClick: onHomeClick || (() => navigateToDashboard()),
       isClickable: true,
     })
 
@@ -93,7 +93,7 @@ export function DepartmentBreadcrumbs({
         type: 'department',
         onClick: onDepartmentClick
           ? () => onDepartmentClick(department)
-          : () => navigate(`/dashboard?dept=${department.id}`),
+          : () => navigateToDepartment(department.id),
         isClickable: true,
       })
     }
@@ -106,14 +106,23 @@ export function DepartmentBreadcrumbs({
         type: 'folder',
         onClick: onFolderClick
           ? () => onFolderClick(f)
-          : () => navigate(`/dashboard?folder=${f.id}`),
+          : () => navigateToFolder(f.id, f.departmentId),
         // Last item is current folder, not clickable
         isClickable: index < folderPath.length - 1,
       })
     })
 
     return items
-  }, [department, folderPath, navigate, onDepartmentClick, onFolderClick, onHomeClick])
+  }, [
+    department,
+    folderPath,
+    navigateToDashboard,
+    navigateToDepartment,
+    navigateToFolder,
+    onDepartmentClick,
+    onFolderClick,
+    onHomeClick,
+  ])
 
   // Apply max items collapsing
   const displayItems = useMemo(() => {

@@ -3,9 +3,10 @@
  * Enterprise-standard folder browsing with full file management capabilities
  */
 
-import { FC, useEffect, useState, useCallback, useMemo } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import React, { FC, useEffect, useState, useCallback, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAppDispatch, useAppSelector } from '@/store'
+import { useEncodedNavigation } from '@/hooks/useEncodedNavigation'
 import {
   fetchFolders,
   selectFolders,
@@ -14,6 +15,7 @@ import {
   deleteFolder,
   moveFolder,
 } from '@/store/slices/folderSlice'
+import { selectNavigation } from '@/store/slices/departmentSlice'
 import { Breadcrumbs } from '@components/Navigation/Breadcrumbs'
 import { FileList } from '@components/FileManagement/FileList'
 import { SortFilterBar } from '@components/FileManagement/SortFilterBar'
@@ -42,7 +44,7 @@ import { FolderPropertiesModal } from '@components/Folder/FolderPropertiesModal'
 import { ShareFolderModal, type FolderShareData } from '@components/Folder/ShareFolderModal'
 import { DocumentUploadModal } from '@components/Upload/DocumentUploadModal'
 import { Spinner } from '@components/Feedback/Spinner'
-import { Upload, FolderPlus } from 'lucide-react'
+import { Upload, FolderPlus, Building2, Folder as FolderIcon } from 'lucide-react'
 import { cn } from '@utils/cn'
 import type {
   FileListItem,
@@ -90,13 +92,23 @@ import { usePermissions } from '@/contexts/PermissionContext'
 export const FolderContentView: FC = () => {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-  const folderId = searchParams.get('folder')
+
+  // Use encoded navigation hook for URL parameter handling
+  const {
+    departmentId,
+    folderId,
+    navigateToDashboard,
+    navigateToDepartment,
+    navigateToFolder,
+    getDepartmentUrl,
+    getFolderUrl,
+  } = useEncodedNavigation()
 
   // Get permission checking capabilities
   const { isAdmin, hasGlobalPermission } = usePermissions()
 
   const allFolders = useAppSelector(selectFolders)
+  const departmentNavigation = useAppSelector(selectNavigation)
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [sortBy, setSortBy] = useState<SortField>('name')
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc')
@@ -194,15 +206,16 @@ export const FolderContentView: FC = () => {
     loadFavorites()
   }, [])
 
-  // Fetch documents and shortcuts when folder changes
+  // Fetch documents and shortcuts when folder or department changes
   useEffect(() => {
     const loadDocumentsAndShortcuts = async () => {
       setDocumentsLoading(true)
       setIsNavigating(true)
       try {
         // Fetch documents and shortcuts in parallel
+        // Pass departmentId when at department root (no folder selected)
         const [docs, shortcutItems] = await Promise.all([
-          getDocumentsInFolder(folderId),
+          getDocumentsInFolder(folderId, { departmentId: !folderId ? departmentId : null }),
           getShortcutsInFolder(folderId),
         ])
         setDocuments(docs)
@@ -222,13 +235,67 @@ export const FolderContentView: FC = () => {
       }
     }
     loadDocumentsAndShortcuts()
-  }, [folderId])
+  }, [folderId, departmentId])
 
   // Get current folder and its items
   const currentFolder = folderId ? allFolders.find((f) => f.id === folderId) : null
-  const subfolders = folderId
-    ? allFolders.filter((folder) => folder.parentId === folderId)
-    : allFolders.filter((folder) => !folder.parentId)
+
+  // Get subfolders based on current context (folder, department, or root)
+  const subfolders = useMemo(() => {
+    if (folderId) {
+      // Inside a folder - show its children
+      return allFolders.filter((folder) => folder.parentId === folderId)
+    }
+    if (departmentId) {
+      // At department root - show root folders for this department
+      // Compare both as strings and numbers to handle type mismatches
+      const deptIdNum = parseInt(String(departmentId), 10)
+      const filtered = allFolders.filter((folder) => {
+        if (folder.parentId) return false // Only root folders
+        const folderDeptId = folder.departmentId
+        if (folderDeptId === null || folderDeptId === undefined) return false
+        // Compare as strings
+        if (String(folderDeptId) === String(departmentId)) return true
+        // Compare as numbers
+        const folderDeptNum = parseInt(String(folderDeptId), 10)
+        if (!isNaN(deptIdNum) && !isNaN(folderDeptNum) && folderDeptNum === deptIdNum) return true
+        return false
+      })
+      console.log(
+        `[FolderContentView] Department ${departmentId}: found ${filtered.length} root folders out of ${allFolders.length} total`
+      )
+      if (filtered.length === 0 && allFolders.length > 0) {
+        console.log(
+          '[FolderContentView] All folder departmentIds:',
+          allFolders.map((f) => ({ name: f.name, deptId: f.departmentId, parentId: f.parentId }))
+        )
+      }
+      return filtered
+    }
+    // At global root - show all root folders
+    return allFolders.filter((folder) => !folder.parentId)
+  }, [folderId, departmentId, allFolders])
+
+  // Get department name for breadcrumb when at department root
+  const currentDepartmentName = useMemo(() => {
+    if (departmentId && !folderId) {
+      // First, try to find the department from navigation (most reliable)
+      const navItem = departmentNavigation.find(
+        (nav) =>
+          nav.department.id === departmentId || String(nav.department.id) === String(departmentId)
+      )
+      if (navItem) {
+        return navItem.department.name
+      }
+
+      // Fallback: find any folder with this department to get the name
+      const deptFolder = allFolders.find(
+        (f) => f.departmentId === departmentId || String(f.departmentId) === String(departmentId)
+      )
+      return deptFolder?.departmentName || `Department ${departmentId}`
+    }
+    return null
+  }, [departmentId, folderId, departmentNavigation, allFolders])
 
   // Map confidentiality level from backend format to display format
   const mapConfidentialityLevel = (
@@ -373,25 +440,63 @@ export const FolderContentView: FC = () => {
     return allItems
   }, [subfolders, documents, shortcuts, favoriteFolderIds, favoriteDocumentIds])
 
-  // Build breadcrumb path
+  // Build breadcrumb path with department
   const breadcrumbItems = useMemo(() => {
-    if (!currentFolder) {
-      return [{ label: 'Root', onClick: () => navigate('/dashboard') }]
+    const items: Array<{ label: string; onClick: () => void; icon?: React.ReactNode }> = []
+
+    // Always start with Home/Root (no icon - Breadcrumbs will show HomeIcon automatically)
+    items.push({
+      label: 'Home',
+      onClick: () => navigateToDashboard(),
+    })
+
+    // Case 1: We're viewing a specific folder
+    if (currentFolder) {
+      // Add department if available
+      if (currentFolder.departmentId && currentFolder.departmentName) {
+        items.push({
+          label: currentFolder.departmentName,
+          onClick: () => navigateToDepartment(currentFolder.departmentId!),
+          icon: <Building2 className="h-4 w-4" />,
+        })
+      }
+
+      // Build folder path
+      const folderPath: Array<{ label: string; onClick: () => void; icon?: React.ReactNode }> = []
+      let current: Folder | null = currentFolder
+      while (current) {
+        const fId = current.id
+        const deptId = current.departmentId
+        folderPath.unshift({
+          label: current.name,
+          onClick: () => navigateToFolder(fId, deptId),
+          icon: <FolderIcon className="h-4 w-4" />,
+        })
+        current = allFolders.find((f) => f.id === current?.parentId) || null
+      }
+
+      return [...items, ...folderPath]
     }
 
-    const items = []
-    let current = currentFolder
-    while (current) {
-      const folderId = current.id
-      items.unshift({
-        label: current.name,
-        onClick: () => navigate(`/dashboard?folder=${folderId}`),
+    // Case 2: We're viewing a department root (no folder selected)
+    if (departmentId && currentDepartmentName) {
+      items.push({
+        label: currentDepartmentName,
+        onClick: () => navigateToDepartment(departmentId),
+        icon: <Building2 className="h-4 w-4" />,
       })
-      current = allFolders.find((f) => f.id === current?.parentId) || null
     }
-    items.unshift({ label: 'Root', onClick: () => navigate('/dashboard') })
+
     return items
-  }, [currentFolder, allFolders, navigate])
+  }, [
+    currentFolder,
+    departmentId,
+    currentDepartmentName,
+    allFolders,
+    navigateToDashboard,
+    navigateToDepartment,
+    navigateToFolder,
+  ])
 
   // Handle folder operations
   const handleFolderOperation = useCallback((operation: FolderOperation, folder: Folder) => {
@@ -478,8 +583,8 @@ export const FolderContentView: FC = () => {
   const handleItemDoubleClick = useCallback(
     (item: FileListItem) => {
       if (item.type === 'folder') {
-        // Double-click on folder navigates into it
-        navigate(`/dashboard?folder=${item.id}`)
+        // Double-click on folder navigates into it (with encoded URL)
+        navigateToFolder(item.id, item.departmentId)
       } else {
         // Double-click on file opens the details drawer
         const fileDetails = convertToFileDetailsData(item)
@@ -487,7 +592,7 @@ export const FolderContentView: FC = () => {
         setFileDetailsDrawerOpen(true)
       }
     },
-    [navigate, convertToFileDetailsData]
+    [navigateToFolder, convertToFileDetailsData]
   )
 
   // Handle selection change
@@ -641,8 +746,8 @@ export const FolderContentView: FC = () => {
         case 'go-to-original':
           // Navigate to the folder containing the original document
           if (item.isShortcut && item.originalFolderId) {
-            // Navigate to the original folder using the folder ID from the shortcut
-            navigate(`/dashboard?folder=${item.originalFolderId}`)
+            // Navigate to the original folder using encoded URL
+            navigateToFolder(item.originalFolderId, item.departmentId)
             toast.info(`Navigating to original location`)
           } else if (item.isShortcut) {
             // Fallback: show message if folder ID is not available
@@ -1485,9 +1590,10 @@ export const FolderContentView: FC = () => {
           setFolderDetailsData(null)
         }}
         folder={folderDetailsData}
-        onOpen={(folderId) => {
-          // Navigate to folder
-          navigate(`/dashboard?folder=${folderId}`)
+        onOpen={(openFolderId) => {
+          // Navigate to folder with encoded URL
+          const folder = allFolders.find((f) => f.id === openFolderId)
+          navigateToFolder(openFolderId, folder?.departmentId)
         }}
         onShare={(folderId) => {
           // Close drawer and open share modal
