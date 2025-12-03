@@ -31,14 +31,6 @@ documents_index.settings(
     # Maximum result window for pagination
     max_result_window=50000,
 
-    # Additional performance settings as a settings dict
-    settings={
-        'index.number_of_routing_shards': 6,  # For future split operations
-        'index.codec': 'best_compression',  # Compress stored fields
-        'index.translog.durability': 'async',  # Better performance
-        'index.translog.sync_interval': '5s',
-    },
-
     analysis={
         'analyzer': {
             # Custom analyzer for full-text search with stemming

@@ -9,8 +9,10 @@ import { FC, useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { XMarkIcon, Squares2X2Icon, ListBulletIcon } from '@heroicons/react/24/outline'
 import { cn } from '@utils/cn'
+import { useDebounce } from '@/hooks/useDebounce'
 import { SearchBar } from './SearchBar'
 import { SearchResultsList } from './SearchResultsList'
+import { searchService } from '@/services/search.service'
 import type {
   SearchQuery,
   SearchResult,
@@ -27,34 +29,6 @@ export interface GlobalSearchCommandProps {
   className?: string
 }
 
-// Mock data - Replace with actual API calls
-const MOCK_RECENT_SEARCHES: RecentSearch[] = [
-  { id: '1', query: 'Q4 Budget', executedAt: '2025-12-01T10:30:00Z', resultCount: 45 },
-  { id: '2', query: 'Contract templates', executedAt: '2025-11-30T14:20:00Z', resultCount: 12 },
-  { id: '3', query: 'Invoice 2024', executedAt: '2025-11-29T09:15:00Z', resultCount: 89 },
-]
-
-const MOCK_SUGGESTIONS: SearchSuggestion[] = [
-  {
-    text: 'Financial reports',
-    type: 'document',
-    score: 95,
-    metadata: { description: '23 documents' },
-  },
-  {
-    text: 'compliance',
-    type: 'tag',
-    score: 90,
-    metadata: { description: 'Tag with 156 documents' },
-  },
-  {
-    text: 'Accounting Department',
-    type: 'department',
-    score: 85,
-    metadata: { description: '89 documents' },
-  },
-]
-
 export const GlobalSearchCommand: FC<GlobalSearchCommandProps> = ({
   isOpen,
   onClose,
@@ -68,16 +42,42 @@ export const GlobalSearchCommand: FC<GlobalSearchCommandProps> = ({
   // State
   const [searchQuery, setSearchQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
+  const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([])
+  const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([])
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
   const [isSearching, setIsSearching] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  // Debounce search query for API calls
+  const debouncedSearchQuery = useDebounce(searchQuery, 300)
+
+  // Load recent searches when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      searchService.getRecentSearches().then(setRecentSearches).catch(console.error)
+    }
+  }, [isOpen])
+
+  // Perform search when debounced query changes
+  useEffect(() => {
+    if (debouncedSearchQuery.trim()) {
+      performQuickSearch(debouncedSearchQuery)
+      // Also get suggestions
+      searchService.getSuggestions(debouncedSearchQuery).then(setSuggestions).catch(console.error)
+    } else {
+      setResults([])
+      setSuggestions([])
+      setHasSearched(false)
+    }
+  }, [debouncedSearchQuery])
 
   // Reset state when modal closes
   useEffect(() => {
     if (!isOpen) {
       setSearchQuery('')
       setResults([])
+      setSuggestions([])
       setHasSearched(false)
       setSelectedIds(new Set())
     }
@@ -95,134 +95,43 @@ export const GlobalSearchCommand: FC<GlobalSearchCommandProps> = ({
     return () => document.removeEventListener('keydown', handleEscape)
   }, [isOpen, onClose])
 
-  // Handle search
+  // Perform quick search (lightweight, for command palette)
+  const performQuickSearch = useCallback(async (query: string) => {
+    if (!query.trim()) {
+      setResults([])
+      return
+    }
+
+    setIsSearching(true)
+    setHasSearched(true)
+
+    try {
+      const searchResults = await searchService.quickSearch(query)
+      setResults(searchResults)
+    } catch (error) {
+      console.error('Quick search failed:', error)
+      setResults([])
+    } finally {
+      setIsSearching(false)
+    }
+  }, [])
+
+  // Handle search (triggered by Enter key or clicking search button)
   const handleSearch = useCallback(
     async (query: string) => {
       setSearchQuery(query)
-      setIsSearching(true)
-      setHasSearched(true)
+
+      if (!query.trim()) {
+        return
+      }
 
       try {
-        // TODO: Replace with actual API call
-        // Simulate API delay
-        await new Promise((resolve) => setTimeout(resolve, 800))
+        // Save to recent searches
+        await searchService.saveRecentSearch(query)
 
-        // Mock results
-        const mockResults: SearchResult[] = [
-          {
-            id: '1',
-            documentId: 'doc-001',
-            fileName: 'Q4_Financial_Report_2024.pdf',
-            filePath: '/Accounting/Reports/2024',
-            fileSize: 2547896,
-            mimeType: 'application/pdf',
-            extension: 'pdf',
-            score: 95,
-            highlights: [
-              {
-                field: 'content',
-                snippet: 'Quarterly financial performance...',
-                matches: [
-                  { text: 'Q4 ', isMatch: true },
-                  { text: 'financial report shows significant growth in revenue', isMatch: false },
-                ],
-              },
-            ],
-            thumbnailUrl: undefined,
-            createdAt: '2024-10-15T10:30:00Z',
-            modifiedAt: '2024-11-20T14:20:00Z',
-            createdBy: 'John Doe',
-            modifiedBy: 'Jane Smith',
-            confidentialityLevel: 'Confidential',
-            isShared: true,
-            isLocked: false,
-            hasVersions: true,
-            currentVersion: 3,
-            permissions: {
-              canView: true,
-              canEdit: false,
-              canDelete: false,
-              canDownload: true,
-              canShare: false,
-            },
-          },
-          {
-            id: '2',
-            documentId: 'doc-002',
-            fileName: 'Budget_Presentation_Q4.pptx',
-            filePath: '/Accounting/Budget/2024',
-            fileSize: 15847253,
-            mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-            extension: 'pptx',
-            score: 88,
-            highlights: [
-              {
-                field: 'filename',
-                snippet: 'Budget presentation for Q4 2024',
-                matches: [
-                  { text: 'Budget Presentation ', isMatch: false },
-                  { text: 'Q4', isMatch: true },
-                ],
-              },
-            ],
-            createdAt: '2024-09-01T08:00:00Z',
-            modifiedAt: '2024-10-05T16:45:00Z',
-            createdBy: 'Alice Johnson',
-            modifiedBy: 'Alice Johnson',
-            confidentialityLevel: 'Internal',
-            isShared: false,
-            isLocked: false,
-            hasVersions: false,
-            permissions: {
-              canView: true,
-              canEdit: true,
-              canDelete: false,
-              canDownload: true,
-              canShare: true,
-            },
-          },
-          {
-            id: '3',
-            documentId: 'doc-003',
-            fileName: 'Executive_Summary_Q4_2024.docx',
-            filePath: '/Executive/Summaries',
-            fileSize: 458963,
-            mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            extension: 'docx',
-            score: 82,
-            highlights: [
-              {
-                field: 'content',
-                snippet: 'Executive summary of Q4 performance metrics...',
-                matches: [
-                  { text: 'Executive summary of ', isMatch: false },
-                  { text: 'Q4', isMatch: true },
-                  { text: ' performance metrics', isMatch: false },
-                ],
-              },
-            ],
-            createdAt: '2024-11-01T09:15:00Z',
-            modifiedAt: '2024-11-25T11:30:00Z',
-            createdBy: 'Bob Wilson',
-            modifiedBy: 'Carol Martinez',
-            confidentialityLevel: 'Highly Confidential',
-            isShared: true,
-            isLocked: true,
-            hasVersions: true,
-            currentVersion: 5,
-            permissions: {
-              canView: true,
-              canEdit: false,
-              canDelete: false,
-              canDownload: false,
-              canShare: false,
-            },
-          },
-        ]
-
-        setResults(
-          mockResults.filter((r) => r.fileName.toLowerCase().includes(query.toLowerCase()))
-        )
+        // Close the command palette and navigate to search results page
+        onClose()
+        navigate(`/search?q=${encodeURIComponent(query)}`)
 
         // Call optional callback
         if (onSearch) {
@@ -348,8 +257,8 @@ export const GlobalSearchCommand: FC<GlobalSearchCommandProps> = ({
             onAdvancedSearch={handleAdvancedSearch}
             showAdvancedButton={true}
             showSuggestions={!hasSearched}
-            suggestions={MOCK_SUGGESTIONS}
-            recentSearches={MOCK_RECENT_SEARCHES}
+            suggestions={suggestions}
+            recentSearches={recentSearches}
             isLoading={isSearching}
             autoFocus={true}
           />

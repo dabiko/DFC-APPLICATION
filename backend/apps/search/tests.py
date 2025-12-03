@@ -123,3 +123,157 @@ class SearchSecurityTests(TestCase):
         self.client.force_authenticate(user=self.user)
         response = self.client.get('/api/v1/search/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
+class QuickSearchTests(TestCase):
+    """Test quick search endpoint for command palette"""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.department = Department.objects.create(name='Sales', code='SALES')
+        self.user = User.objects.create_user(
+            username='quickuser',
+            email='quick@test.com',
+            password='pass123',
+            department=self.department
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def test_quick_search_empty_query(self):
+        """Test quick search with empty query returns empty results"""
+        response = self.client.get('/api/v1/search/quick/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['results'], [])
+
+    def test_quick_search_with_query(self):
+        """Test quick search with query parameter"""
+        response = self.client.get('/api/v1/search/quick/?q=budget')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('results', response.data)
+        self.assertIsInstance(response.data['results'], list)
+
+    def test_quick_search_authentication_required(self):
+        """Test quick search requires authentication"""
+        self.client.logout()
+        response = self.client.get('/api/v1/search/quick/?q=test')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class SuggestionsTests(TestCase):
+    """Test autocomplete suggestions endpoint"""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.department = Department.objects.create(name='Marketing', code='MKT')
+        self.user = User.objects.create_user(
+            username='suggestuser',
+            email='suggest@test.com',
+            password='pass123',
+            department=self.department
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def test_suggestions_minimum_query_length(self):
+        """Test suggestions require minimum 2 characters"""
+        response = self.client.get('/api/v1/search/suggestions/?q=a')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('suggestions', response.data)
+        self.assertIn('message', response.data)
+
+    def test_suggestions_with_valid_query(self):
+        """Test suggestions with valid query"""
+        response = self.client.get('/api/v1/search/suggestions/?q=bud')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('suggestions', response.data)
+        self.assertIsInstance(response.data['suggestions'], list)
+
+    def test_suggestions_authentication_required(self):
+        """Test suggestions require authentication"""
+        self.client.logout()
+        response = self.client.get('/api/v1/search/suggestions/?q=test')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class RecentSearchesTests(TestCase):
+    """Test recent searches endpoint"""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.department = Department.objects.create(name='HR', code='HR')
+        self.user = User.objects.create_user(
+            username='recentuser',
+            email='recent@test.com',
+            password='pass123',
+            department=self.department
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def test_get_recent_searches_empty(self):
+        """Test getting recent searches when none exist"""
+        response = self.client.get('/api/v1/search/recent/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('results', response.data)
+        self.assertEqual(len(response.data['results']), 0)
+
+    def test_save_recent_search(self):
+        """Test saving a recent search"""
+        response = self.client.post(
+            '/api/v1/search/recent/',
+            {'query': 'test search'},
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIn('query', response.data)
+        self.assertEqual(response.data['query'], 'test search')
+
+    def test_save_recent_search_empty_query(self):
+        """Test saving empty query fails"""
+        response = self.client.post(
+            '/api/v1/search/recent/',
+            {'query': ''},
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_get_recent_searches_after_save(self):
+        """Test getting recent searches after saving some"""
+        # Save multiple searches
+        self.client.post('/api/v1/search/recent/', {'query': 'search 1'}, format='json')
+        self.client.post('/api/v1/search/recent/', {'query': 'search 2'}, format='json')
+        self.client.post('/api/v1/search/recent/', {'query': 'search 3'}, format='json')
+
+        # Get recent searches
+        response = self.client.get('/api/v1/search/recent/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 3)
+
+    def test_clear_recent_searches(self):
+        """Test clearing all recent searches"""
+        # Save some searches
+        self.client.post('/api/v1/search/recent/', {'query': 'search 1'}, format='json')
+        self.client.post('/api/v1/search/recent/', {'query': 'search 2'}, format='json')
+
+        # Clear searches
+        response = self.client.delete('/api/v1/search/recent/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Verify cleared
+        response = self.client.get('/api/v1/search/recent/')
+        self.assertEqual(len(response.data['results']), 0)
+
+    def test_recent_searches_authentication_required(self):
+        """Test recent searches require authentication"""
+        self.client.logout()
+        response = self.client.get('/api/v1/search/recent/')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_recent_searches_limit_parameter(self):
+        """Test limit parameter for recent searches"""
+        # Save 15 searches
+        for i in range(15):
+            self.client.post('/api/v1/search/recent/', {'query': f'search {i}'}, format='json')
+
+        # Get with limit
+        response = self.client.get('/api/v1/search/recent/?limit=5')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 5)

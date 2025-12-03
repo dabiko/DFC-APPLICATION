@@ -20,6 +20,7 @@ import { SharedWithMePage } from './pages/SharedWithMePage'
 import { MyDocumentsPage } from './pages/MyDocumentsPage'
 import SmartFolderResultsPage from './pages/SmartFolderResultsPage'
 import { SmartFoldersPage } from './pages/SmartFoldersPage'
+import { SearchPage } from './pages/SearchPage'
 import { AuditLogPage } from './pages/AuditLogPage'
 import { PermissionAuditPage } from './pages/PermissionAuditPage'
 import { UsersRolesPage } from './pages/UsersRolesPage'
@@ -163,6 +164,16 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <SmartFolderResultsPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Search Results - Protected Route */}
+              <Route
+                path="/search"
+                element={
+                  <ProtectedRoute>
+                    <SearchPage />
                   </ProtectedRoute>
                 }
               />

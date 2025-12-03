@@ -73,12 +73,19 @@ apiClient.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
 
-    console.log('🔴 API Error:', {
-      status: error.response?.status,
-      url: originalRequest?.url,
-      isRefreshing,
-      queueLength: failedQueue.length,
-    })
+    // Suppress 404 errors for search endpoints in development (API not implemented yet)
+    const isSearchEndpoint = originalRequest?.url?.includes('/search/')
+    const is404 = error.response?.status === 404
+    const isDev = import.meta.env.DEV
+
+    if (!(isSearchEndpoint && is404 && isDev)) {
+      console.log('🔴 API Error:', {
+        status: error.response?.status,
+        url: originalRequest?.url,
+        isRefreshing,
+        queueLength: failedQueue.length,
+      })
+    }
 
     // If error is 401 and we haven't retried yet, try to refresh token
     if (error.response?.status === 401 && !originalRequest._retry) {
