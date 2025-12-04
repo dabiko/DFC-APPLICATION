@@ -386,6 +386,8 @@ class TrustedDeviceSerializer(serializers.ModelSerializer):
             'device_id',
             'device_name',
             'device_type',
+            'user_agent',
+            'ip_address',
             'location',
             'trusted_at',
             'expires_at',
@@ -395,7 +397,7 @@ class TrustedDeviceSerializer(serializers.ModelSerializer):
             'is_current',
             'expires_in_days',
         ]
-        read_only_fields = ['device_id', 'trusted_at', 'last_used_at']
+        read_only_fields = ['device_id', 'trusted_at', 'last_used_at', 'user_agent', 'ip_address']
 
     def get_is_current(self, obj):
         """Check if this is the current device"""

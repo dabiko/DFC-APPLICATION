@@ -123,21 +123,27 @@ export interface BackupCodesRegenerateResponse {
 // Trusted Device Types
 export interface TrustedDevice {
   id: string
+  device_id: string
   device_name: string
-  device_type: 'desktop' | 'mobile' | 'tablet' | 'unknown'
-  browser: string
-  os: string
-  ip_address: string
+  device_type: 'desktop' | 'laptop' | 'mobile' | 'tablet' | 'other'
+  user_agent: string
+  ip_address: string | null
   location?: string
   trusted_at: string
   expires_at: string
   last_used_at: string
+  is_revoked: boolean
+  is_valid: boolean
   is_current: boolean
+  expires_in_days: number
 }
 
 export interface TrustedDevicesResponse {
   success: boolean
-  data: TrustedDevice[]
+  data: {
+    devices: TrustedDevice[]
+    count: number
+  }
 }
 
 // SMS/Email OTP Types
@@ -310,7 +316,13 @@ class MFAService {
    * Get list of trusted devices for current user
    */
   async getTrustedDevices(): Promise<TrustedDevicesResponse> {
-    const response = await api.get(`${this.baseUrl}/trusted-devices/`)
+    // Include device fingerprint header so backend can identify current device
+    const fingerprint = this.generateDeviceFingerprint()
+    const response = await api.get(`${this.baseUrl}/trusted-devices/`, {
+      headers: {
+        'X-Device-Fingerprint': fingerprint,
+      },
+    })
     return response.data
   }
 

@@ -28,7 +28,7 @@ import {
 import { MFASettings, MFASetup, MFABackupCodes } from '@/components/MFA'
 import type { MFAConfig, MFADisableRequest } from '@/types/mfa'
 import type { SecuritySettings, Session } from '@/services/settingsService'
-import { mfaService } from '@/services/mfaService'
+import { mfaService, type TrustedDevice } from '@/services/mfaService'
 import { cn } from '@/utils/cn'
 import { toast } from '@/utils/toast'
 
@@ -97,6 +97,15 @@ export function SecurityTab({
   const [sessions, setSessions] = useState<Session[]>([])
   const [loadingSessions, setLoadingSessions] = useState(false)
 
+  // Trusted devices state
+  const [trustedDevices, setTrustedDevices] = useState<TrustedDevice[]>([])
+  const [loadingTrustedDevices, setLoadingTrustedDevices] = useState(false)
+  const [currentDeviceFingerprint, setCurrentDeviceFingerprint] = useState<string>('')
+  const [showRemoveDeviceModal, setShowRemoveDeviceModal] = useState(false)
+  const [deviceToRemove, setDeviceToRemove] = useState<TrustedDevice | null>(null)
+  const [showRemoveAllDevicesModal, setShowRemoveAllDevicesModal] = useState(false)
+  const [removingDevice, setRemovingDevice] = useState(false)
+
   // Load MFA status from backend
   useEffect(() => {
     const loadMFAStatus = async () => {
@@ -158,6 +167,20 @@ export function SecurityTab({
     loadSessions()
   }, [])
 
+  // Load trusted devices and get current device fingerprint
+  useEffect(() => {
+    // Generate current device fingerprint
+    const fingerprint = mfaService.generateDeviceFingerprint()
+    setCurrentDeviceFingerprint(fingerprint)
+    console.log('[SecurityTab] useEffect triggered, mfaConfig.enabled:', mfaConfig.enabled)
+
+    // Load trusted devices if MFA is enabled
+    if (mfaConfig.enabled) {
+      console.log('[SecurityTab] MFA is enabled, loading trusted devices...')
+      loadTrustedDevices()
+    }
+  }, [mfaConfig.enabled])
+
   const loadSessions = async () => {
     setLoadingSessions(true)
     try {
@@ -176,6 +199,77 @@ export function SecurityTab({
       console.error('Error loading sessions:', error)
     } finally {
       setLoadingSessions(false)
+    }
+  }
+
+  const loadTrustedDevices = async () => {
+    setLoadingTrustedDevices(true)
+    try {
+      console.log('[SecurityTab] Loading trusted devices...')
+      const response = await mfaService.getTrustedDevices()
+      console.log('[SecurityTab] Trusted devices response:', response)
+      if (response.success && response.data?.devices) {
+        console.log('[SecurityTab] Found', response.data.devices.length, 'trusted devices')
+        setTrustedDevices(response.data.devices)
+      } else {
+        console.log('[SecurityTab] No devices in response or response unsuccessful')
+      }
+    } catch (error) {
+      console.error('[SecurityTab] Error loading trusted devices:', error)
+    } finally {
+      setLoadingTrustedDevices(false)
+    }
+  }
+
+  const handleRemoveDeviceClick = (device: TrustedDevice) => {
+    setDeviceToRemove(device)
+    setShowRemoveDeviceModal(true)
+  }
+
+  const handleConfirmRemoveDevice = async () => {
+    if (!deviceToRemove) return
+
+    setRemovingDevice(true)
+    try {
+      const response = await mfaService.removeTrustedDevice(deviceToRemove.id)
+      if (response.success) {
+        toast.success('Device removed from trusted devices')
+        setShowRemoveDeviceModal(false)
+        setDeviceToRemove(null)
+        // Refresh the list
+        await loadTrustedDevices()
+      } else {
+        toast.error(response.message || 'Failed to remove device')
+      }
+    } catch (error) {
+      console.error('Error revoking trusted device:', error)
+      toast.error('Failed to remove device')
+    } finally {
+      setRemovingDevice(false)
+    }
+  }
+
+  const handleRemoveAllDevicesClick = () => {
+    setShowRemoveAllDevicesModal(true)
+  }
+
+  const handleConfirmRemoveAllDevices = async () => {
+    setRemovingDevice(true)
+    try {
+      const response = await mfaService.revokeAllTrustedDevices()
+      if (response.success) {
+        toast.success(response.message || 'All other trusted devices removed')
+        setShowRemoveAllDevicesModal(false)
+        // Refresh the list (current device should still be there)
+        await loadTrustedDevices()
+      } else {
+        toast.error(response.message || 'Failed to remove devices')
+      }
+    } catch (error) {
+      console.error('Error revoking all trusted devices:', error)
+      toast.error('Failed to remove devices')
+    } finally {
+      setRemovingDevice(false)
     }
   }
 
@@ -745,6 +839,268 @@ export function SecurityTab({
           ))}
         </div>
       </div>
+
+      {/* Trusted Devices - Only show if MFA is enabled */}
+      {mfaConfig.enabled && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                <Smartphone className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Trusted Devices
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Devices that can skip MFA verification for 30 days
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={loadTrustedDevices}
+                disabled={loadingTrustedDevices}
+                className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                title="Refresh"
+              >
+                <RefreshCw className={cn('w-4 h-4', loadingTrustedDevices && 'animate-spin')} />
+              </button>
+              {trustedDevices.filter((d) => !d.is_current).length > 0 && (
+                <button
+                  onClick={handleRemoveAllDevicesClick}
+                  className="px-3 py-1.5 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                >
+                  Remove All Others
+                </button>
+              )}
+            </div>
+          </div>
+
+          {loadingTrustedDevices ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
+            </div>
+          ) : trustedDevices.length === 0 ? (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              <Smartphone className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p>No trusted devices</p>
+              <p className="text-sm mt-1">
+                Trust a device during MFA verification to skip it for 30 days
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {trustedDevices.map((device) => {
+                const isCurrentDevice = device.is_current
+                const expiresAt = new Date(device.expires_at)
+                const daysUntilExpiry = Math.ceil(
+                  (expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+                )
+                const isExpiringSoon = daysUntilExpiry <= 7 && daysUntilExpiry > 0
+
+                return (
+                  <div
+                    key={device.id}
+                    className={cn(
+                      'flex items-center justify-between p-4 rounded-lg border',
+                      isCurrentDevice
+                        ? 'border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/20'
+                        : 'border-gray-200 dark:border-gray-700'
+                    )}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div
+                        className={cn(
+                          'p-2 rounded-lg',
+                          isCurrentDevice
+                            ? 'bg-purple-100 dark:bg-purple-800'
+                            : 'bg-gray-100 dark:bg-gray-700'
+                        )}
+                      >
+                        {device.device_type === 'mobile' || device.device_type === 'tablet' ? (
+                          <Smartphone className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                        ) : (
+                          <Monitor className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                        )}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">
+                            {device.device_name ||
+                              device.user_agent?.split(' ')[0] ||
+                              'Unknown Device'}
+                          </p>
+                          {isCurrentDevice && (
+                            <span className="px-2 py-0.5 text-xs font-medium bg-purple-100 dark:bg-purple-800 text-purple-700 dark:text-purple-300 rounded-full">
+                              This Device
+                            </span>
+                          )}
+                          {isExpiringSoon && (
+                            <span className="px-2 py-0.5 text-xs font-medium bg-orange-100 dark:bg-orange-800 text-orange-700 dark:text-orange-300 rounded-full">
+                              Expires in {daysUntilExpiry} days
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          {device.ip_address && (
+                            <span className="flex items-center gap-1">
+                              <MapPin className="w-3 h-3" />
+                              {device.ip_address}
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            Last used: {new Date(device.last_used_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    {!isCurrentDevice && (
+                      <button
+                        onClick={() => handleRemoveDeviceClick(device)}
+                        className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                        title="Remove device"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Remove Single Device Confirmation Modal */}
+      {showRemoveDeviceModal && deviceToRemove && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full p-6 shadow-xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full">
+                <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Remove Trusted Device
+              </h3>
+            </div>
+
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Are you sure you want to remove this device from your trusted devices?
+            </p>
+
+            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 mb-6">
+              <div className="flex items-center gap-3">
+                {deviceToRemove.device_type === 'mobile' ||
+                deviceToRemove.device_type === 'tablet' ? (
+                  <Smartphone className="w-5 h-5 text-gray-500" />
+                ) : (
+                  <Monitor className="w-5 h-5 text-gray-500" />
+                )}
+                <div>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {deviceToRemove.device_name ||
+                      deviceToRemove.user_agent?.split(' ')[0] ||
+                      'Unknown Device'}
+                  </p>
+                  {deviceToRemove.ip_address && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      IP: {deviceToRemove.ip_address}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <p className="text-sm text-orange-600 dark:text-orange-400 mb-6">
+              After removal, you will need to verify MFA when logging in from this device.
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowRemoveDeviceModal(false)
+                  setDeviceToRemove(null)
+                }}
+                disabled={removingDevice}
+                className="flex-1 px-4 py-2.5 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg font-medium transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmRemoveDevice}
+                disabled={removingDevice}
+                className="flex-1 px-4 py-2.5 text-white bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {removingDevice ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Removing...
+                  </>
+                ) : (
+                  'Remove Device'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Remove All Devices Confirmation Modal */}
+      {showRemoveAllDevicesModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full p-6 shadow-xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full">
+                <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Remove All Other Devices
+              </h3>
+            </div>
+
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Are you sure you want to remove all other trusted devices? This will affect{' '}
+              <span className="font-semibold text-gray-900 dark:text-white">
+                {trustedDevices.filter((d) => !d.is_current).length} device(s)
+              </span>
+              .
+            </p>
+
+            <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-3 mb-6">
+              <p className="text-sm text-orange-700 dark:text-orange-300">
+                After removal, you will need to verify MFA when logging in from those devices. Your
+                current device will remain trusted.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowRemoveAllDevicesModal(false)}
+                disabled={removingDevice}
+                className="flex-1 px-4 py-2.5 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg font-medium transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmRemoveAllDevices}
+                disabled={removingDevice}
+                className="flex-1 px-4 py-2.5 text-white bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {removingDevice ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Removing...
+                  </>
+                ) : (
+                  'Remove All Others'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Security Settings */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
