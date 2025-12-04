@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   KeyIcon,
   EyeIcon,
@@ -27,30 +27,40 @@ export const MFABackupCodes: React.FC<MFABackupCodesProps> = ({
 }) => {
   const [visible, setVisible] = useState(showCodes)
   const [regenerating, setRegenerating] = useState(false)
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+
+  // Sync visible state with showCodes prop (for when codes are regenerated)
+  useEffect(() => {
+    setVisible(showCodes)
+  }, [showCodes])
 
   const usagePercentage = getBackupCodesUsagePercentage(codes)
   const needsRegeneration = needsBackupCodeRegeneration(codes)
+  const hasCodes = codes.codes && codes.codes.length > 0
 
   const handleDownload = () => {
     const codeStrings = codes.codes.map((c) => c.code)
     downloadBackupCodes(codeStrings)
-    onDownload()
+    onDownload?.()
   }
 
   const handlePrint = () => {
     const codeStrings = codes.codes.map((c) => c.code)
     printBackupCodes(codeStrings)
-    onPrint()
+    onPrint?.()
   }
 
-  const handleRegenerate = async () => {
-    if (confirm('Regenerate backup codes? Your current codes will no longer work.')) {
-      setRegenerating(true)
-      try {
-        await onRegenerate()
-      } finally {
-        setRegenerating(false)
-      }
+  const handleRegenerate = () => {
+    setShowConfirmModal(true)
+  }
+
+  const handleConfirmRegenerate = async () => {
+    setShowConfirmModal(false)
+    setRegenerating(true)
+    try {
+      await onRegenerate()
+    } finally {
+      setRegenerating(false)
     }
   }
 
@@ -69,13 +79,16 @@ export const MFABackupCodes: React.FC<MFABackupCodesProps> = ({
             </p>
           </div>
         </div>
-        <button
-          onClick={() => setVisible(!visible)}
-          className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-          title={visible ? 'Hide codes' : 'Show codes'}
-        >
-          {visible ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
-        </button>
+        {/* Only show eye icon if there are actual codes to display */}
+        {hasCodes && (
+          <button
+            onClick={() => setVisible(!visible)}
+            className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            title={visible ? 'Hide codes' : 'Show codes'}
+          >
+            {visible ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+          </button>
+        )}
       </div>
 
       {/* Usage Stats */}
@@ -120,55 +133,72 @@ export const MFABackupCodes: React.FC<MFABackupCodesProps> = ({
       )}
 
       {/* Codes Grid */}
-      <div className="grid grid-cols-2 gap-3 mb-6">
-        {codes.codes.map((code, index) => (
-          <div
-            key={code.id}
-            className={`px-4 py-3 rounded-lg border font-mono text-center ${
-              code.used
-                ? 'bg-gray-100 dark:bg-gray-700/50 border-gray-300 dark:border-gray-600 opacity-50'
-                : 'bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600'
-            }`}
-          >
-            <span className="text-xs text-gray-500 dark:text-gray-400 mr-2">{index + 1}.</span>
-            <span
-              className={`text-sm font-semibold ${
+      {hasCodes ? (
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          {codes.codes.map((code, index) => (
+            <div
+              key={code.id}
+              className={`px-4 py-3 rounded-lg border font-mono text-center ${
                 code.used
-                  ? 'text-gray-500 dark:text-gray-500 line-through'
-                  : visible
-                    ? 'text-gray-900 dark:text-white'
-                    : 'text-gray-400 dark:text-gray-500'
+                  ? 'bg-gray-100 dark:bg-gray-700/50 border-gray-300 dark:border-gray-600 opacity-50'
+                  : 'bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600'
               }`}
             >
-              {visible ? formatBackupCode(code.code) : '••••-••••'}
+              <span className="text-xs text-gray-500 dark:text-gray-400 mr-2">{index + 1}.</span>
+              <span
+                className={`text-sm font-semibold ${
+                  code.used
+                    ? 'text-gray-500 dark:text-gray-500 line-through'
+                    : visible
+                      ? 'text-gray-900 dark:text-white'
+                      : 'text-gray-400 dark:text-gray-500'
+                }`}
+              >
+                {visible ? formatBackupCode(code.code) : '••••-••••'}
+              </span>
+              {code.used && (
+                <span className="block text-xs text-gray-500 dark:text-gray-500 mt-1">Used</span>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg">
+          <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
+            <ExclamationTriangleIcon className="w-5 h-5 inline mr-2 text-amber-500" />
+            Backup codes are only shown once when generated for security reasons.
+            <br />
+            <span className="text-gray-500 dark:text-gray-500">
+              If you've lost your codes, click "Regenerate" below to create new ones.
             </span>
-            {code.used && (
-              <span className="block text-xs text-gray-500 dark:text-gray-500 mt-1">Used</span>
-            )}
-          </div>
-        ))}
-      </div>
+          </p>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex flex-wrap gap-3">
-        <button
-          onClick={handleDownload}
-          className="flex-1 min-w-[140px] px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg font-medium transition-colors"
-        >
-          <ArrowDownTrayIcon className="w-4 h-4 inline mr-1" />
-          Download
-        </button>
-        <button
-          onClick={handlePrint}
-          className="flex-1 min-w-[140px] px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg font-medium transition-colors"
-        >
-          <PrinterIcon className="w-4 h-4 inline mr-1" />
-          Print
-        </button>
+        {hasCodes && (
+          <>
+            <button
+              onClick={handleDownload}
+              className="flex-1 min-w-[140px] px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg font-medium transition-colors"
+            >
+              <ArrowDownTrayIcon className="w-4 h-4 inline mr-1" />
+              Download
+            </button>
+            <button
+              onClick={handlePrint}
+              className="flex-1 min-w-[140px] px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg font-medium transition-colors"
+            >
+              <PrinterIcon className="w-4 h-4 inline mr-1" />
+              Print
+            </button>
+          </>
+        )}
         <button
           onClick={handleRegenerate}
           disabled={loading || regenerating}
-          className="flex-1 min-w-[140px] px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className={`${hasCodes ? 'flex-1 min-w-[140px]' : 'w-full'} px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
         >
           <ArrowPathIcon className={`w-4 h-4 inline mr-1 ${regenerating ? 'animate-spin' : ''}`} />
           {regenerating ? 'Regenerating...' : 'Regenerate'}
@@ -182,6 +212,43 @@ export const MFABackupCodes: React.FC<MFABackupCodesProps> = ({
           If you use all your codes, regenerate a new set.
         </p>
       </div>
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full">
+                <ArrowPathIcon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Regenerate Backup Codes?
+              </h3>
+            </div>
+
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              This will invalidate all your current backup codes. Make sure you have access to your
+              authenticator app before proceeding. You'll need to enter your authenticator code to
+              confirm.
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                className="flex-1 px-4 py-2.5 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmRegenerate}
+                className="flex-1 px-4 py-2.5 text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 rounded-lg font-medium transition-colors"
+              >
+                Yes, Regenerate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -64,7 +64,7 @@ export function Login() {
   })
   const [mfaLoading, setMfaLoading] = useState(false)
 
-  // Check if user just registered
+  // Check for special login scenarios (registration, MFA re-verification)
   useEffect(() => {
     if (searchParams.get('registered') === 'true') {
       setSuccessMessage('Registration successful! Please log in with your credentials.')
@@ -72,6 +72,16 @@ export function Login() {
       setTimeout(() => {
         setSuccessMessage('')
       }, 5000)
+    }
+
+    // Check if user was redirected due to MFA re-verification requirement
+    if (searchParams.get('reason') === 'mfa_required') {
+      setErrors({
+        submit:
+          'Your session requires MFA verification. Please log in again to verify your identity.',
+      })
+      // Clear the session flag
+      sessionStorage.removeItem('mfa_reverification_required')
     }
   }, [searchParams])
 

@@ -147,6 +147,32 @@ app.conf.beat_schedule = {
         'schedule': crontab(minute=15),  # Every hour at :15
         'options': {'queue': 'events'},
     },
+
+    # =============================================================================
+    # MFA & Security Tasks
+    # =============================================================================
+
+    # Cleanup old used backup codes - Run daily at 3:30 AM
+    'cleanup-old-backup-codes': {
+        'task': 'cleanup_old_backup_codes',
+        'schedule': crontab(hour=3, minute=30),
+        'options': {'queue': 'default'},
+        'kwargs': {'days': 90},
+    },
+
+    # Cleanup expired trusted devices - Run daily at 4:00 AM
+    'cleanup-expired-trusted-devices': {
+        'task': 'cleanup_expired_trusted_devices',
+        'schedule': crontab(hour=4, minute=0),
+        'options': {'queue': 'default'},
+    },
+
+    # Reset MFA regeneration counters - Run daily at 1:00 AM
+    'reset-mfa-regeneration-counters': {
+        'task': 'reset_mfa_regeneration_counters',
+        'schedule': crontab(hour=1, minute=0),
+        'options': {'queue': 'default'},
+    },
 }
 
 

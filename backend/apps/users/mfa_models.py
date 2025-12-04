@@ -130,6 +130,27 @@ class MFABackupCode(models.Model):
         """Get the number of unused backup codes for a user."""
         return cls.objects.filter(user=user, used=False).count()
 
+    @classmethod
+    def cleanup_old_used_codes(cls, days=90):
+        """
+        Delete used backup codes older than specified days.
+        Returns tuple: (deleted_count, deleted_user_ids)
+        """
+        cutoff_date = timezone.now() - timedelta(days=days)
+        old_codes = cls.objects.filter(
+            used=True,
+            used_at__lt=cutoff_date
+        )
+
+        # Get user IDs for audit logging
+        user_ids = list(old_codes.values_list('user_id', flat=True).distinct())
+        deleted_count = old_codes.count()
+
+        # Delete the old codes
+        old_codes.delete()
+
+        return (deleted_count, user_ids)
+
 
 class MFASettings(models.Model):
     """
@@ -163,6 +184,22 @@ class MFASettings(models.Model):
     # Statistics
     verification_failures = models.IntegerField(default=0)
     last_failure_at = models.DateTimeField(null=True, blank=True)
+
+    # Backup code regeneration tracking (for rate limiting)
+    backup_codes_regenerated_count = models.IntegerField(
+        default=0,
+        help_text='Number of times backup codes have been regenerated in the current period'
+    )
+    backup_codes_regenerated_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Last time backup codes were regenerated'
+    )
+    backup_codes_regeneration_reset_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='When the regeneration counter was last reset (24h window start)'
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -225,6 +262,84 @@ class MFASettings(models.Model):
     def requires_mfa(self):
         """Check if user requires MFA verification."""
         return self.is_fully_configured
+
+    # Backup code regeneration rate limiting constants
+    REGENERATION_MAX_PER_DAY = 3
+    REGENERATION_COOLDOWN_MINUTES = 5
+
+    def can_regenerate_backup_codes(self):
+        """
+        Check if user can regenerate backup codes.
+        Returns tuple: (can_regenerate: bool, reason: str, wait_seconds: int)
+        """
+        now = timezone.now()
+
+        # Check cooldown (5 minutes between regenerations)
+        if self.backup_codes_regenerated_at:
+            cooldown_end = self.backup_codes_regenerated_at + timedelta(minutes=self.REGENERATION_COOLDOWN_MINUTES)
+            if now < cooldown_end:
+                wait_seconds = int((cooldown_end - now).total_seconds())
+                return (False, f'Please wait {wait_seconds // 60} minutes and {wait_seconds % 60} seconds before regenerating again', wait_seconds)
+
+        # Check rate limit (3 per 24 hours)
+        # Reset counter if 24 hours have passed since the reset time
+        if self.backup_codes_regeneration_reset_at:
+            reset_window_end = self.backup_codes_regeneration_reset_at + timedelta(hours=24)
+            if now >= reset_window_end:
+                # Reset the counter - 24 hours have passed
+                self.backup_codes_regenerated_count = 0
+                self.backup_codes_regeneration_reset_at = now
+                self.save(update_fields=['backup_codes_regenerated_count', 'backup_codes_regeneration_reset_at'])
+
+        if self.backup_codes_regenerated_count >= self.REGENERATION_MAX_PER_DAY:
+            if self.backup_codes_regeneration_reset_at:
+                reset_time = self.backup_codes_regeneration_reset_at + timedelta(hours=24)
+                wait_seconds = int((reset_time - now).total_seconds())
+                hours = wait_seconds // 3600
+                minutes = (wait_seconds % 3600) // 60
+                return (False, f'Daily limit reached ({self.REGENERATION_MAX_PER_DAY} regenerations per 24 hours). Try again in {hours} hours and {minutes} minutes', wait_seconds)
+            return (False, f'Daily limit reached ({self.REGENERATION_MAX_PER_DAY} regenerations per 24 hours)', 0)
+
+        return (True, '', 0)
+
+    def record_backup_code_regeneration(self):
+        """Record a successful backup code regeneration."""
+        now = timezone.now()
+
+        # Initialize reset time if not set or if 24 hours have passed
+        if not self.backup_codes_regeneration_reset_at:
+            self.backup_codes_regeneration_reset_at = now
+            self.backup_codes_regenerated_count = 0
+        elif now >= self.backup_codes_regeneration_reset_at + timedelta(hours=24):
+            self.backup_codes_regeneration_reset_at = now
+            self.backup_codes_regenerated_count = 0
+
+        self.backup_codes_regenerated_count += 1
+        self.backup_codes_regenerated_at = now
+        self.save(update_fields=[
+            'backup_codes_regenerated_count',
+            'backup_codes_regenerated_at',
+            'backup_codes_regeneration_reset_at'
+        ])
+
+    def get_regeneration_stats(self):
+        """Get current regeneration statistics."""
+        now = timezone.now()
+        remaining = self.REGENERATION_MAX_PER_DAY - self.backup_codes_regenerated_count
+
+        # Check if we need to reset
+        if self.backup_codes_regeneration_reset_at:
+            reset_window_end = self.backup_codes_regeneration_reset_at + timedelta(hours=24)
+            if now >= reset_window_end:
+                remaining = self.REGENERATION_MAX_PER_DAY
+
+        return {
+            'regenerations_today': self.backup_codes_regenerated_count,
+            'regenerations_remaining': max(0, remaining),
+            'max_per_day': self.REGENERATION_MAX_PER_DAY,
+            'last_regenerated_at': self.backup_codes_regenerated_at,
+            'cooldown_minutes': self.REGENERATION_COOLDOWN_MINUTES,
+        }
 
 
 class TrustedDevice(models.Model):

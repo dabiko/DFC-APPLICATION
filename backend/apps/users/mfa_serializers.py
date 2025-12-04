@@ -102,8 +102,14 @@ class MFASetupSerializer(serializers.Serializer):
         img.save(buffer, format='PNG')
         img_str = base64.b64encode(buffer.getvalue()).decode()
 
+        # Convert hex key to base32 for manual entry in authenticator apps
+        # device.key is hex-encoded, we need to convert to bytes then base32
+        hex_key = device.key
+        key_bytes = bytes.fromhex(hex_key)
+        base32_secret = base64.b32encode(key_bytes).decode('utf-8').rstrip('=')
+
         return {
-            'secret': device.key,
+            'secret': base32_secret,
             'qr_code': f"data:image/png;base64,{img_str}"
         }
 
@@ -300,7 +306,7 @@ class MFADisableSerializer(serializers.Serializer):
 
 
 class BackupCodeRegenerateSerializer(serializers.Serializer):
-    """Serializer for regenerating backup codes"""
+    """Serializer for regenerating backup codes with rate limiting"""
     token = serializers.CharField(
         max_length=6,
         help_text="Current TOTP code to confirm regeneration"
@@ -309,6 +315,23 @@ class BackupCodeRegenerateSerializer(serializers.Serializer):
         child=serializers.CharField(),
         read_only=True
     )
+
+    def validate(self, attrs):
+        """Check rate limiting before validating token"""
+        user = self.context['request'].user
+
+        # Get or create MFA settings
+        mfa_settings, _ = MFASettings.objects.get_or_create(user=user)
+
+        # Check rate limiting
+        can_regenerate, reason, wait_seconds = mfa_settings.can_regenerate_backup_codes()
+        if not can_regenerate:
+            raise serializers.ValidationError({
+                'rate_limit': reason,
+                'wait_seconds': wait_seconds
+            })
+
+        return attrs
 
     def validate_token(self, value):
         """Validate TOTP token before regenerating"""
@@ -326,15 +349,24 @@ class BackupCodeRegenerateSerializer(serializers.Serializer):
         return value
 
     def create(self, validated_data):
-        """Regenerate backup codes"""
+        """Regenerate backup codes and record the regeneration"""
         user = self.context['request'].user
+
+        # Get or create MFA settings and record regeneration
+        mfa_settings, _ = MFASettings.objects.get_or_create(user=user)
+        mfa_settings.record_backup_code_regeneration()
 
         # Generate new backup codes
         codes = MFABackupCode.generate_codes_for_user(user, count=10)
         plain_codes = [code[0] for code in codes]
 
+        # Get regeneration stats for response
+        stats = mfa_settings.get_regeneration_stats()
+
         return {
-            'backup_codes': plain_codes
+            'backup_codes': plain_codes,
+            'regenerations_remaining': stats['regenerations_remaining'],
+            'next_regeneration_available_in': stats['cooldown_minutes'] * 60,  # seconds
         }
 
 

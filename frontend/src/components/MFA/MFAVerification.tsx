@@ -93,13 +93,17 @@ export const MFAVerification: React.FC<ExtendedMFAVerificationProps> = ({
 
   const handleCodeChange = (value: string) => {
     if (useBackupCode) {
-      // Backup codes: alphanumeric
+      // Backup codes: alphanumeric, strip non-alphanumeric first
+      const cleanValue = value
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '')
+        .slice(0, 8)
+      // Auto-format with dash after 4 characters for display
+      const formattedValue =
+        cleanValue.length > 4 ? `${cleanValue.slice(0, 4)}-${cleanValue.slice(4)}` : cleanValue
       setState({
         ...state,
-        code: value
-          .toUpperCase()
-          .replace(/[^A-Z0-9]/g, '')
-          .slice(0, 10),
+        code: formattedValue,
         error: undefined,
       })
     } else {
@@ -178,7 +182,8 @@ export const MFAVerification: React.FC<ExtendedMFAVerificationProps> = ({
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && state.code.length >= (useBackupCode ? 8 : 6)) {
+    // Backup code with dash is 9 chars (XXXX-XXXX), TOTP is 6 digits
+    if (e.key === 'Enter' && state.code.length >= (useBackupCode ? 9 : 6)) {
       handleVerify()
     }
   }
@@ -335,8 +340,8 @@ export const MFAVerification: React.FC<ExtendedMFAVerificationProps> = ({
               onKeyPress={handleKeyPress}
               disabled={state.isLocked || loading}
               className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-800 dark:text-white text-center text-2xl font-mono tracking-widest focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              placeholder={useBackupCode ? 'XXXXXXXX' : '000000'}
-              maxLength={useBackupCode ? 10 : 6}
+              placeholder={useBackupCode ? 'XXXX-XXXX' : '000000'}
+              maxLength={useBackupCode ? 9 : 6}
               autoFocus
             />
             {state.error && (
@@ -372,7 +377,7 @@ export const MFAVerification: React.FC<ExtendedMFAVerificationProps> = ({
         {(activeMethod === 'totp' || useBackupCode || otpSent) && (
           <button
             onClick={handleVerify}
-            disabled={state.code.length < (useBackupCode ? 8 : 6) || state.isLocked || loading}
+            disabled={state.code.length < (useBackupCode ? 9 : 6) || state.isLocked || loading}
             className="w-full px-4 py-3 text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors mb-3"
           >
             {loading ? 'Verifying...' : 'Verify'}

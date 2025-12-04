@@ -143,6 +143,9 @@ class MFAConfirmView(APIView):
 
         result = serializer.save()
 
+        ip_address = request.META.get('REMOTE_ADDR')
+        user_agent = request.META.get('HTTP_USER_AGENT', '')
+
         # Log successful confirmation
         log_audit_event(
             user=request.user,
@@ -150,16 +153,69 @@ class MFAConfirmView(APIView):
             resource_type='mfa_settings',
             resource_id=str(request.user.id),
             outcome='success',
-            ip_address=request.META.get('REMOTE_ADDR'),
-            user_agent=request.META.get('HTTP_USER_AGENT'),
+            ip_address=ip_address,
+            user_agent=user_agent,
             details={'message': 'MFA successfully enabled', 'backup_codes_generated': 10}
         )
+
+        # Send email notification
+        self._send_mfa_enabled_notification(request.user, ip_address, user_agent)
 
         return Response({
             'success': True,
             'message': 'MFA enabled successfully. Save your backup codes in a secure location.',
             'data': result
         }, status=status.HTTP_200_OK)
+
+    def _send_mfa_enabled_notification(self, user, ip_address, user_agent):
+        """Send email notification when MFA is enabled."""
+        from django.core.mail import send_mail
+        from django.template.loader import render_to_string
+        from django.conf import settings as django_settings
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        try:
+            context = {
+                'user_name': user.get_full_name() or user.username,
+                'user_email': user.email,
+                'enabled_time': timezone.now().strftime('%B %d, %Y at %I:%M %p %Z'),
+                'ip_address': ip_address,
+                'user_agent': user_agent,
+                'support_email': getattr(django_settings, 'SUPPORT_EMAIL', 'support@cccplc.net'),
+                'company_name': getattr(django_settings, 'COMPANY_NAME', 'CCC PLC'),
+            }
+
+            logger.info(f"Attempting to send MFA enabled email to {user.email}")
+
+            html_message = render_to_string('emails/mfa_enabled.html', context)
+
+            result = send_mail(
+                subject='Two-Factor Authentication Enabled - Digital Filing Cabinet',
+                message=f'Two-factor authentication has been enabled on your account on {context["enabled_time"]}.',
+                from_email=getattr(django_settings, 'DEFAULT_FROM_EMAIL', 'noreply@cccplc.net'),
+                recipient_list=[user.email],
+                html_message=html_message,
+                fail_silently=False,  # Don't fail silently so we can see errors
+            )
+
+            logger.info(f"MFA enabled email sent to {user.email}, result: {result}")
+
+        except Exception as e:
+            # Log email failure but don't fail the operation
+            import traceback
+            logger.error(f"Failed to send MFA enabled email to {user.email}: {str(e)}")
+            logger.error(traceback.format_exc())
+
+            log_audit_event(
+                user=user,
+                action='mfa_enabled_email_failed',
+                resource_type='email',
+                resource_id=str(user.id),
+                outcome='failure',
+                details={'error': str(e), 'traceback': traceback.format_exc()}
+            )
 
 
 class MFAVerifyView(APIView):
@@ -416,6 +472,9 @@ class MFADisableView(APIView):
         try:
             result = serializer.save()
 
+            ip_address = request.META.get('REMOTE_ADDR')
+            user_agent = request.META.get('HTTP_USER_AGENT', '')
+
             # Log successful disable
             log_audit_event(
                 user=request.user,
@@ -423,10 +482,13 @@ class MFADisableView(APIView):
                 resource_type='mfa_settings',
                 resource_id=str(request.user.id),
                 outcome='success',
-                ip_address=request.META.get('REMOTE_ADDR'),
-                user_agent=request.META.get('HTTP_USER_AGENT'),
+                ip_address=ip_address,
+                user_agent=user_agent,
                 details={'message': 'MFA disabled successfully'}
             )
+
+            # Send email notification
+            self._send_mfa_disabled_notification(request.user, ip_address, user_agent)
 
             return Response({
                 'success': True,
@@ -440,6 +502,61 @@ class MFADisableView(APIView):
                 'message': str(e)
             }, status=status.HTTP_400_BAD_REQUEST)
 
+    def _send_mfa_disabled_notification(self, user, ip_address, user_agent):
+        """Send email notification when MFA is disabled."""
+        from django.core.mail import send_mail
+        from django.template.loader import render_to_string
+        from django.conf import settings as django_settings
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        try:
+            # Build the settings URL for re-enabling MFA
+            frontend_url = getattr(django_settings, 'FRONTEND_URL', 'https://dfc.cccplc.net')
+            settings_url = f"{frontend_url}/settings/security"
+
+            context = {
+                'user_name': user.get_full_name() or user.username,
+                'user_email': user.email,
+                'disabled_time': timezone.now().strftime('%B %d, %Y at %I:%M %p %Z'),
+                'ip_address': ip_address,
+                'user_agent': user_agent,
+                'settings_url': settings_url,
+                'support_email': getattr(django_settings, 'SUPPORT_EMAIL', 'support@cccplc.net'),
+                'company_name': getattr(django_settings, 'COMPANY_NAME', 'CCC PLC'),
+            }
+
+            logger.info(f"Attempting to send MFA disabled email to {user.email}")
+
+            html_message = render_to_string('emails/mfa_disabled.html', context)
+
+            result = send_mail(
+                subject='Security Alert: Two-Factor Authentication Disabled - Digital Filing Cabinet',
+                message=f'Two-factor authentication has been disabled on your account on {context["disabled_time"]}. If you did not make this change, please secure your account immediately.',
+                from_email=getattr(django_settings, 'DEFAULT_FROM_EMAIL', 'noreply@cccplc.net'),
+                recipient_list=[user.email],
+                html_message=html_message,
+                fail_silently=False,  # Don't fail silently so we can see errors
+            )
+
+            logger.info(f"MFA disabled email sent to {user.email}, result: {result}")
+
+        except Exception as e:
+            # Log email failure but don't fail the operation
+            import traceback
+            logger.error(f"Failed to send MFA disabled email to {user.email}: {str(e)}")
+            logger.error(traceback.format_exc())
+
+            log_audit_event(
+                user=user,
+                action='mfa_disabled_email_failed',
+                resource_type='email',
+                resource_id=str(user.id),
+                outcome='failure',
+                details={'error': str(e), 'traceback': traceback.format_exc()}
+            )
+
 
 class BackupCodeRegenerateView(APIView):
     """
@@ -447,6 +564,8 @@ class BackupCodeRegenerateView(APIView):
 
     Regenerate backup codes (requires TOTP verification).
     Invalidates all existing backup codes.
+
+    Rate limiting: Max 3 regenerations per 24 hours, 5 minute cooldown between regenerations.
 
     Request body:
     {
@@ -456,23 +575,55 @@ class BackupCodeRegenerateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        ip_address = request.META.get('REMOTE_ADDR')
+        user_agent = request.META.get('HTTP_USER_AGENT', '')
+
         serializer = BackupCodeRegenerateSerializer(
             data=request.data,
             context={'request': request}
         )
 
         if not serializer.is_valid():
-            # Log failed regeneration
+            # Check if it's a rate limit error
+            if 'rate_limit' in serializer.errors:
+                error_detail = serializer.errors.get('rate_limit', ['Rate limit exceeded'])[0]
+                wait_seconds = serializer.errors.get('wait_seconds', [0])[0]
+
+                # Log rate limit hit
+                log_audit_event(
+                    user=request.user,
+                    action='mfa_backup_codes_regenerate_rate_limited',
+                    resource_type='mfa_settings',
+                    resource_id=str(request.user.id),
+                    outcome='failure',
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    details={
+                        'reason': 'rate_limit',
+                        'message': error_detail,
+                        'wait_seconds': wait_seconds
+                    }
+                )
+
+                return Response({
+                    'success': False,
+                    'message': error_detail,
+                    'errors': {'rate_limit': [error_detail]},
+                    'wait_seconds': wait_seconds
+                }, status=status.HTTP_429_TOO_MANY_REQUESTS)
+
+            # Log failed regeneration (invalid token)
             log_audit_event(
                 user=request.user,
                 action='mfa_backup_codes_regenerate_failed',
                 resource_type='mfa_settings',
                 resource_id=str(request.user.id),
                 outcome='failure',
-                ip_address=request.META.get('REMOTE_ADDR'),
-                user_agent=request.META.get('HTTP_USER_AGENT'),
+                ip_address=ip_address,
+                user_agent=user_agent,
                 details={'errors': serializer.errors}
             )
+
             return Response({
                 'success': False,
                 'message': 'Invalid verification code',
@@ -481,23 +632,73 @@ class BackupCodeRegenerateView(APIView):
 
         result = serializer.save()
 
-        # Log successful regeneration
+        # Get MFA settings for stats
+        mfa_settings = MFASettings.objects.get(user=request.user)
+        stats = mfa_settings.get_regeneration_stats()
+
+        # Log successful regeneration with detailed info
         log_audit_event(
             user=request.user,
             action='mfa_backup_codes_regenerated',
             resource_type='mfa_settings',
             resource_id=str(request.user.id),
             outcome='success',
-            ip_address=request.META.get('REMOTE_ADDR'),
-            user_agent=request.META.get('HTTP_USER_AGENT'),
-            details={'message': 'Backup codes regenerated', 'codes_generated': 10}
+            ip_address=ip_address,
+            user_agent=user_agent,
+            details={
+                'message': 'Backup codes regenerated',
+                'codes_generated': 10,
+                'regenerations_today': stats['regenerations_today'],
+                'regenerations_remaining': stats['regenerations_remaining'],
+            }
         )
+
+        # Send email notification
+        self._send_regeneration_notification(request.user, ip_address, user_agent)
 
         return Response({
             'success': True,
             'message': 'Backup codes regenerated successfully. Save them in a secure location.',
             'data': result
         }, status=status.HTTP_200_OK)
+
+    def _send_regeneration_notification(self, user, ip_address, user_agent):
+        """Send email notification about backup code regeneration."""
+        from django.core.mail import send_mail
+        from django.template.loader import render_to_string
+        from django.conf import settings as django_settings
+
+        try:
+            context = {
+                'user_name': user.get_full_name() or user.username,
+                'user_email': user.email,
+                'regeneration_time': timezone.now().strftime('%B %d, %Y at %I:%M %p %Z'),
+                'ip_address': ip_address,
+                'user_agent': user_agent,
+                'support_email': getattr(django_settings, 'SUPPORT_EMAIL', 'support@cccplc.net'),
+                'company_name': getattr(django_settings, 'COMPANY_NAME', 'CCC PLC'),
+            }
+
+            html_message = render_to_string('emails/backup_codes_regenerated.html', context)
+
+            send_mail(
+                subject='Security Alert: Backup Codes Regenerated - Digital Filing Cabinet',
+                message=f'Your backup codes were regenerated on {context["regeneration_time"]} from IP {ip_address}.',
+                from_email=getattr(django_settings, 'DEFAULT_FROM_EMAIL', 'noreply@cccplc.net'),
+                recipient_list=[user.email],
+                html_message=html_message,
+                fail_silently=True,
+            )
+        except Exception as e:
+            # Log email failure but don't fail the regeneration
+            log_audit_event(
+                user=user,
+                action='mfa_backup_codes_email_failed',
+                resource_type='email',
+                resource_id=str(user.id),
+                outcome='failure',
+                details={'error': str(e)}
+            )
 
 
 # ============================================================================

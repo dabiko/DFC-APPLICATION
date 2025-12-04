@@ -278,6 +278,7 @@ export function SettingsPage() {
             isLoading={isLoadingSecurity}
             onUpdateSecuritySettings={handleUpdateSecuritySettings}
             onChangePassword={handleChangePassword}
+            onMFAEnabled={handleLogout}
           />
         )
       default:

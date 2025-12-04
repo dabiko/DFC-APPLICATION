@@ -89,6 +89,29 @@ apiClient.interceptors.response.use(
 
     // If error is 401 and we haven't retried yet, try to refresh token
     if (error.response?.status === 401 && !originalRequest._retry) {
+      // Check if this is an MFA required error - user needs to re-authenticate with MFA
+      const errorData = error.response?.data as { code?: string; user_id?: string }
+      if (errorData?.code === 'mfa_required') {
+        console.log('🔐 MFA verification required - redirecting to login')
+
+        // Clear all tokens - user needs to re-authenticate with MFA
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('refresh_token')
+        localStorage.removeItem('user')
+        sessionStorage.removeItem('access_token')
+        sessionStorage.removeItem('refresh_token')
+        sessionStorage.removeItem('user')
+
+        // Redirect to login with a message
+        if (!window.location.pathname.includes('/login')) {
+          // Store a flag to show MFA required message on login page
+          sessionStorage.setItem('mfa_reverification_required', 'true')
+          window.location.href = '/login?reason=mfa_required'
+        }
+
+        return Promise.reject(error)
+      }
+
       // If already refreshing, queue this request
       if (isRefreshing) {
         console.log('🔄 Token refresh in progress, queuing request:', originalRequest?.url)

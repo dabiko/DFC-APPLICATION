@@ -248,8 +248,27 @@ class MFAService {
    * Can be TOTP code or backup code
    */
   async verify(data: MFAVerifyRequest): Promise<MFAVerifyResponse> {
-    const response = await api.post(`${this.baseUrl}/verify/`, data)
-    return response.data
+    try {
+      const response = await api.post(`${this.baseUrl}/verify/`, data)
+      return response.data
+    } catch (error: any) {
+      // Handle 400 errors with specific error messages from backend
+      if (error.response?.data) {
+        const errorData = error.response.data
+        // Extract specific error message from errors.token array if available
+        const specificError =
+          errorData.errors?.token?.[0] || errorData.message || 'Verification failed'
+        return {
+          success: false,
+          message: specificError,
+          data: {
+            verified: false,
+            backup_codes_remaining: errorData.data?.backup_codes_remaining,
+          },
+        }
+      }
+      throw error
+    }
   }
 
   /**

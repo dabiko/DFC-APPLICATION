@@ -30,6 +30,7 @@ import type { MFAConfig, MFADisableRequest } from '@/types/mfa'
 import type { SecuritySettings, Session } from '@/services/settingsService'
 import { mfaService } from '@/services/mfaService'
 import { cn } from '@/utils/cn'
+import { toast } from '@/utils/toast'
 
 interface SecurityTabProps {
   securitySettings: SecuritySettings | null
@@ -40,6 +41,7 @@ interface SecurityTabProps {
     new_password: string
     new_password_confirm: string
   }) => Promise<void>
+  onMFAEnabled?: () => void // Called after MFA is enabled to trigger re-authentication
 }
 
 // Session timeout options
@@ -57,6 +59,7 @@ export function SecurityTab({
   isLoading,
   onUpdateSecuritySettings,
   onChangePassword,
+  onMFAEnabled,
 }: SecurityTabProps) {
   // Password change state
   const [showPasswordForm, setShowPasswordForm] = useState(false)
@@ -74,6 +77,11 @@ export function SecurityTab({
   // MFA state
   const [showMFASetup, setShowMFASetup] = useState(false)
   const [showBackupCodes, setShowBackupCodes] = useState(false)
+  const [regeneratedCodes, setRegeneratedCodes] = useState<string[]>([])
+  const [showRegenerateModal, setShowRegenerateModal] = useState(false)
+  const [regenerateToken, setRegenerateToken] = useState('')
+  const [regenerateError, setRegenerateError] = useState<string | null>(null)
+  const [isRegenerating, setIsRegenerating] = useState(false)
   const [mfaConfig, setMfaConfig] = useState<MFAConfig>({
     enabled: false,
     method: 'totp',
@@ -204,25 +212,138 @@ export function SecurityTab({
     setShowMFASetup(true)
   }
 
-  const handleMFADisable = async (_request: MFADisableRequest) => {
-    // Integration point for MFA disable API
-    setMfaConfig((prev) => ({ ...prev, enabled: false }))
+  const handleMFADisable = async (request: MFADisableRequest) => {
+    try {
+      const response = await mfaService.disable(request)
+
+      if (response.success) {
+        // Show success toast
+        toast.success(response.message || 'Two-factor authentication disabled successfully')
+
+        // Refresh MFA status from server
+        const statusResponse = await mfaService.getStatus()
+        if (statusResponse.success && statusResponse.data) {
+          const { data } = statusResponse
+          setMfaConfig({
+            enabled: Boolean(data.is_enabled),
+            method: 'totp' as const,
+            setupCompleted: Boolean(data.is_configured),
+            backupCodesGenerated: (data.backup_codes_remaining ?? 0) > 0,
+            backupCodesRemaining: data.backup_codes_remaining ?? 0,
+            lastVerifiedAt: data.last_verified_at || undefined,
+            createdAt: data.enabled_at || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          })
+        } else {
+          // Fallback to local state update
+          setMfaConfig((prev) => ({
+            ...prev,
+            enabled: false,
+            setupCompleted: false,
+            backupCodesGenerated: false,
+            backupCodesRemaining: 0,
+          }))
+        }
+      } else {
+        throw new Error(response.message || 'Failed to disable MFA')
+      }
+    } catch (error) {
+      console.error('[SecurityTab] Error disabling MFA:', error)
+      throw error // Re-throw so the MFASettings component can handle it
+    }
   }
 
-  const handleMFASetupComplete = () => {
+  const handleMFASetupComplete = async () => {
     setShowMFASetup(false)
-    setMfaConfig((prev) => ({
-      ...prev,
-      enabled: true,
-      setupCompleted: true,
-      backupCodesGenerated: true,
-      backupCodesRemaining: 10,
-    }))
+
+    // Show success toast with re-login message
+    toast.success(
+      'Two-factor authentication enabled successfully. Please log in again to verify your identity.'
+    )
+
+    // Refresh MFA status from server to get accurate state
+    try {
+      const response = await mfaService.getStatus()
+      if (response.success && response.data) {
+        const { data } = response
+        setMfaConfig({
+          enabled: Boolean(data.is_enabled),
+          method: 'totp' as const,
+          setupCompleted: Boolean(data.is_configured),
+          backupCodesGenerated: (data.backup_codes_remaining ?? 0) > 0,
+          backupCodesRemaining: data.backup_codes_remaining ?? 0,
+          lastVerifiedAt: data.last_verified_at || undefined,
+          createdAt: data.enabled_at || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })
+      }
+    } catch (error) {
+      console.error('[SecurityTab] Error refreshing MFA status after setup:', error)
+      // Fallback to optimistic update if refresh fails
+      setMfaConfig((prev) => ({
+        ...prev,
+        enabled: true,
+        setupCompleted: true,
+        backupCodesGenerated: true,
+        backupCodesRemaining: 10,
+      }))
+    }
+
+    // Trigger re-authentication after a short delay to allow user to see the success message
+    if (onMFAEnabled) {
+      setTimeout(() => {
+        onMFAEnabled()
+      }, 2000)
+    }
   }
 
   const handleRegenerateBackupCodes = async () => {
-    // Integration point for regenerate backup codes API
-    console.log('Regenerating backup codes...')
+    // Show modal to enter TOTP code
+    setShowRegenerateModal(true)
+    setRegenerateToken('')
+    setRegenerateError(null)
+  }
+
+  const handleConfirmRegenerate = async () => {
+    if (!regenerateToken || regenerateToken.length !== 6) {
+      setRegenerateError('Please enter a valid 6-digit code')
+      return
+    }
+
+    setIsRegenerating(true)
+    setRegenerateError(null)
+
+    try {
+      const response = await mfaService.regenerateBackupCodes({ token: regenerateToken })
+
+      if (response.success && response.data?.backup_codes) {
+        // Store the new codes to display
+        setRegeneratedCodes(response.data.backup_codes)
+        // Update the remaining count
+        setMfaConfig((prev) => ({
+          ...prev,
+          backupCodesRemaining: response.data.backup_codes.length,
+          backupCodesGenerated: true,
+        }))
+        // Close the TOTP modal
+        setShowRegenerateModal(false)
+        setRegenerateToken('')
+        // Navigate to backup codes view to show the new codes
+        setShowBackupCodes(true)
+      } else {
+        setRegenerateError(response.message || 'Failed to regenerate backup codes')
+      }
+    } catch (error: any) {
+      console.error('Failed to regenerate backup codes:', error)
+      const errorMessage =
+        error.response?.data?.errors?.token?.[0] ||
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to regenerate backup codes'
+      setRegenerateError(errorMessage)
+    } finally {
+      setIsRegenerating(false)
+    }
   }
 
   const handleRevokeSession = async (sessionId: string) => {
@@ -273,11 +394,22 @@ export function SecurityTab({
 
   // Backup Codes Modal
   if (showBackupCodes) {
+    // Convert regenerated codes to BackupCode format if available
+    const backupCodesList = regeneratedCodes.map((code, index) => ({
+      id: `code-${index}`,
+      code: code,
+      used: false,
+      createdAt: new Date().toISOString(),
+    }))
+
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4 mb-6">
           <button
-            onClick={() => setShowBackupCodes(false)}
+            onClick={() => {
+              setShowBackupCodes(false)
+              setRegeneratedCodes([]) // Clear codes when closing
+            }}
             className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
           >
             <X className="w-5 h-5 text-gray-500" />
@@ -286,15 +418,75 @@ export function SecurityTab({
         </div>
         <MFABackupCodes
           codes={{
-            codes: [],
+            codes: backupCodesList,
             generatedAt: new Date().toISOString(),
             totalCodes: 10,
             usedCodes: 10 - mfaConfig.backupCodesRemaining,
             remainingCodes: mfaConfig.backupCodesRemaining,
           }}
-          onClose={() => setShowBackupCodes(false)}
           onRegenerate={handleRegenerateBackupCodes}
+          showCodes={regeneratedCodes.length > 0}
         />
+
+        {/* TOTP Verification Modal for Regeneration */}
+        {showRegenerateModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                Verify Your Identity
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                Enter your 6-digit authenticator code to regenerate backup codes. This will
+                invalidate all existing backup codes.
+              </p>
+
+              <input
+                type="text"
+                value={regenerateToken}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, '').slice(0, 6)
+                  setRegenerateToken(value)
+                  setRegenerateError(null)
+                }}
+                placeholder="000000"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-center text-2xl font-mono tracking-widest focus:ring-2 focus:ring-blue-500 mb-4"
+                maxLength={6}
+                autoFocus
+              />
+
+              {regenerateError && (
+                <p className="text-sm text-red-600 dark:text-red-400 mb-4">{regenerateError}</p>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowRegenerateModal(false)
+                    setRegenerateToken('')
+                    setRegenerateError(null)
+                  }}
+                  className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmRegenerate}
+                  disabled={regenerateToken.length !== 6 || isRegenerating}
+                  className="flex-1 px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isRegenerating ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Regenerating...
+                    </span>
+                  ) : (
+                    'Regenerate'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
@@ -631,6 +823,66 @@ export function SecurityTab({
           </div>
         </div>
       </div>
+
+      {/* TOTP Verification Modal for Regeneration - shown from main settings */}
+      {showRegenerateModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Verify Your Identity
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Enter your 6-digit authenticator code to regenerate backup codes. This will invalidate
+              all existing backup codes.
+            </p>
+
+            <input
+              type="text"
+              value={regenerateToken}
+              onChange={(e) => {
+                const value = e.target.value.replace(/\D/g, '').slice(0, 6)
+                setRegenerateToken(value)
+                setRegenerateError(null)
+              }}
+              placeholder="000000"
+              className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-center text-2xl font-mono tracking-widest focus:ring-2 focus:ring-blue-500 mb-4"
+              maxLength={6}
+              autoFocus
+            />
+
+            {regenerateError && (
+              <p className="text-sm text-red-600 dark:text-red-400 mb-4">{regenerateError}</p>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowRegenerateModal(false)
+                  setRegenerateToken('')
+                  setRegenerateError(null)
+                }}
+                className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmRegenerate}
+                disabled={regenerateToken.length !== 6 || isRegenerating}
+                className="flex-1 px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isRegenerating ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Regenerating...
+                  </span>
+                ) : (
+                  'Regenerate'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

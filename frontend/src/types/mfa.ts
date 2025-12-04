@@ -128,8 +128,7 @@ export interface MFAConfirmSetupRequest {
 }
 
 export interface MFADisableRequest {
-  password: string
-  verificationCode?: string
+  token: string // 6-digit TOTP code required to disable MFA
 }
 
 // ============================================================================
@@ -191,9 +190,9 @@ export interface MFASettingsProps {
 
 export interface MFABackupCodesProps {
   codes: BackupCodesSet
-  onRegenerate: () => Promise<BackupCodesSet>
-  onDownload: () => void
-  onPrint: () => void
+  onRegenerate: () => Promise<BackupCodesSet | void>
+  onDownload?: () => void
+  onPrint?: () => void
   showCodes?: boolean
   loading?: boolean
 }
@@ -272,9 +271,15 @@ export function validateBackupCode(code: string): boolean {
 /**
  * Format backup code for display
  * Example: "ABCD1234" -> "ABCD-1234"
+ * Handles codes that already have dashes
  */
 export function formatBackupCode(code: string): string {
-  return code.replace(/(.{4})(.{4})/, '$1-$2')
+  // First remove any existing dashes, then format
+  const cleanCode = code.replace(/-/g, '')
+  if (cleanCode.length >= 8) {
+    return `${cleanCode.slice(0, 4)}-${cleanCode.slice(4, 8)}`
+  }
+  return code
 }
 
 /**
