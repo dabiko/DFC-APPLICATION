@@ -4,7 +4,7 @@ import { authService } from '@/services/auth.service'
 import { useInactivityTimeout } from '@/hooks/useInactivityTimeout'
 import { InactivityWarningModal } from './InactivityWarningModal'
 
-interface ProtectedRouteProps {
+export interface ProtectedRouteProps {
   children: React.ReactNode
   /**
    * Whether to enable session timeout monitoring (default: true)
@@ -18,6 +18,18 @@ interface ProtectedRouteProps {
    * Logout timeout in milliseconds (default: 10 minutes)
    */
   logoutTimeout?: number
+  /**
+   * Required role(s) to access this route (not enforced, for future use)
+   */
+  requiredRole?: string | string[]
+  /**
+   * Required permission to access this route (not enforced, for future use)
+   */
+  requiredPermission?: string
+  /**
+   * Page name for display purposes
+   */
+  pageName?: string
 }
 
 /**
@@ -31,6 +43,9 @@ export function ProtectedRoute({
   enableSessionTimeout = true,
   warningTimeout = 5 * 60 * 1000, // 5 minutes default
   logoutTimeout = 10 * 60 * 1000, // 10 minutes default
+  requiredRole: _requiredRole,
+  requiredPermission: _requiredPermission,
+  pageName: _pageName,
 }: ProtectedRouteProps) {
   const navigate = useNavigate()
   const isAuthenticated = authService.isAuthenticated()

@@ -224,6 +224,7 @@ class SecurityStatsView(APIView):
     def get(self, request):
         now = timezone.now()
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        day_ago = now - timedelta(hours=24)
 
         users = CustomUser.objects.all()
         total_users = users.count()
@@ -246,6 +247,19 @@ class SecurityStatsView(APIView):
             failed_login_attempts__gt=0
         ).count()
 
+        # Failed logins in last 24 hours
+        failed_logins_24h = users.filter(
+            last_failed_login__gte=day_ago,
+            failed_login_attempts__gt=0
+        ).count()
+
+        # Active sessions - users who logged in within the last hour (approximation)
+        one_hour_ago = now - timedelta(hours=1)
+        active_sessions = users.filter(
+            last_login__gte=one_hour_ago,
+            is_active=True
+        ).count()
+
         # Pending invitations (if you have an invitation model)
         pending_invitations = 0
         try:
@@ -261,9 +275,12 @@ class SecurityStatsView(APIView):
             'locked_accounts': locked_accounts,
             'mfa_enabled_count': mfa_enabled_count,
             'mfa_enabled_percentage': mfa_enabled_percentage,
+            'mfa_adoption_rate': mfa_enabled_percentage,  # Alias for frontend compatibility
             'pending_invitations': pending_invitations,
             'failed_logins_today': failed_logins_today,
+            'failed_logins_24h': failed_logins_24h,  # Last 24 hours
             'users_with_failed_attempts': users_with_failed_attempts,
+            'active_sessions': active_sessions,
         })
 
 
@@ -315,10 +332,16 @@ class UserManagementStatsView(APIView):
     def get(self, request):
         now = timezone.now()
         month_ago = now - timedelta(days=30)
+        week_ago = now - timedelta(days=7)
 
         users = CustomUser.objects.all()
         total_users = users.count()
-        active_users = users.filter(is_active=True).count()
+
+        # Active users - those who logged in within the last 30 days
+        active_users = users.filter(
+            is_active=True,
+            last_login__gte=month_ago
+        ).count()
 
         # New users this month
         new_users_this_month = users.filter(date_joined__gte=month_ago).count()
@@ -326,11 +349,11 @@ class UserManagementStatsView(APIView):
         # Locked accounts
         locked_accounts = users.filter(account_locked_until__gt=now).count()
 
-        # MFA stats
+        # MFA stats - only count users with mfa_enabled=True
         mfa_enabled_count = users.filter(mfa_enabled=True).count()
         mfa_adoption_rate = round((mfa_enabled_count / total_users * 100) if total_users > 0 else 0)
 
-        # Departments
+        # Departments - count from database
         total_departments = Department.objects.count()
 
         # Pending invitations
@@ -341,8 +364,8 @@ class UserManagementStatsView(APIView):
         except:
             pass
 
-        # Role distribution
-        role_distribution = {
+        # Role distribution (users_by_role)
+        users_by_role = {
             'owner': 0,
             'admin': users.filter(is_superuser=True).count(),
             'manager': users.filter(is_staff=True, is_superuser=False).count(),
@@ -353,26 +376,51 @@ class UserManagementStatsView(APIView):
         # Try to get role from organization membership
         try:
             from apps.organizations.models import OrganizationMember
-            from django.db.models import Count
 
             role_counts = OrganizationMember.objects.values('role').annotate(count=Count('role'))
             for rc in role_counts:
-                if rc['role'] in role_distribution:
-                    role_distribution[rc['role']] = rc['count']
+                if rc['role'] in users_by_role:
+                    users_by_role[rc['role']] = rc['count']
         except:
             pass
+
+        # Users by department - from database
+        users_by_department = []
+        department_counts = users.filter(
+            department__isnull=False
+        ).values(
+            'department__name'
+        ).annotate(
+            count=Count('id')
+        ).order_by('-count')
+
+        for dept in department_counts:
+            users_by_department.append({
+                'department': dept['department__name'],
+                'count': dept['count']
+            })
+
+        # Recent activity stats
+        deactivated_this_month = users.filter(
+            is_active=False,
+            updated_at__gte=month_ago
+        ).count()
 
         return Response({
             'total_users': total_users,
             'active_users': active_users,
-            'inactive_users': total_users - active_users,
             'new_users_this_month': new_users_this_month,
+            'pending_invitations': pending_invitations,
             'locked_accounts': locked_accounts,
-            'mfa_enabled_count': mfa_enabled_count,
             'mfa_adoption_rate': mfa_adoption_rate,
             'total_departments': total_departments,
-            'pending_invitations': pending_invitations,
-            'role_distribution': role_distribution,
+            'users_by_role': users_by_role,
+            'users_by_department': users_by_department,
+            'recent_activity': {
+                'new_users': new_users_this_month,
+                'deactivated': deactivated_this_month,
+                'role_changes': 0,  # Would need audit log to track this
+            },
         })
 
 

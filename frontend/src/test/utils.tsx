@@ -4,10 +4,16 @@ import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
 import type { RootState } from '@/store'
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyStore = ReturnType<typeof configureStore<any>>
+
 interface ExtendedRenderOptions extends Omit<RenderOptions, 'wrapper'> {
   preloadedState?: Partial<RootState>
-  store?: ReturnType<typeof configureStore>
+  store?: AnyStore
 }
+
+// Simple passthrough reducer for testing
+const testReducer = (state: unknown = {}) => state
 
 /**
  * Custom render function that includes Redux Provider
@@ -18,7 +24,7 @@ export function renderWithProviders(
   {
     preloadedState = {},
     // Automatically create a store instance if no store was passed in
-    store = configureStore({ reducer: {}, preloadedState }),
+    store = configureStore({ reducer: testReducer, preloadedState }),
     ...renderOptions
   }: ExtendedRenderOptions = {}
 ) {

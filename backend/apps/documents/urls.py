@@ -75,6 +75,8 @@ from apps.documents.views import (
     DocumentRestoreView,
     DocumentPermanentDeleteView,
     DocumentEmptyTrashView,
+    # Orphaned document cleanup
+    DocumentOrphanedCleanupView,
 )
 from apps.classification.views import ApplyClassificationManuallyView
 
@@ -181,4 +183,7 @@ urlpatterns = [
     path('trash/empty/', DocumentEmptyTrashView.as_view(), name='document_empty_trash'),
     path('trash/<uuid:id>/restore/', DocumentRestoreView.as_view(), name='document_restore'),
     path('trash/<uuid:id>/delete/', DocumentPermanentDeleteView.as_view(), name='document_permanent_delete'),
+
+    # Orphaned document cleanup endpoint
+    path('<uuid:id>/cleanup-orphaned/', DocumentOrphanedCleanupView.as_view(), name='document_orphaned_cleanup'),
 ]

@@ -10,7 +10,7 @@ from django.dispatch import receiver
 from django.db import transaction
 import logging
 
-from apps.documents.models import Document, DocumentTag, DocumentShortcut, RecentActivity
+from apps.documents.models import Document, DocumentTag, DocumentShortcut, DocumentVersion, RecentActivity
 from apps.audit.models import AuditLog
 
 logger = logging.getLogger(__name__)
@@ -89,16 +89,20 @@ def update_document_index(sender, instance, created, **kwargs):
 
 
 @receiver(post_delete, sender=Document)
-def delete_document_index(sender, instance, **kwargs):
+def delete_document_index_and_file(sender, instance, **kwargs):
     """
-    Remove document from Elasticsearch index when deleted.
+    Remove document from Elasticsearch index and delete file from MinIO when deleted.
 
     Args:
         sender: The Document model class
         instance: The Document instance being deleted
         **kwargs: Additional signal arguments
     """
+    # Delete from Elasticsearch index
     delete_document_from_index(instance)
+
+    # Delete file from MinIO storage
+    delete_document_file_from_storage(instance)
 
 
 def delete_document_from_index(instance):
@@ -119,6 +123,103 @@ def delete_document_from_index(instance):
     except Exception as e:
         logger.error(
             f"Failed to delete document {instance.id} from Elasticsearch index: {e}",
+            exc_info=True
+        )
+
+
+def delete_document_file_from_storage(instance):
+    """
+    Helper function to delete document file from MinIO storage.
+
+    Args:
+        instance: Document instance whose file should be deleted
+    """
+    # Skip if no MinIO object key (file was never uploaded)
+    if not instance.minio_object_key:
+        logger.debug(f"Skipping MinIO deletion for document {instance.id} - no object key")
+        return
+
+    try:
+        from apps.storage.services import StorageService
+
+        storage_service = StorageService()
+        bucket = instance.minio_bucket or storage_service.default_bucket
+
+        # Delete the main document file
+        success = storage_service.delete_file(bucket, instance.minio_object_key)
+
+        if success:
+            logger.info(
+                f"Deleted document file from MinIO: {bucket}/{instance.minio_object_key} "
+                f"(document_id={instance.id})"
+            )
+        else:
+            logger.warning(
+                f"Failed to delete document file from MinIO: {bucket}/{instance.minio_object_key} "
+                f"(document_id={instance.id}) - file may not exist"
+            )
+
+        # Also delete thumbnail if exists
+        if instance.thumbnail_path:
+            thumb_success = storage_service.delete_file(bucket, instance.thumbnail_path)
+            if thumb_success:
+                logger.info(f"Deleted thumbnail from MinIO: {bucket}/{instance.thumbnail_path}")
+
+        # Also delete PDF version if exists
+        if instance.pdf_version_path:
+            pdf_success = storage_service.delete_file(bucket, instance.pdf_version_path)
+            if pdf_success:
+                logger.info(f"Deleted PDF version from MinIO: {bucket}/{instance.pdf_version_path}")
+
+    except Exception as e:
+        # Log error but don't fail the deletion - the database record is already gone
+        logger.error(
+            f"Error deleting document file from MinIO for document {instance.id}: {e}",
+            exc_info=True
+        )
+
+
+# ========================================
+# Document Version Storage Cleanup
+# ========================================
+
+@receiver(post_delete, sender=DocumentVersion)
+def delete_document_version_file(sender, instance, **kwargs):
+    """
+    Delete document version file from MinIO when version is deleted.
+
+    Args:
+        sender: The DocumentVersion model class
+        instance: The DocumentVersion instance being deleted
+        **kwargs: Additional signal arguments
+    """
+    # Skip if no MinIO object key
+    if not instance.minio_object_key:
+        logger.debug(f"Skipping MinIO deletion for version {instance.id} - no object key")
+        return
+
+    try:
+        from apps.storage.services import StorageService
+
+        storage_service = StorageService()
+        bucket = instance.minio_bucket or storage_service.default_bucket
+
+        success = storage_service.delete_file(bucket, instance.minio_object_key)
+
+        if success:
+            logger.info(
+                f"Deleted document version file from MinIO: {bucket}/{instance.minio_object_key} "
+                f"(version_id={instance.id}, document_id={instance.document_id})"
+            )
+        else:
+            logger.warning(
+                f"Failed to delete document version file from MinIO: {bucket}/{instance.minio_object_key} "
+                f"(version_id={instance.id}) - file may not exist"
+            )
+
+    except Exception as e:
+        logger.error(
+            f"Error deleting document version file from MinIO for version {instance.id}: {e}",
             exc_info=True
         )
 

@@ -478,6 +478,11 @@ class DocumentDeleteView(generics.DestroyAPIView):
                 f"Cannot delete document under legal hold. Active cases: {hold_cases}"
             )
 
+        # Delete file from MinIO storage before soft delete
+        # This ensures file is removed immediately while keeping database record in trash
+        from apps.documents.signals import delete_document_file_from_storage
+        delete_document_file_from_storage(instance)
+
         instance.is_deleted = True
         instance.deleted_at = timezone.now()
         instance.deleted_by = user
@@ -546,6 +551,21 @@ class DocumentDownloadView(APIView):
                     {'error': 'File not found', 'detail': 'This document does not have an associated file. It may have been deleted from storage.'},
                     status=status.HTTP_404_NOT_FOUND
                 )
+
+            # Verify file actually exists in MinIO storage
+            if has_minio_file:
+                from apps.storage.services import StorageService
+                storage_service = StorageService()
+                if not storage_service.file_exists(document.minio_bucket, document.minio_object_key):
+                    return Response(
+                        {
+                            'error': 'file_missing_in_storage',
+                            'detail': 'The file no longer exists in storage. The database record may be orphaned.',
+                            'document_id': str(document.id),
+                            'can_delete': True
+                        },
+                        status=status.HTTP_404_NOT_FOUND
+                    )
 
             if mode == 'stream':
                 # Direct file streaming through Django
@@ -2272,7 +2292,10 @@ class BulkDeleteDocumentsView(APIView):
                         )
                 else:
                     # Soft delete
+                    from apps.documents.signals import delete_document_file_from_storage
                     for doc in documents:
+                        # Delete file from MinIO before soft delete
+                        delete_document_file_from_storage(doc)
                         doc.is_deleted = True
                         doc.deleted_at = timezone.now()
                         doc.deleted_by = request.user
@@ -4730,3 +4753,78 @@ class DocumentEmptyTrashView(APIView):
             'message': f'{deleted_count} documents permanently deleted',
             'deleted_count': deleted_count
         })
+
+
+@extend_schema(
+    tags=['Documents - Cleanup'],
+    responses={
+        204: OpenApiResponse(description='Orphaned document record deleted successfully'),
+        403: OpenApiResponse(description='Permission denied'),
+        404: OpenApiResponse(description='Document not found'),
+    }
+)
+class DocumentOrphanedCleanupView(APIView):
+    """
+    Delete an orphaned document record (database entry without file in storage).
+
+    This endpoint is used when a document's file no longer exists in MinIO storage
+    but the database record still exists. It allows users to clean up these orphaned
+    records after confirmation.
+
+    Only the document owner, superusers, or users with delete permissions can
+    perform this action.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, id):
+        """Delete orphaned document record from database"""
+        from apps.permissions.utils import PermissionChecker
+
+        user = request.user
+
+        try:
+            document = Document.objects.select_related('folder', 'owner', 'department').get(pk=id)
+        except Document.DoesNotExist:
+            return Response(
+                {'error': 'Document not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Check permissions - only owner, superuser, or admin can delete orphaned records
+        checker = PermissionChecker(user)
+        has_permission = (
+            user.is_superuser or
+            document.owner == user or
+            checker.has_global_permission('can_delete')
+        )
+
+        if not has_permission:
+            return Response(
+                {'error': 'You do not have permission to delete this document record'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Verify that the file is actually missing from storage (to prevent misuse)
+        if document.minio_object_key and document.minio_bucket:
+            from apps.storage.services import StorageService
+            storage_service = StorageService()
+            if storage_service.file_exists(document.minio_bucket, document.minio_object_key):
+                return Response(
+                    {
+                        'error': 'File exists in storage',
+                        'detail': 'This document has a valid file in storage. Use the regular delete endpoint instead.'
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        document_id = str(document.id)
+        document_title = document.title
+
+        # Delete the orphaned record
+        document.delete()
+
+        logger.warning(
+            f"Orphaned document record deleted: {document_id} ({document_title}) by user {user.username}"
+        )
+
+        return Response(status=status.HTTP_204_NO_CONTENT)

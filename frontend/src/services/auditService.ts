@@ -336,7 +336,7 @@ export function getActionIcon(action: AuditAction): string {
 /**
  * Get color classes for action type
  */
-export function getActionColorClasses(action: AuditAction): {
+export function getActionColorClasses(action: AuditAction | string): {
   bg: string
   text: string
   border: string
@@ -395,8 +395,8 @@ export function getActionColorClasses(action: AuditAction): {
       border: 'border-emerald-300 dark:border-emerald-600',
     },
     LOGOUT: {
-      bg: 'bg-gray-100 dark:bg-gray-800',
-      text: 'text-gray-700 dark:text-gray-400',
+      bg: 'bg-gray-100 dark:bg-gray-700',
+      text: 'text-gray-700 dark:text-gray-300',
       border: 'border-gray-300 dark:border-gray-600',
     },
     FAILED_LOGIN: {
@@ -420,14 +420,75 @@ export function getActionColorClasses(action: AuditAction): {
       border: 'border-amber-300 dark:border-amber-600',
     },
     MFA_ENABLED: {
-      bg: 'bg-green-100 dark:bg-green-900/30',
-      text: 'text-green-700 dark:text-green-400',
-      border: 'border-green-300 dark:border-green-600',
+      bg: 'bg-emerald-100 dark:bg-emerald-900/30',
+      text: 'text-emerald-700 dark:text-emerald-400',
+      border: 'border-emerald-300 dark:border-emerald-600',
     },
     MFA_DISABLED: {
       bg: 'bg-orange-100 dark:bg-orange-900/30',
       text: 'text-orange-700 dark:text-orange-400',
       border: 'border-orange-300 dark:border-orange-600',
+    },
+    // Additional MFA-related actions
+    MFA_VERIFICATION_SUCCESS: {
+      bg: 'bg-emerald-100 dark:bg-emerald-900/30',
+      text: 'text-emerald-700 dark:text-emerald-400',
+      border: 'border-emerald-300 dark:border-emerald-600',
+    },
+    MFA_CONFIRM_FAILED: {
+      bg: 'bg-red-100 dark:bg-red-900/30',
+      text: 'text-red-700 dark:text-red-400',
+      border: 'border-red-300 dark:border-red-600',
+    },
+    MFA_SETUP_INITIATED: {
+      bg: 'bg-blue-100 dark:bg-blue-900/30',
+      text: 'text-blue-700 dark:text-blue-400',
+      border: 'border-blue-300 dark:border-blue-600',
+    },
+    MFA_SETUP_PASSWORD_FAILED: {
+      bg: 'bg-red-100 dark:bg-red-900/30',
+      text: 'text-red-700 dark:text-red-400',
+      border: 'border-red-300 dark:border-red-600',
+    },
+    MFA_DISABLED_EMAIL_FAILED: {
+      bg: 'bg-red-100 dark:bg-red-900/30',
+      text: 'text-red-700 dark:text-red-400',
+      border: 'border-red-300 dark:border-red-600',
+    },
+    ALL_TRUSTED_DEVICES_REVOKED: {
+      bg: 'bg-orange-100 dark:bg-orange-900/30',
+      text: 'text-orange-700 dark:text-orange-400',
+      border: 'border-orange-300 dark:border-orange-600',
+    },
+    TRUSTED_DEVICE_ADDED: {
+      bg: 'bg-emerald-100 dark:bg-emerald-900/30',
+      text: 'text-emerald-700 dark:text-emerald-400',
+      border: 'border-emerald-300 dark:border-emerald-600',
+    },
+    TRUSTED_DEVICE_REVOKED: {
+      bg: 'bg-orange-100 dark:bg-orange-900/30',
+      text: 'text-orange-700 dark:text-orange-400',
+      border: 'border-orange-300 dark:border-orange-600',
+    },
+    BACKUP_CODES_GENERATED: {
+      bg: 'bg-blue-100 dark:bg-blue-900/30',
+      text: 'text-blue-700 dark:text-blue-400',
+      border: 'border-blue-300 dark:border-blue-600',
+    },
+    BACKUP_CODES_USED: {
+      bg: 'bg-amber-100 dark:bg-amber-900/30',
+      text: 'text-amber-700 dark:text-amber-400',
+      border: 'border-amber-300 dark:border-amber-600',
+    },
+    MFA_BACKUP_CODES_REGENERATED: {
+      bg: 'bg-blue-100 dark:bg-blue-900/30',
+      text: 'text-blue-700 dark:text-blue-400',
+      border: 'border-blue-300 dark:border-blue-600',
+    },
+    MFA_BACKUP_CODES_REGENERATE_FAILED: {
+      bg: 'bg-red-100 dark:bg-red-900/30',
+      text: 'text-red-700 dark:text-red-400',
+      border: 'border-red-300 dark:border-red-600',
     },
     PERMISSION_CHANGED: {
       bg: 'bg-violet-100 dark:bg-violet-900/30',
@@ -440,20 +501,24 @@ export function getActionColorClasses(action: AuditAction): {
       border: 'border-cyan-300 dark:border-cyan-600',
     },
     ARCHIVE: {
-      bg: 'bg-slate-100 dark:bg-slate-800',
-      text: 'text-slate-700 dark:text-slate-400',
+      bg: 'bg-slate-100 dark:bg-slate-700',
+      text: 'text-slate-700 dark:text-slate-300',
       border: 'border-slate-300 dark:border-slate-600',
     },
     UNARCHIVE: {
-      bg: 'bg-slate-100 dark:bg-slate-800',
-      text: 'text-slate-700 dark:text-slate-400',
+      bg: 'bg-slate-100 dark:bg-slate-700',
+      text: 'text-slate-700 dark:text-slate-300',
       border: 'border-slate-300 dark:border-slate-600',
     },
   }
+
+  // Normalize action to uppercase for lookup
+  const normalizedAction = String(action).toUpperCase()
+
   return (
-    colors[action] || {
-      bg: 'bg-gray-100 dark:bg-gray-800',
-      text: 'text-gray-700 dark:text-gray-400',
+    colors[normalizedAction] || {
+      bg: 'bg-gray-100 dark:bg-gray-700',
+      text: 'text-gray-700 dark:text-gray-300',
       border: 'border-gray-300 dark:border-gray-600',
     }
   )
@@ -479,11 +544,14 @@ export function getResourceTypeIcon(resourceType: AuditResourceType): string {
 /**
  * Get outcome badge classes
  */
-export function getOutcomeClasses(outcome: AuditOutcome): {
+export function getOutcomeClasses(outcome: AuditOutcome | string): {
   bg: string
   text: string
 } {
-  if (outcome === 'SUCCESS') {
+  // Normalize outcome to uppercase for comparison
+  const normalizedOutcome = String(outcome).toUpperCase()
+
+  if (normalizedOutcome === 'SUCCESS') {
     return {
       bg: 'bg-green-100 dark:bg-green-900/30',
       text: 'text-green-700 dark:text-green-400',
@@ -493,6 +561,13 @@ export function getOutcomeClasses(outcome: AuditOutcome): {
     bg: 'bg-red-100 dark:bg-red-900/30',
     text: 'text-red-700 dark:text-red-400',
   }
+}
+
+/**
+ * Check if outcome is success (case-insensitive)
+ */
+export function isSuccessOutcome(outcome: AuditOutcome | string): boolean {
+  return String(outcome).toUpperCase() === 'SUCCESS'
 }
 
 /**

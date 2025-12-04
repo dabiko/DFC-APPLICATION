@@ -108,6 +108,7 @@ export interface CreateFolderData {
   parentId: string | null
   confidentiality?: ConfidentialityLevel
   templateId?: string
+  description?: string
 }
 
 /**

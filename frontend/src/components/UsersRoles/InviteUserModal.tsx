@@ -181,7 +181,31 @@ export function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUserModalP
         onClose()
       }, 1500)
     } catch (err: any) {
-      setError(err.message || 'Failed to send invitations')
+      // Handle API error response format
+      if (err.response?.data) {
+        const errorData = err.response.data
+        if (errorData.email) {
+          // Email validation errors from backend
+          setError(Array.isArray(errorData.email) ? errorData.email[0] : errorData.email)
+        } else if (errorData.error) {
+          setError(errorData.error)
+        } else if (errorData.detail) {
+          setError(errorData.detail)
+        } else if (typeof errorData === 'string') {
+          setError(errorData)
+        } else {
+          // Try to extract first error message
+          const firstKey = Object.keys(errorData)[0]
+          if (firstKey) {
+            const firstError = errorData[firstKey]
+            setError(Array.isArray(firstError) ? firstError[0] : firstError)
+          } else {
+            setError('Failed to send invitations')
+          }
+        }
+      } else {
+        setError(err.message || 'Failed to send invitations')
+      }
     } finally {
       setIsLoading(false)
     }
@@ -237,6 +261,15 @@ export function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUserModalP
                 <span>{error}</span>
               </div>
             )}
+
+            {/* Email Domain Notice */}
+            <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <AlertCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-blue-700 dark:text-blue-300">
+                Only users with your organization's email domain can be invited. Personal email
+                providers (Gmail, Yahoo, Hotmail, etc.) are not allowed.
+              </p>
+            </div>
 
             {/* Invitees */}
             <div className="space-y-4">

@@ -6,56 +6,61 @@
 /**
  * Billing cycle options
  */
-export enum BillingCycle {
-  MONTHLY = 'monthly',
-  ANNUAL = 'annual',
-}
+export const BillingCycle = {
+  MONTHLY: 'monthly',
+  ANNUAL: 'annual',
+} as const
+export type BillingCycle = (typeof BillingCycle)[keyof typeof BillingCycle]
 
 /**
  * Subscription status
  */
-export enum SubscriptionStatus {
-  ACTIVE = 'active',
-  TRIAL = 'trial',
-  CANCELLED = 'cancelled',
-  EXPIRED = 'expired',
-  PAST_DUE = 'past_due',
-  SUSPENDED = 'suspended',
-  PENDING = 'pending',
-}
+export const SubscriptionStatus = {
+  ACTIVE: 'active',
+  TRIAL: 'trial',
+  CANCELLED: 'cancelled',
+  EXPIRED: 'expired',
+  PAST_DUE: 'past_due',
+  SUSPENDED: 'suspended',
+  PENDING: 'pending',
+} as const
+export type SubscriptionStatus = (typeof SubscriptionStatus)[keyof typeof SubscriptionStatus]
 
 /**
  * Invoice status
  */
-export enum InvoiceStatus {
-  PAID = 'paid',
-  PENDING = 'pending',
-  FAILED = 'failed',
-  REFUNDED = 'refunded',
-  DRAFT = 'draft',
-}
+export const InvoiceStatus = {
+  PAID: 'paid',
+  PENDING: 'pending',
+  FAILED: 'failed',
+  REFUNDED: 'refunded',
+  DRAFT: 'draft',
+} as const
+export type InvoiceStatus = (typeof InvoiceStatus)[keyof typeof InvoiceStatus]
 
 /**
  * Payment method type
  */
-export enum PaymentMethodType {
-  CARD = 'card',
-  BANK_ACCOUNT = 'bank_account',
-  PAYPAL = 'paypal',
-}
+export const PaymentMethodType = {
+  CARD: 'card',
+  BANK_ACCOUNT: 'bank_account',
+  PAYPAL: 'paypal',
+} as const
+export type PaymentMethodType = (typeof PaymentMethodType)[keyof typeof PaymentMethodType]
 
 /**
  * Card brand
  */
-export enum CardBrand {
-  VISA = 'visa',
-  MASTERCARD = 'mastercard',
-  AMEX = 'amex',
-  DISCOVER = 'discover',
-  DINERS = 'diners',
-  JCB = 'jcb',
-  UNKNOWN = 'unknown',
-}
+export const CardBrand = {
+  VISA: 'visa',
+  MASTERCARD: 'mastercard',
+  AMEX: 'amex',
+  DISCOVER: 'discover',
+  DINERS: 'diners',
+  JCB: 'jcb',
+  UNKNOWN: 'unknown',
+} as const
+export type CardBrand = (typeof CardBrand)[keyof typeof CardBrand]
 
 /**
  * Subscription plan tier
@@ -411,18 +416,4 @@ export interface PaginatedResponse<T> {
     pageSize: number
     totalPages: number
   }
-}
-
-// Explicit re-exports to ensure proper module resolution
-export type {
-  TrialStatus,
-  Plan,
-  Subscription,
-  PaymentMethod,
-  Invoice,
-  InvoiceLineItem,
-  ProrationCalculation,
-  UsageMetrics,
-  UsageAlert,
-  Coupon,
 }

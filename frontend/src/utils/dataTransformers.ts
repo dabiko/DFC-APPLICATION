@@ -3,7 +3,7 @@
  * Transform data between backend (snake_case) and frontend (camelCase) formats
  */
 
-import type { Folder } from '@/types/folder'
+import type { Folder, ConfidentialityLevel } from '@/types/folder'
 
 /**
  * Transform backend folder response to frontend format
@@ -93,8 +93,8 @@ export function transformFolderToBackend(frontendFolder: Partial<Folder>): any {
 /**
  * Transform confidentiality level from backend to frontend
  */
-function transformConfidentialityFromBackend(backendLevel: string): string {
-  const mapping: Record<string, string> = {
+function transformConfidentialityFromBackend(backendLevel: string): ConfidentialityLevel {
+  const mapping: Record<string, ConfidentialityLevel> = {
     PUBLIC: 'public',
     INTERNAL: 'internal',
     CONFIDENTIAL: 'confidential',

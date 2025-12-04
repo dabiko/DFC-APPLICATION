@@ -3,6 +3,7 @@
  * API service for folder operations
  */
 
+import axios from 'axios'
 import api from './apiClient'
 import type {
   Folder,
@@ -84,7 +85,9 @@ export const folderService = {
     const response = await api.post<any>('/folders/', {
       name: data.name,
       parent: data.parentId, // Backend expects 'parent' not 'parent_id'
-      confidentiality_level: confidentialityMapping[data.confidentiality] || 'INTERNAL',
+      confidentiality_level: data.confidentiality
+        ? confidentialityMapping[data.confidentiality]
+        : 'INTERNAL',
       template_id: data.templateId,
       description: data.description || '',
     })
@@ -270,9 +273,9 @@ export const folderService = {
    * Get folders in trash
    */
   getTrashFolders: async (): Promise<Folder[]> => {
-    const response = await api.get<any[]>('/folders/trash/')
+    const response = await api.get<any>('/folders/trash/')
     // Handle paginated response
-    const data = Array.isArray(response.data) ? response.data : response.data.results || []
+    const data = Array.isArray(response.data) ? response.data : response.data?.results || []
     const { transformFoldersFromBackend } = await import('@/utils/dataTransformers')
     return transformFoldersFromBackend(data)
   },

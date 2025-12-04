@@ -327,7 +327,7 @@ const departmentSlice = createSlice({
     },
 
     // Clear department data (on logout)
-    clearDepartmentData: (state) => {
+    clearDepartmentData: (_state) => {
       return initialState
     },
 

@@ -3,7 +3,8 @@
  * Calculate prorated amounts for mid-cycle plan changes
  */
 
-import type { BillingCycle, Plan, Subscription, ProrationCalculation } from '@/types/billing'
+import { BillingCycle } from '@/types/billing'
+import type { Plan, Subscription, ProrationCalculation } from '@/types/billing'
 
 /**
  * Calculate the number of days remaining in the current billing period

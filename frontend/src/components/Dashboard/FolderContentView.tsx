@@ -35,6 +35,7 @@ import {
   CreateShortcutModal,
   RenameDocumentModal,
   DeleteDocumentModal,
+  OrphanedDocumentModal,
 } from '@components/Document'
 import { CreateFolderModal } from '@components/Folder/CreateFolderModal'
 import { RenameFolderModal } from '@components/Folder/RenameFolderModal'
@@ -67,6 +68,8 @@ import {
   renameDocument,
   deleteDocument,
   deleteShortcut,
+  deleteOrphanedDocument,
+  isFileMissingError,
   getDocumentVersions,
   downloadDocumentVersion,
   restoreDocumentVersion,
@@ -150,6 +153,11 @@ export const FolderContentView: FC = () => {
   )
   const [documentToRename, setDocumentToRename] = useState<FileListItem | null>(null)
   const [documentToDelete, setDocumentToDelete] = useState<FileListItem | null>(null)
+
+  // Orphaned document modal state (when file is missing from storage)
+  const [orphanedDocument, setOrphanedDocument] = useState<{ id: string; name?: string } | null>(
+    null
+  )
 
   // File details drawer state
   const [fileDetailsDrawerOpen, setFileDetailsDrawerOpen] = useState(false)
@@ -522,7 +530,12 @@ export const FolderContentView: FC = () => {
       setPreviewFile(preview)
     } catch (error) {
       console.error('Failed to load preview:', error)
-      toast.error('Failed to load file preview. Please try again.')
+      // Check if file is missing from storage (orphaned record)
+      if (isFileMissingError(error)) {
+        setOrphanedDocument({ id: docId, name: item.name })
+      } else {
+        toast.error('Failed to load file preview. Please try again.')
+      }
     } finally {
       setIsPreviewLoading(false)
     }
@@ -786,7 +799,15 @@ export const FolderContentView: FC = () => {
             }
           } catch (error) {
             console.error('Download failed:', error)
-            toast.error(`Failed to download "${item.name}". Please try again.`)
+            // Check if file is missing from storage (orphaned record)
+            if (isFileMissingError(error)) {
+              const docId = item.isShortcut ? item.originalDocumentId : item.id
+              if (docId) {
+                setOrphanedDocument({ id: docId, name: item.name })
+              }
+            } else {
+              toast.error(`Failed to download "${item.name}". Please try again.`)
+            }
           }
           break
 
@@ -1236,14 +1257,18 @@ export const FolderContentView: FC = () => {
     [folderId]
   )
 
-  // Handle drag and drop for file uploads
-  const handleDragEnter = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (e.dataTransfer.types.includes('Files')) {
-      setIsDraggingFiles(true)
-    }
-  }, [])
+  // Handle drag and drop for file uploads (only allowed when inside a folder)
+  const handleDragEnter = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      // Only allow drag-drop when inside a folder (documents must be in folders)
+      if (e.dataTransfer.types.includes('Files') && folderId) {
+        setIsDraggingFiles(true)
+      }
+    },
+    [folderId]
+  )
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -1259,16 +1284,20 @@ export const FolderContentView: FC = () => {
     e.stopPropagation()
   }, [])
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDraggingFiles(false)
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      setIsDraggingFiles(false)
 
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      // Open upload modal when files are dropped
-      setShowUploadModal(true)
-    }
-  }, [])
+      // Only allow file drops when inside a folder (documents must be in folders)
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0 && folderId) {
+        // Open upload modal when files are dropped
+        setShowUploadModal(true)
+      }
+    },
+    [folderId]
+  )
 
   // Handle upload completion
   const handleUploadComplete = useCallback(
@@ -1400,14 +1429,16 @@ export const FolderContentView: FC = () => {
               New Folder
             </button>
 
-            {/* Upload button - backend enforces permissions on actual upload */}
-            <button
-              onClick={() => setShowUploadModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
-            >
-              <Upload className="w-4 h-4" />
-              Upload
-            </button>
+            {/* Upload button - only shown when inside a folder (documents must be in folders) */}
+            {folderId && (
+              <button
+                onClick={() => setShowUploadModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
+              >
+                <Upload className="w-4 h-4" />
+                Upload
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1451,10 +1482,12 @@ export const FolderContentView: FC = () => {
                   <FolderPlus className="w-8 h-8 text-gray-400" />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                  No items yet
+                  {folderId ? 'This folder is empty' : 'No folders yet'}
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-                  Get started by creating a folder or uploading documents
+                  {folderId
+                    ? 'Get started by creating a subfolder or uploading documents'
+                    : 'Create a folder to start organizing and uploading documents'}
                 </p>
                 <div className="flex items-center gap-3">
                   <PermissionGate
@@ -1473,22 +1506,25 @@ export const FolderContentView: FC = () => {
                       New Folder
                     </button>
                   </PermissionGate>
-                  <PermissionGate
-                    permission="can_upload"
-                    folder={
-                      currentFolder
-                        ? { id: currentFolder.id, owner_id: currentFolder.ownerId }
-                        : undefined
-                    }
-                  >
-                    <button
-                      onClick={() => setShowUploadModal(true)}
-                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
+                  {/* Upload button only shown when inside a folder - documents must be in folders */}
+                  {folderId && (
+                    <PermissionGate
+                      permission="can_upload"
+                      folder={
+                        currentFolder
+                          ? { id: currentFolder.id, owner_id: currentFolder.ownerId }
+                          : undefined
+                      }
                     >
-                      <Upload className="w-4 h-4" />
-                      Upload Documents
-                    </button>
-                  </PermissionGate>
+                      <button
+                        onClick={() => setShowUploadModal(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
+                      >
+                        <Upload className="w-4 h-4" />
+                        Upload Documents
+                      </button>
+                    </PermissionGate>
+                  )}
                 </div>
               </div>
             }
@@ -1835,6 +1871,20 @@ export const FolderContentView: FC = () => {
         onDelete={handleDeleteDocument}
       />
 
+      {/* Orphaned Document Modal (file missing from storage) */}
+      <OrphanedDocumentModal
+        isOpen={!!orphanedDocument}
+        documentId={orphanedDocument?.id || ''}
+        documentName={orphanedDocument?.name}
+        onClose={() => setOrphanedDocument(null)}
+        onDelete={async (documentId) => {
+          await deleteOrphanedDocument(documentId)
+          // Refresh the document list after cleanup
+          await loadDocuments()
+          toast.success('Orphaned document record removed')
+        }}
+      />
+
       {/* Share Document Modal */}
       <ShareDocumentModal
         isOpen={!!documentToShare}
@@ -1872,7 +1922,13 @@ export const FolderContentView: FC = () => {
             toast.success(`Downloading "${fileDetailsData?.fileName || 'file'}"`)
           } catch (error) {
             console.error('Download failed:', error)
-            toast.error('Failed to download file. Please try again.')
+            // Check if file is missing from storage (orphaned record)
+            if (isFileMissingError(error)) {
+              setFileDetailsDrawerOpen(false)
+              setOrphanedDocument({ id: fileId, name: fileDetailsData?.fileName })
+            } else {
+              toast.error('Failed to download file. Please try again.')
+            }
           }
         }}
         onShare={(fileId) => {

@@ -11,6 +11,7 @@ import type {
   UpdateFolderData,
   FolderFilterOptions,
   FolderSortOptions,
+  ConfidentialityLevel,
 } from '@/types/folder'
 import folderService, { handleFolderError } from '@/services/folderService'
 import { buildFolderTree } from '@/utils/folderTree'
@@ -96,12 +97,12 @@ export const renameFolder = createAsyncThunk(
       folderId,
       newName,
       confidentiality,
-    }: { folderId: string; newName: string; confidentiality?: string },
+    }: { folderId: string; newName: string; confidentiality?: ConfidentialityLevel },
     { rejectWithValue }
   ) => {
     try {
       // Use updateFolder to handle both name and confidentiality
-      const updateData: { name?: string; confidentiality?: string } = {}
+      const updateData: UpdateFolderData = {}
       if (newName) updateData.name = newName
       if (confidentiality) updateData.confidentiality = confidentiality
 

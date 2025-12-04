@@ -15,7 +15,6 @@ import {
   Grid3X3,
   ChevronDown,
   X,
-  Calendar,
   User,
   Activity,
   FileText,
@@ -47,7 +46,9 @@ import {
   AlertCircle,
   Loader2,
   ShieldAlert,
+  Mail,
 } from 'lucide-react'
+import { DatePicker } from '@/components/UI/DatePicker'
 import { ThreePanelLayout } from '@/components/Layout/ThreePanelLayout'
 import { DashboardHeader } from '@/components/Dashboard/DashboardHeader'
 import { DashboardSidebar } from '@/components/Dashboard/DashboardSidebar'
@@ -68,6 +69,7 @@ import {
   OUTCOME_OPTIONS,
   getActionColorClasses,
   getOutcomeClasses,
+  isSuccessOutcome,
   formatAuditTimestamp,
   formatRelativeTime,
 } from '@/services/auditService'
@@ -77,7 +79,7 @@ import { cn } from '@/utils/cn'
 // ICON MAPPING
 // ============================================================================
 
-const ActionIcons: Record<AuditAction, React.FC<{ className?: string }>> = {
+const ActionIcons: Record<string, React.FC<{ className?: string }>> = {
   CREATE: PlusCircle,
   VIEW: Eye,
   EDIT: Edit,
@@ -98,9 +100,22 @@ const ActionIcons: Record<AuditAction, React.FC<{ className?: string }>> = {
   RESTORE: RotateCcw,
   ARCHIVE: Archive,
   UNARCHIVE: ArchiveRestore,
+  // Additional MFA-related actions
+  MFA_VERIFICATION_SUCCESS: Shield,
+  MFA_CONFIRM_FAILED: ShieldAlert,
+  MFA_SETUP_INITIATED: Shield,
+  MFA_SETUP_PASSWORD_FAILED: ShieldAlert,
+  MFA_DISABLED_EMAIL_FAILED: ShieldOff,
+  ALL_TRUSTED_DEVICES_REVOKED: ShieldOff,
+  TRUSTED_DEVICE_ADDED: Shield,
+  TRUSTED_DEVICE_REVOKED: ShieldOff,
+  BACKUP_CODES_GENERATED: Key,
+  BACKUP_CODES_USED: Key,
+  MFA_BACKUP_CODES_REGENERATED: Key,
+  MFA_BACKUP_CODES_REGENERATE_FAILED: Key,
 }
 
-const ResourceTypeIcons: Record<AuditResourceType, React.FC<{ className?: string }>> = {
+const ResourceTypeIcons: Record<string, React.FC<{ className?: string }>> = {
   DOCUMENT: FileText,
   FOLDER: Folder,
   USER: User,
@@ -109,6 +124,24 @@ const ResourceTypeIcons: Record<AuditResourceType, React.FC<{ className?: string
   SHARE: Share2,
   RETENTION_POLICY: Clock,
   LEGAL_HOLD: Gavel,
+  // Additional resource types
+  MFA_SETTINGS: Shield,
+  TRUSTED_DEVICE: Shield,
+  EMAIL: Mail,
+  BACKUP_CODES: Key,
+  SESSION: LogIn,
+}
+
+// Helper function to get action icon (case-insensitive)
+function getActionIcon(action: string): React.FC<{ className?: string }> {
+  const normalizedAction = String(action).toUpperCase()
+  return ActionIcons[normalizedAction] || Activity
+}
+
+// Helper function to get resource type icon (case-insensitive)
+function getResourceIcon(resourceType: string): React.FC<{ className?: string }> {
+  const normalizedType = String(resourceType).toUpperCase()
+  return ResourceTypeIcons[normalizedType] || FileText
 }
 
 // ============================================================================
@@ -205,65 +238,21 @@ function DateRangePicker({
 }: DateRangePickerProps) {
   return (
     <div className="flex items-center gap-2">
-      <div className="relative">
-        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none z-10" />
-        <input
-          type="date"
-          value={startDate}
-          onChange={(e) => onStartDateChange(e.target.value)}
-          className={cn(
-            'pl-10 pr-3 py-2 text-sm rounded-lg border transition-colors appearance-none',
-            'bg-white dark:bg-gray-800',
-            'border-gray-300 dark:border-gray-600',
-            'text-gray-900 dark:text-gray-100',
-            'placeholder-gray-500 dark:placeholder-gray-400',
-            'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
-            'hover:border-gray-400 dark:hover:border-gray-500',
-            // Custom styling for date input
-            '[&::-webkit-calendar-picker-indicator]:dark:invert',
-            '[&::-webkit-calendar-picker-indicator]:opacity-60',
-            '[&::-webkit-calendar-picker-indicator]:hover:opacity-100',
-            '[&::-webkit-calendar-picker-indicator]:cursor-pointer'
-          )}
-          placeholder="Start date"
-        />
-      </div>
+      <DatePicker
+        value={startDate}
+        onChange={onStartDateChange}
+        placeholder="Start date"
+        maxDate={endDate || undefined}
+        className="w-[150px]"
+      />
       <span className="text-gray-500 dark:text-gray-400 text-sm font-medium">to</span>
-      <div className="relative">
-        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none z-10" />
-        <input
-          type="date"
-          value={endDate}
-          onChange={(e) => onEndDateChange(e.target.value)}
-          className={cn(
-            'pl-10 pr-3 py-2 text-sm rounded-lg border transition-colors appearance-none',
-            'bg-white dark:bg-gray-800',
-            'border-gray-300 dark:border-gray-600',
-            'text-gray-900 dark:text-gray-100',
-            'placeholder-gray-500 dark:placeholder-gray-400',
-            'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
-            'hover:border-gray-400 dark:hover:border-gray-500',
-            // Custom styling for date input
-            '[&::-webkit-calendar-picker-indicator]:dark:invert',
-            '[&::-webkit-calendar-picker-indicator]:opacity-60',
-            '[&::-webkit-calendar-picker-indicator]:hover:opacity-100',
-            '[&::-webkit-calendar-picker-indicator]:cursor-pointer'
-          )}
-          placeholder="End date"
-        />
-      </div>
-      {(startDate || endDate) && (
-        <button
-          onClick={() => {
-            onStartDateChange('')
-            onEndDateChange('')
-          }}
-          className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-          title="Clear dates"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      )}
+      <DatePicker
+        value={endDate}
+        onChange={onEndDateChange}
+        placeholder="End date"
+        minDate={startDate || undefined}
+        className="w-[150px]"
+      />
     </div>
   )
 }
@@ -274,8 +263,8 @@ interface AuditLogRowProps {
 }
 
 function AuditLogRow({ log, onClick }: AuditLogRowProps) {
-  const ActionIcon = ActionIcons[log.action] || Activity
-  const ResourceIcon = ResourceTypeIcons[log.resource_type] || FileText
+  const ActionIcon = getActionIcon(log.action)
+  const ResourceIcon = getResourceIcon(log.resource_type)
   const actionColors = getActionColorClasses(log.action)
   const outcomeColors = getOutcomeClasses(log.outcome)
 
@@ -346,7 +335,7 @@ function AuditLogRow({ log, onClick }: AuditLogRowProps) {
             outcomeColors.text
           )}
         >
-          {log.outcome === 'SUCCESS' ? (
+          {isSuccessOutcome(log.outcome) ? (
             <CheckCircle className="w-3 h-3" />
           ) : (
             <AlertCircle className="w-3 h-3" />
@@ -367,59 +356,65 @@ interface AuditLogCardProps {
 }
 
 function AuditLogCard({ log, onClick }: AuditLogCardProps) {
-  const ActionIcon = ActionIcons[log.action] || Activity
-  const ResourceIcon = ResourceTypeIcons[log.resource_type] || FileText
+  const ActionIcon = getActionIcon(log.action)
+  const ResourceIcon = getResourceIcon(log.resource_type)
   const actionColors = getActionColorClasses(log.action)
   const outcomeColors = getOutcomeClasses(log.outcome)
 
   return (
     <div
       onClick={onClick}
-      className="p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:shadow-md transition-all cursor-pointer"
+      className="p-3 sm:p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all cursor-pointer overflow-hidden"
     >
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <div className={cn('p-2 rounded-lg', actionColors.bg)}>
-            <ActionIcon className={cn('w-5 h-5', actionColors.text)} />
+      {/* Header - Action & Status */}
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <div className={cn('p-1.5 sm:p-2 rounded-lg flex-shrink-0', actionColors.bg)}>
+            <ActionIcon className={cn('w-4 h-4 sm:w-5 sm:h-5', actionColors.text)} />
           </div>
-          <div>
-            <div className={cn('text-sm font-semibold', actionColors.text)}>
+          <div className="min-w-0 flex-1">
+            <div className={cn('text-xs sm:text-sm font-semibold truncate', actionColors.text)}>
               {log.action_display}
             </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">
+            <div className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">
               {formatRelativeTime(log.timestamp)}
             </div>
           </div>
         </div>
         <span
           className={cn(
-            'inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full',
+            'inline-flex items-center gap-1 text-[10px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full flex-shrink-0',
             outcomeColors.bg,
             outcomeColors.text
           )}
         >
-          {log.outcome === 'SUCCESS' ? (
+          {isSuccessOutcome(log.outcome) ? (
             <CheckCircle className="w-3 h-3" />
           ) : (
             <AlertCircle className="w-3 h-3" />
           )}
-          {log.outcome}
         </span>
       </div>
 
-      <div className="flex items-center gap-2 mb-2">
-        <ResourceIcon className="w-4 h-4 text-gray-400" />
-        <span className="text-sm text-gray-900 dark:text-gray-100 truncate">
+      {/* Resource */}
+      <div className="flex items-center gap-2 mb-2 min-w-0">
+        <ResourceIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400 flex-shrink-0" />
+        <span className="text-xs sm:text-sm text-gray-900 dark:text-gray-100 truncate">
           {log.resource_name}
         </span>
       </div>
 
-      <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-        <div className="flex items-center gap-1">
-          <User className="w-3 h-3" />
-          <span>{log.user_details?.full_name || log.user_details?.email || 'System'}</span>
+      {/* Footer - User & IP */}
+      <div className="flex items-center justify-between text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 gap-2 pt-2 border-t border-gray-100 dark:border-gray-700">
+        <div className="flex items-center gap-1 min-w-0 flex-1">
+          <User className="w-3 h-3 flex-shrink-0" />
+          <span className="truncate">
+            {log.user_details?.full_name || log.user_details?.email || 'System'}
+          </span>
         </div>
-        <span className="font-mono">{log.ip_address}</span>
+        <span className="font-mono text-[10px] flex-shrink-0 hidden sm:block">
+          {log.ip_address}
+        </span>
       </div>
     </div>
   )
@@ -435,7 +430,7 @@ interface AuditLogDetailModalProps {
 function AuditLogDetailModal({ log, isOpen, onClose, isLoading }: AuditLogDetailModalProps) {
   if (!isOpen) return null
 
-  const ActionIcon = log ? ActionIcons[log.action] || Activity : Activity
+  const ActionIcon = log ? getActionIcon(log.action) : Activity
   const actionColors = log ? getActionColorClasses(log.action) : { bg: '', text: '' }
   const outcomeColors = log ? getOutcomeClasses(log.outcome) : { bg: '', text: '' }
 
@@ -484,7 +479,7 @@ function AuditLogDetailModal({ log, isOpen, onClose, isLoading }: AuditLogDetail
                     outcomeColors.text
                   )}
                 >
-                  {log.outcome === 'SUCCESS' ? (
+                  {isSuccessOutcome(log.outcome) ? (
                     <CheckCircle className="w-4 h-4" />
                   ) : (
                     <AlertCircle className="w-4 h-4" />
@@ -1092,7 +1087,7 @@ export function AuditLogPage() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
             {logs.map((log) => (
               <AuditLogCard key={log.id} log={log} onClick={() => fetchLogDetails(log.id)} />
             ))}

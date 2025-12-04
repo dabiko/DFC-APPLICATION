@@ -180,10 +180,18 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
         success_rate = (success_count / total_actions * 100) if total_actions > 0 else 0
 
         # Date range
-        date_range = {
-            'start': queryset.last().timestamp if queryset.exists() else None,
-            'end': queryset.first().timestamp if queryset.exists() else None,
-        }
+        if queryset.exists():
+            last_log = queryset.last()
+            first_log = queryset.first()
+            date_range = {
+                'start': last_log.timestamp if last_log else None,
+                'end': first_log.timestamp if first_log else None,
+            }
+        else:
+            date_range = {
+                'start': None,
+                'end': None,
+            }
 
         data = {
             'total_actions': total_actions,

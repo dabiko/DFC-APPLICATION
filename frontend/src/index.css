@@ -148,9 +148,78 @@
 
 @layer components {
   /* Custom component classes */
+
+  /* ===== Custom Date Input Styling ===== */
+
+  /* Base date input styling */
+  input[type='date'] {
+    position: relative;
+    color-scheme: light;
+  }
+
+  /* Hide the default calendar icon */
+  input[type='date']::-webkit-calendar-picker-indicator {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  /* Dark mode color scheme */
+  .dark input[type='date'] {
+    color-scheme: dark;
+  }
+
+  /* ===== Custom Calendar Dropdown Styling ===== */
+
+  /* Style the calendar popup - Webkit browsers */
+  ::-webkit-datetime-edit {
+    padding: 0;
+  }
+
+  ::-webkit-datetime-edit-fields-wrapper {
+    padding: 0;
+  }
+
+  ::-webkit-datetime-edit-text {
+    color: #9ca3af;
+    padding: 0 2px;
+  }
+
+  ::-webkit-datetime-edit-month-field,
+  ::-webkit-datetime-edit-day-field,
+  ::-webkit-datetime-edit-year-field {
+    padding: 0;
+  }
+
+  .dark ::-webkit-datetime-edit-text {
+    color: #6b7280;
+  }
+
+  /* Date input when empty */
+  input[type='date']:not(:valid)::-webkit-datetime-edit {
+    color: #9ca3af;
+  }
+
+  .dark input[type='date']:not(:valid)::-webkit-datetime-edit {
+    color: #6b7280;
+  }
 }
 
 @layer utilities {
+  /* Scrollbar hide utility - cross-browser */
+  .scrollbar-hide {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+  }
+
   /* Custom animation utilities */
   .animate-progress-indeterminate {
     animation: progress-indeterminate 1.5s ease-in-out infinite;

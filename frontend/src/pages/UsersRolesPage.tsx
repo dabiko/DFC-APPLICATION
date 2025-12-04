@@ -111,32 +111,34 @@ function KPICard({ title, value, icon, trend, subtitle, color, onClick }: KPICar
     <div
       onClick={onClick}
       className={cn(
-        'bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 transition-all',
+        'bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2.5 transition-all',
         onClick && 'cursor-pointer hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600'
       )}
     >
-      <div className="flex items-start justify-between">
-        <div className={cn('p-2 rounded-lg', colorClasses[color])}>{icon}</div>
-        {trend && (
-          <div
-            className={cn(
-              'flex items-center gap-1 text-xs font-medium',
-              trend.isPositive
-                ? 'text-green-600 dark:text-green-400'
-                : 'text-red-600 dark:text-red-400'
+      <div className="flex items-center gap-2.5">
+        <div className={cn('p-1.5 rounded-md', colorClasses[color])}>{icon}</div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-bold text-gray-900 dark:text-gray-100">{value}</span>
+            {trend && (
+              <span
+                className={cn(
+                  'flex items-center gap-0.5 text-[10px] font-medium',
+                  trend.isPositive
+                    ? 'text-green-600 dark:text-green-400'
+                    : 'text-red-600 dark:text-red-400'
+                )}
+              >
+                <TrendingUp className={cn('w-2.5 h-2.5', !trend.isPositive && 'rotate-180')} />
+                {trend.value}%
+              </span>
             )}
-          >
-            <TrendingUp className={cn('w-3 h-3', !trend.isPositive && 'rotate-180')} />
-            {trend.value}%
           </div>
-        )}
-      </div>
-      <div className="mt-3">
-        <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{value}</div>
-        <div className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</div>
-        {subtitle && (
-          <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">{subtitle}</div>
-        )}
+          <div className="text-xs font-medium text-gray-600 dark:text-gray-400">{title}</div>
+          {subtitle && (
+            <div className="text-[10px] text-gray-500 dark:text-gray-500">{subtitle}</div>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -241,41 +243,39 @@ export function UsersRolesPage() {
     <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900">
       {/* Header with KPIs */}
       <div className="flex-shrink-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="px-6 py-4">
-          <div className="flex items-center justify-between mb-4">
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between mb-3">
             <div>
-              <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+              <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                 Users & Roles
               </h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
                 Manage users, roles, departments, and security settings
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleRefresh}
-                disabled={isLoadingStats}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
-                title="Refresh"
-              >
-                <RefreshCw
-                  className={cn('w-5 h-5 text-gray-500', isLoadingStats && 'animate-spin')}
-                />
-              </button>
-            </div>
+            <button
+              onClick={handleRefresh}
+              disabled={isLoadingStats}
+              className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
+              title="Refresh"
+            >
+              <RefreshCw
+                className={cn('w-4 h-4 text-gray-500', isLoadingStats && 'animate-spin')}
+              />
+            </button>
           </div>
 
           {/* KPI Cards */}
           {isLoadingStats ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
             </div>
           ) : stats ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
               <KPICard
                 title="Total Users"
                 value={stats.total_users}
-                icon={<Users className="w-5 h-5" />}
+                icon={<Users className="w-4 h-4" />}
                 trend={
                   stats.new_users_this_month > 0
                     ? {
@@ -291,7 +291,7 @@ export function UsersRolesPage() {
               <KPICard
                 title="Active Users"
                 value={stats.active_users}
-                icon={<CheckCircle className="w-5 h-5" />}
+                icon={<CheckCircle className="w-4 h-4" />}
                 subtitle="Last 30 days"
                 color="green"
                 onClick={() => handleTabChange('users')}
@@ -299,7 +299,7 @@ export function UsersRolesPage() {
               <KPICard
                 title="Pending Invites"
                 value={stats.pending_invitations}
-                icon={<Mail className="w-5 h-5" />}
+                icon={<Mail className="w-4 h-4" />}
                 subtitle="Awaiting response"
                 color="yellow"
                 onClick={() => handleTabChange('invitations')}
@@ -307,7 +307,7 @@ export function UsersRolesPage() {
               <KPICard
                 title="Locked Accounts"
                 value={stats.locked_accounts}
-                icon={<AlertTriangle className="w-5 h-5" />}
+                icon={<AlertTriangle className="w-4 h-4" />}
                 subtitle="Need attention"
                 color="red"
                 onClick={() => handleTabChange('security')}
@@ -315,7 +315,7 @@ export function UsersRolesPage() {
               <KPICard
                 title="MFA Adoption"
                 value={`${stats.mfa_adoption_rate}%`}
-                icon={<Shield className="w-5 h-5" />}
+                icon={<Shield className="w-4 h-4" />}
                 subtitle="Users with MFA"
                 color="purple"
                 onClick={() => handleTabChange('security')}
@@ -323,7 +323,7 @@ export function UsersRolesPage() {
               <KPICard
                 title="Departments"
                 value={stats.total_departments}
-                icon={<Building2 className="w-5 h-5" />}
+                icon={<Building2 className="w-4 h-4" />}
                 subtitle="Active departments"
                 color="indigo"
                 onClick={() => handleTabChange('departments')}
@@ -333,8 +333,8 @@ export function UsersRolesPage() {
         </div>
 
         {/* Tab Navigation */}
-        <div className="px-6 border-t border-gray-200 dark:border-gray-700">
-          <nav className="flex gap-1 -mb-px overflow-x-auto">
+        <div className="px-4 border-t border-gray-200 dark:border-gray-700">
+          <nav className="flex gap-0.5 -mb-px overflow-x-auto">
             {TABS.map((tab) => {
               const Icon = tab.icon
               const isActive = activeTab === tab.id
@@ -343,13 +343,13 @@ export function UsersRolesPage() {
                   key={tab.id}
                   onClick={() => handleTabChange(tab.id)}
                   className={cn(
-                    'flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
+                    'flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors whitespace-nowrap',
                     isActive
                       ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                       : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:border-gray-300'
                   )}
                 >
-                  <Icon className="w-4 h-4" />
+                  <Icon className="w-3.5 h-3.5" />
                   <span>{tab.label}</span>
                 </button>
               )

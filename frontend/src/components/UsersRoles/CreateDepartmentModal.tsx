@@ -77,8 +77,8 @@ export function CreateDepartmentModal({
   const fetchUsers = async () => {
     setIsLoadingUsers(true)
     try {
-      const data = await getUsers()
-      setUsers(data)
+      const response = await getUsers({ page_size: 1000 })
+      setUsers(response.results)
     } catch (err) {
       console.error('Failed to fetch users:', err)
     } finally {

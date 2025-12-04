@@ -8,7 +8,7 @@
  * - Document summarization
  */
 
-import api from './api'
+import api from './apiClient'
 
 // =============================================================================
 // Types

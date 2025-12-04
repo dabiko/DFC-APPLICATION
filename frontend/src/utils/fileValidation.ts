@@ -123,10 +123,10 @@ export function getFileTypeCategory(file: File): FileTypeCategory {
   const extension = getFileExtension(file.name)
 
   for (const [category, info] of Object.entries(FILE_TYPE_CATEGORIES)) {
-    if (info.mimeTypes.includes(file.type)) {
+    if ((info.mimeTypes as readonly string[]).includes(file.type)) {
       return category as FileTypeCategory
     }
-    if (info.extensions.includes(extension)) {
+    if ((info.extensions as readonly string[]).includes(extension)) {
       return category as FileTypeCategory
     }
   }
@@ -208,7 +208,7 @@ export function getAcceptedFileTypesLabel(acceptedTypes: string[]): string {
 
   for (const type of acceptedTypes) {
     for (const category of Object.values(FILE_TYPE_CATEGORIES)) {
-      if (category.mimeTypes.includes(type)) {
+      if ((category.mimeTypes as readonly string[]).includes(type)) {
         category.extensions.forEach((ext) => extensions.add(ext))
       }
     }

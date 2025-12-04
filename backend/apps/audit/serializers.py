@@ -114,7 +114,7 @@ class AuditLogStatsSerializer(serializers.Serializer):
     actions_by_type = serializers.DictField(child=serializers.IntegerField())
     actions_by_user = serializers.DictField(child=serializers.IntegerField())
     actions_by_resource_type = serializers.DictField(child=serializers.IntegerField())
-    recent_actions = AuditLogListSerializer(many=True, read_only=True)
+    recent_actions = serializers.ListField(child=serializers.DictField(), read_only=True)
     success_rate = serializers.FloatField()
     date_range = serializers.DictField()
 

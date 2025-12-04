@@ -373,7 +373,7 @@ export const validateMetadata = (
 
   // Validate required fields
   for (const field of REQUIRED_FIELDS) {
-    const value = metadata[field]
+    const value = (metadata as Record<string, unknown>)[field]
     if (value === undefined || value === null || value === '') {
       errors.push({
         field,

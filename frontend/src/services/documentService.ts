@@ -5,12 +5,10 @@
 
 import apiClient from './apiClient'
 import type { CreateDocumentMetadata } from '@/types/metadata'
-import type { FileUploadItem, UploadResult, BulkUploadResult } from '@/types/upload'
+import type { UploadResult, BulkUploadResult } from '@/types/upload'
 import type {
   DocumentShortcut,
   DocumentShortcutListItem,
-  CreateShortcutRequest,
-  BulkCreateShortcutRequest,
   BulkCreateShortcutResponse,
   CanDeleteResponse,
   ShortcutLocationsResponse,
@@ -33,6 +31,16 @@ export interface UploadDocumentResponse {
   metadata: CreateDocumentMetadata
   createdAt: string
   createdBy: string
+  // Backend snake_case fields
+  file_name?: string
+  file_size?: number
+  file_type?: string
+  document_type?: string
+  confidentiality_level?: string
+  department_name?: string
+  created_at?: string
+  updated_at?: string
+  tags?: string[]
 }
 
 /**
@@ -121,7 +129,6 @@ export const uploadDocument = async ({
 
   // Track upload progress
   const startTime = Date.now()
-  const uploadedBytes = 0
 
   const response = await apiClient.post<UploadDocumentResponse>('/documents/upload/', formData, {
     headers: {
@@ -293,6 +300,47 @@ export const getDocumentPreview = async (
  */
 export const deleteDocument = async (documentId: string): Promise<void> => {
   await apiClient.delete(`/documents/${documentId}/delete/`)
+}
+
+/**
+ * Delete orphaned document record (when file is missing from storage)
+ * This is used when a document's file no longer exists in MinIO storage
+ * but the database record still exists.
+ */
+export const deleteOrphanedDocument = async (documentId: string): Promise<void> => {
+  await apiClient.delete(`/documents/${documentId}/cleanup-orphaned/`)
+}
+
+/**
+ * Error response type for file missing in storage
+ */
+export interface FileMissingError {
+  error: 'file_missing_in_storage'
+  detail: string
+  document_id: string
+  can_delete: boolean
+}
+
+/**
+ * Check if an error response indicates a file is missing from storage
+ */
+export const isFileMissingError = (
+  error: unknown
+): error is { response: { data: FileMissingError } } => {
+  if (
+    error &&
+    typeof error === 'object' &&
+    'response' in error &&
+    error.response &&
+    typeof error.response === 'object' &&
+    'data' in error.response &&
+    error.response.data &&
+    typeof error.response.data === 'object' &&
+    'error' in error.response.data
+  ) {
+    return (error.response.data as { error: string }).error === 'file_missing_in_storage'
+  }
+  return false
 }
 
 /**
@@ -1296,6 +1344,8 @@ const documentService = {
   getDocument,
   downloadDocument,
   deleteDocument,
+  deleteOrphanedDocument,
+  isFileMissingError,
   bulkDeleteDocuments,
   getDocumentsInFolder,
   searchDocuments,

@@ -16,14 +16,31 @@ export type UserStatus = 'active' | 'inactive' | 'locked' | 'pending'
 export type OrganizationRole = 'owner' | 'admin' | 'manager' | 'member' | 'viewer'
 
 export interface Department {
-  id: number
+  id: string
   name: string
   code: string
+  description?: string
   parent: number | null
+  parent_id?: string
   parent_name?: string
+  icon?: string
+  color?: string
+  display_order?: number
+  is_active?: boolean
+  default_confidentiality?: string
   storage_quota_gb: number
+  storage_used_bytes?: number
   storage_used_gb?: number
+  storage_percentage?: number
   member_count?: number
+  root_path?: string
+  head?: {
+    id: string
+    first_name: string
+    last_name: string
+    email: string
+  }
+  children?: Department[]
   created_at: string
   updated_at: string
 }
@@ -232,9 +249,12 @@ export interface SecurityStats {
   locked_accounts: number
   mfa_enabled_count: number
   mfa_enabled_percentage: number
+  mfa_adoption_rate: number // alias for mfa_enabled_percentage
   pending_invitations: number
   failed_logins_today: number
+  failed_logins_24h: number // alias for failed_logins_today
   users_with_failed_attempts: number
+  active_sessions: number
 }
 
 export interface LockedAccount {
@@ -596,7 +616,7 @@ export async function updateDepartment(
 /**
  * Delete a department
  */
-export async function deleteDepartment(id: number): Promise<void> {
+export async function deleteDepartment(id: string | number): Promise<void> {
   await apiClient.delete(`/auth/departments/${id}/`)
 }
 
@@ -872,8 +892,12 @@ export async function getInvitations(filters?: InvitationFilters): Promise<Invit
  * Create an invitation
  */
 export async function createInvitation(data: CreateInvitationRequest): Promise<Invitation> {
-  const response = await apiClient.post<Invitation>('/organizations/invitations/', data)
-  return response.data
+  const response = await apiClient.post<{
+    success: boolean
+    message: string
+    invitation: Invitation
+  }>('/organizations/invitations/create/', data)
+  return response.data.invitation
 }
 
 /**
@@ -1016,65 +1040,11 @@ export async function enforceMFA(enforce: boolean): Promise<{ message: string }>
 
 /**
  * Get user management dashboard statistics
+ * All data is fetched from the backend database
  */
 export async function getUserManagementStats(): Promise<UserManagementStats> {
-  try {
-    const response = await apiClient.get<UserManagementStats>('/auth/stats/')
-    return response.data
-  } catch {
-    // Calculate from available data
-    const [users, departments, invitations, securityStats] = await Promise.all([
-      getUsers({ page_size: 1000 }),
-      getDepartments(),
-      getInvitations({ status: 'pending' }),
-      getSecurityStats(),
-    ])
-
-    const allUsers = users.results
-    const now = new Date()
-    const monthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
-
-    const newUsersThisMonth = allUsers.filter((u) => new Date(u.date_joined) > monthAgo).length
-
-    const usersByRole: Record<OrganizationRole, number> = {
-      owner: 0,
-      admin: 0,
-      manager: 0,
-      member: 0,
-      viewer: 0,
-    }
-
-    const deptCounts: Record<string, number> = {}
-
-    allUsers.forEach((user) => {
-      if (user.role && usersByRole[user.role] !== undefined) {
-        usersByRole[user.role]++
-      }
-      if (user.department_name) {
-        deptCounts[user.department_name] = (deptCounts[user.department_name] || 0) + 1
-      }
-    })
-
-    return {
-      total_users: allUsers.length,
-      active_users: securityStats.active_users,
-      new_users_this_month: newUsersThisMonth,
-      pending_invitations: invitations.count,
-      locked_accounts: securityStats.locked_accounts,
-      mfa_adoption_rate: securityStats.mfa_enabled_percentage,
-      total_departments: departments.length,
-      users_by_role: usersByRole,
-      users_by_department: Object.entries(deptCounts).map(([department, count]) => ({
-        department,
-        count,
-      })),
-      recent_activity: {
-        new_users: newUsersThisMonth,
-        deactivated: 0,
-        role_changes: 0,
-      },
-    }
-  }
+  const response = await apiClient.get<UserManagementStats>('/auth/stats/')
+  return response.data
 }
 
 // ============================================================================

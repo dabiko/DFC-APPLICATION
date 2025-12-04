@@ -114,7 +114,7 @@ export function DashboardSidebar({
     <aside
       className={cn(
         'h-full flex flex-col bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 transition-all duration-300',
-        isCollapsed ? 'w-16' : 'w-64'
+        isCollapsed ? 'w-16 overflow-hidden' : 'w-64'
       )}
     >
       {/* Logo and Toggle Button */}
@@ -172,7 +172,13 @@ export function DashboardSidebar({
       )}
 
       {/* Scrollable Content Area */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden">
+      <div
+        className={cn(
+          'flex-1 overflow-x-hidden',
+          // Only enable scrolling when expanded, hide overflow when collapsed
+          isCollapsed ? 'overflow-hidden' : 'overflow-y-auto'
+        )}
+      >
         {/* Navigation Links Section */}
         <div className={cn('py-2', isCollapsed ? '' : 'px-3')}>
           <div className="space-y-1">

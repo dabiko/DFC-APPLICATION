@@ -1,3 +1,5 @@
+// React is required for JSX even if not directly referenced
+
 import React from 'react'
 
 import './button.css'

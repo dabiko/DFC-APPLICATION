@@ -9,3 +9,4 @@ export { ShareDocumentModal, type ShareDocumentModalProps } from './ShareDocumen
 export { CreateShortcutModal, type CreateShortcutModalProps } from './CreateShortcutModal'
 export { RenameDocumentModal, type RenameDocumentModalProps } from './RenameDocumentModal'
 export { DeleteDocumentModal, type DeleteDocumentModalProps } from './DeleteDocumentModal'
+export { OrphanedDocumentModal, type OrphanedDocumentModalProps } from './OrphanedDocumentModal'
