@@ -280,61 +280,120 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
         # Check if MFA is enabled for this user
         if user.mfa_enabled:
-            # Don't issue full tokens yet - require MFA verification
-            # Generate a temporary MFA token that expires in 5 minutes
-            import jwt
-            from datetime import timedelta
-            from django.conf import settings
+            import logging
+            logger = logging.getLogger(__name__)
 
-            mfa_token_payload = {
-                'user_id': user.id,
-                'type': 'mfa_pending',
-                'exp': timezone.now() + timedelta(minutes=5),
-                'iat': timezone.now(),
-            }
+            # Check if this is a trusted device (bypass MFA)
+            device_fingerprint = self.context.get('request').data.get('device_fingerprint')
+            logger.info(f"[MFA] User {user.email} - MFA enabled, checking trusted device")
+            logger.info(f"[MFA] Device fingerprint received: {device_fingerprint}")
 
-            # Use Django's SECRET_KEY to sign the MFA token
-            mfa_token = jwt.encode(
-                {
+            if device_fingerprint:
+                from apps.users.mfa_models import TrustedDevice
+                import hashlib
+                device_id = hashlib.sha256(device_fingerprint.encode()).hexdigest()
+                logger.info(f"[MFA] Device ID (hashed): {device_id}")
+
+                # Check if any trusted devices exist for this user
+                trusted_devices = TrustedDevice.objects.filter(user=user, is_revoked=False)
+                logger.info(f"[MFA] User has {trusted_devices.count()} non-revoked trusted devices")
+                for td in trusted_devices:
+                    logger.info(f"[MFA] Trusted device: id={td.device_id}, expires={td.expires_at}, is_valid={td.is_valid}")
+
+                is_trusted = TrustedDevice.is_device_trusted(user, device_fingerprint)
+                logger.info(f"[MFA] is_device_trusted result: {is_trusted}")
+
+                if is_trusted:
+                    # Device is trusted - skip MFA verification
+                    # Record successful login and continue with normal token flow
+                    logger.info(f"[MFA] Device is trusted - skipping MFA for {user.email}")
+                    user.record_successful_login()
+
+                    # Generate tokens with mfa_verified claim
+                    from datetime import timedelta
+                    from rest_framework_simplejwt.tokens import RefreshToken
+
+                    refresh = RefreshToken.for_user(user)
+                    # Add mfa_verified claim to the token - required by MFAJWTAuthentication
+                    refresh['mfa_verified'] = True
+
+                    # If remember_me is True, extend token lifetime
+                    if remember_me:
+                        refresh.set_exp(lifetime=timedelta(days=30))
+
+                    data['refresh'] = str(refresh)
+                    data['access'] = str(refresh.access_token)
+
+                    # Add flag to indicate device was trusted (for frontend)
+                    data['device_trusted'] = True
+
+                    # Continue to add user data below (skip MFA requirement)
+                else:
+                    # Device not trusted - require MFA
+                    logger.info(f"[MFA] Device not trusted - requiring MFA for {user.email}")
+            else:
+                # No device fingerprint provided - require MFA
+                logger.info(f"[MFA] No device fingerprint provided - requiring MFA")
+
+            # If we didn't skip MFA above, require it
+            if not data.get('device_trusted'):
+                # Don't issue full tokens yet - require MFA verification
+                # Generate a temporary MFA token that expires in 5 minutes
+                import jwt
+                from datetime import timedelta
+                from django.conf import settings
+
+                mfa_token_payload = {
                     'user_id': user.id,
                     'type': 'mfa_pending',
-                    'exp': (timezone.now() + timedelta(minutes=5)).timestamp(),
-                    'iat': timezone.now().timestamp(),
-                },
-                settings.SECRET_KEY,
-                algorithm='HS256'
-            )
+                    'exp': timezone.now() + timedelta(minutes=5),
+                    'iat': timezone.now(),
+                }
 
-            # Return partial response requiring MFA
-            return {
-                'mfa_required': True,
-                'mfa_token': mfa_token,
-                'user': {
-                    'id': user.id,
-                    'email': user.email,
-                    'first_name': user.first_name,
-                    'last_name': user.last_name,
-                    'mfa_enabled': True,
-                },
-                'remember_me': remember_me,
-            }
+                # Use Django's SECRET_KEY to sign the MFA token
+                mfa_token = jwt.encode(
+                    {
+                        'user_id': user.id,
+                        'type': 'mfa_pending',
+                        'exp': (timezone.now() + timedelta(minutes=5)).timestamp(),
+                        'iat': timezone.now().timestamp(),
+                    },
+                    settings.SECRET_KEY,
+                    algorithm='HS256'
+                )
+
+                # Return partial response requiring MFA
+                return {
+                    'mfa_required': True,
+                    'mfa_token': mfa_token,
+                    'user': {
+                        'id': user.id,
+                        'email': user.email,
+                        'first_name': user.first_name,
+                        'last_name': user.last_name,
+                        'mfa_enabled': True,
+                    },
+                    'remember_me': remember_me,
+                }
 
         # No MFA required - record successful login and return full tokens
-        user.record_successful_login()
+        # (Skip if device_trusted is set - we already recorded login and generated tokens above)
+        if not data.get('device_trusted'):
+            user.record_successful_login()
 
-        # If remember_me is True, generate longer-lived refresh token
-        if remember_me:
-            from datetime import timedelta
-            from rest_framework_simplejwt.tokens import RefreshToken
+            # If remember_me is True, generate longer-lived refresh token
+            if remember_me:
+                from datetime import timedelta
+                from rest_framework_simplejwt.tokens import RefreshToken
 
-            # Create custom refresh token with extended lifetime
-            refresh = RefreshToken.for_user(user)
-            # Extend refresh token lifetime to 30 days for remember me
-            refresh.set_exp(lifetime=timedelta(days=30))
+                # Create custom refresh token with extended lifetime
+                refresh = RefreshToken.for_user(user)
+                # Extend refresh token lifetime to 30 days for remember me
+                refresh.set_exp(lifetime=timedelta(days=30))
 
-            # Update tokens in response
-            data['refresh'] = str(refresh)
-            data['access'] = str(refresh.access_token)
+                # Update tokens in response
+                data['refresh'] = str(refresh)
+                data['access'] = str(refresh.access_token)
 
         # Add custom claims including organization context
         data['user'] = {

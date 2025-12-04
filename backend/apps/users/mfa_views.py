@@ -349,9 +349,17 @@ class MFAVerifyView(APIView):
         refresh_token = str(refresh)
 
         # Handle trusted device if requested
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"[MFA Verify] trust_device={trust_device}, device_fingerprint={device_fingerprint}")
+
         if trust_device and device_fingerprint:
             try:
-                TrustedDevice.create_trusted_device(
+                import hashlib
+                device_id = hashlib.sha256(device_fingerprint.encode()).hexdigest()
+                logger.info(f"[MFA Verify] Creating trusted device for user {user.email}, device_id={device_id}")
+
+                trusted_device = TrustedDevice.create_trusted_device(
                     user=user,
                     device_fingerprint=device_fingerprint,
                     device_name=request.data.get('device_name', ''),
@@ -360,9 +368,12 @@ class MFAVerifyView(APIView):
                     ip_address=request.META.get('REMOTE_ADDR'),
                     trust_days=30
                 )
+                logger.info(f"[MFA Verify] Trusted device created: id={trusted_device.id}, device_id={trusted_device.device_id}, expires_at={trusted_device.expires_at}")
             except Exception as e:
                 # Don't fail the MFA verification if trust device fails
-                pass
+                logger.error(f"[MFA Verify] Failed to create trusted device: {str(e)}")
+                import traceback
+                logger.error(traceback.format_exc())
 
         # Log successful verification
         token_type = 'backup_code' if '-' in request.data.get('token', '') else 'totp'

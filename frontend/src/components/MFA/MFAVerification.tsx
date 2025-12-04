@@ -7,7 +7,7 @@ import {
   EnvelopeIcon,
 } from '@heroicons/react/24/outline'
 import type { MFAVerificationProps, MFAVerificationState } from '@/types/mfa'
-import { validateMFACode, validateBackupCode, generateDeviceFingerprint } from '@/types/mfa'
+import { validateMFACode, validateBackupCode } from '@/types/mfa'
 import { mfaService } from '@/services/mfaService'
 
 type VerificationMethod = 'totp' | 'sms' | 'email' | 'backup_code'
@@ -143,7 +143,9 @@ export const MFAVerification: React.FC<ExtendedMFAVerificationProps> = ({
             code: state.code,
             method: activeMethod,
             trustDevice: state.trustDevice,
-            deviceFingerprint: state.trustDevice ? generateDeviceFingerprint() : undefined,
+            deviceFingerprint: state.trustDevice
+              ? mfaService.generateDeviceFingerprint()
+              : undefined,
           })
         } else {
           setState({
@@ -160,7 +162,7 @@ export const MFAVerification: React.FC<ExtendedMFAVerificationProps> = ({
         code: state.code,
         method: useBackupCode ? 'backup_code' : state.method,
         trustDevice: state.trustDevice,
-        deviceFingerprint: state.trustDevice ? generateDeviceFingerprint() : undefined,
+        deviceFingerprint: state.trustDevice ? mfaService.generateDeviceFingerprint() : undefined,
       })
 
       if (!response.verified) {

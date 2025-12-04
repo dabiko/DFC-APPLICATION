@@ -57,6 +57,42 @@ export interface AuthError {
 
 class AuthService {
   /**
+   * Generate a device fingerprint for trusted device identification
+   * This MUST match the algorithm in mfaService.generateDeviceFingerprint()
+   */
+  private generateDeviceFingerprint(): string {
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    if (ctx) {
+      ctx.textBaseline = 'top'
+      ctx.font = '14px Arial'
+      ctx.fillText('DFC fingerprint', 2, 2)
+    }
+
+    const components = [
+      navigator.userAgent,
+      navigator.language,
+      screen.width + 'x' + screen.height,
+      screen.colorDepth,
+      new Date().getTimezoneOffset(),
+      !!window.sessionStorage,
+      !!window.localStorage,
+      navigator.hardwareConcurrency || 'unknown',
+      canvas.toDataURL(),
+    ]
+
+    // Simple hash function - MUST match mfaService
+    let hash = 0
+    const str = components.join('|')
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i)
+      hash = (hash << 5) - hash + char
+      hash = hash & hash
+    }
+    return Math.abs(hash).toString(36)
+  }
+
+  /**
    * Login user with email/username and password
    * @param email - Can be either email address or username
    * @param password - User's password
@@ -67,6 +103,9 @@ class AuthService {
     password: string,
     rememberMe: boolean = false
   ): Promise<LoginResponse> {
+    // Generate device fingerprint to check for trusted devices
+    const deviceFingerprint = this.generateDeviceFingerprint()
+
     const response = await fetch(`${API_BASE_URL}/api/v1/auth/login/`, {
       method: 'POST',
       headers: {
@@ -76,6 +115,7 @@ class AuthService {
         username: email, // Backend expects 'username' field (accepts both email and username)
         password: password,
         remember_me: rememberMe, // Send remember_me flag for extended token lifetime
+        device_fingerprint: deviceFingerprint, // Send device fingerprint for trusted device check
       }),
     })
 

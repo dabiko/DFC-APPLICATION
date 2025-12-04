@@ -249,7 +249,12 @@ class MFAService {
    */
   async verify(data: MFAVerifyRequest): Promise<MFAVerifyResponse> {
     try {
+      console.log('[MFA Service] Verify request data:', {
+        ...data,
+        token: data.token ? '******' : undefined, // Hide token in logs
+      })
       const response = await api.post(`${this.baseUrl}/verify/`, data)
+      console.log('[MFA Service] Verify response:', response.data)
       return response.data
     } catch (error: any) {
       // Handle 400 errors with specific error messages from backend
