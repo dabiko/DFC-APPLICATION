@@ -264,5 +264,147 @@ export const handlers = [
     })
   }),
 
+  // Billing endpoints
+  http.get('/api/v1/billing/subscription/', () => {
+    return HttpResponse.json({
+      id: 'sub_123',
+      userId: 'user_123',
+      planId: 'professional',
+      plan: {
+        id: 'professional',
+        name: 'Professional',
+        price: 29.99,
+        billingCycle: 'monthly',
+        features: ['50 users', '1TB storage', 'Priority support'],
+      },
+      status: 'active',
+      billingCycle: 'monthly',
+      currentPeriodStart: '2025-11-01T00:00:00Z',
+      currentPeriodEnd: '2025-12-01T00:00:00Z',
+      cancelAtPeriodEnd: false,
+      autoRenew: true,
+      usage: {
+        users: { current: 18, limit: 50 },
+        storage: { currentGB: 425, limitGB: 1000, percentage: 42.5 },
+        documents: { current: 8500, limit: 100000, percentage: 8.5 },
+        folders: { current: 342, limit: 1000 },
+        apiCalls: { currentMonth: 75000, limit: 1000000, percentage: 7.5 },
+      },
+      createdAt: '2025-01-15T00:00:00Z',
+      updatedAt: '2025-11-01T00:00:00Z',
+    })
+  }),
+
+  http.get('/api/v1/billing/plans/', () => {
+    return HttpResponse.json([
+      {
+        id: 'starter',
+        name: 'Starter',
+        price: 9.99,
+        billingCycle: 'monthly',
+        features: ['5 users', '10GB storage'],
+      },
+      {
+        id: 'professional',
+        name: 'Professional',
+        price: 29.99,
+        billingCycle: 'monthly',
+        features: ['50 users', '1TB storage'],
+      },
+      {
+        id: 'enterprise',
+        name: 'Enterprise',
+        price: 99.99,
+        billingCycle: 'monthly',
+        features: ['Unlimited users', '10TB storage'],
+      },
+    ])
+  }),
+
+  http.get('/api/v1/billing/payment-methods/', () => {
+    return HttpResponse.json([
+      {
+        id: 'pm_1',
+        type: 'card',
+        isDefault: true,
+        card: {
+          brand: 'visa',
+          last4: '4242',
+          expiryMonth: 12,
+          expiryYear: 2026,
+          holderName: 'Admin User',
+        },
+        createdAt: '2025-01-15T00:00:00Z',
+      },
+    ])
+  }),
+
+  http.get('/api/v1/billing/invoices/', () => {
+    return HttpResponse.json({
+      results: [
+        {
+          id: 'inv_1',
+          invoiceNumber: 'INV-2025-11-001',
+          status: 'paid',
+          amount: 29.99,
+          currency: 'USD',
+          description: 'Professional Plan - November 2025',
+          dueDate: '2025-11-01T00:00:00Z',
+          paidAt: '2025-11-01T00:00:00Z',
+          createdAt: '2025-11-01T00:00:00Z',
+        },
+      ],
+      count: 1,
+    })
+  }),
+
+  http.get('/api/v1/billing/usage/', () => {
+    return HttpResponse.json({
+      users: { current: 18, limit: 50 },
+      storage: { currentGB: 425, limitGB: 1000, percentage: 42.5 },
+      documents: { current: 8500, limit: 100000, percentage: 8.5 },
+    })
+  }),
+
+  http.get('/api/v1/billing/usage/alerts/', () => {
+    return HttpResponse.json([])
+  }),
+
+  // Document stats endpoints
+  http.get('/api/v1/documents/my-documents/stats/', () => {
+    return HttpResponse.json({ count: 150, size: 1024000000 })
+  }),
+
+  http.get('/api/v1/shared-with-me/stats/', () => {
+    return HttpResponse.json({ count: 25, size: 256000000 })
+  }),
+
+  http.get('/api/v1/documents/recent/stats/', () => {
+    return HttpResponse.json({ count: 10 })
+  }),
+
+  http.get('/api/v1/folders/trash/', () => {
+    return HttpResponse.json({ count: 5, folders: [], documents: [] })
+  }),
+
+  // Department navigation
+  http.get('/api/v1/departments/navigation/', () => {
+    return HttpResponse.json([
+      {
+        department: { id: 1, name: 'IT', code: 'IT' },
+        accessType: 'own',
+        folderCount: 10,
+      },
+    ])
+  }),
+
+  // Folders endpoint
+  http.get('/api/v1/folders/', () => {
+    return HttpResponse.json({
+      results: [],
+      count: 0,
+    })
+  }),
+
   // Add more handlers as needed for your API endpoints
 ]

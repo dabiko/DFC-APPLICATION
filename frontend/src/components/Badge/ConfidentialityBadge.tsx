@@ -69,6 +69,15 @@ const levelConfig: Record<
  * <ConfidentialityBadge level="confidential" dotOnly />
  * ```
  */
+/**
+ * Get the color classes for a confidentiality level
+ */
+export function getConfidentialityColor(level: ConfidentialityLevel | string): string {
+  const normalizedLevel = (level?.replace(/_/g, '-') || 'internal') as ConfidentialityLevel
+  const config = levelConfig[normalizedLevel] || levelConfig['internal']
+  return config.color
+}
+
 export function ConfidentialityBadge({
   level,
   showIcon = false,

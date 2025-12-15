@@ -14,6 +14,7 @@ const config = {
     name: '@storybook/react-vite',
     options: {},
   },
+  staticDirs: ['../public'], // Serve mockServiceWorker.js from public folder
   async viteFinal(config) {
     return mergeConfig(config, {
       // Ensure the same Vite plugins are used as in vite.config.ts

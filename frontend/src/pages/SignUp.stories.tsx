@@ -3,7 +3,6 @@
  */
 
 import type { Meta, StoryObj } from '@storybook/react'
-import { BrowserRouter } from 'react-router-dom'
 import { SignUp } from './SignUp'
 
 const meta: Meta<typeof SignUp> = {
@@ -18,13 +17,6 @@ const meta: Meta<typeof SignUp> = {
       },
     },
   },
-  decorators: [
-    (Story) => (
-      <BrowserRouter>
-        <Story />
-      </BrowserRouter>
-    ),
-  ],
   tags: ['autodocs'],
 }
 
