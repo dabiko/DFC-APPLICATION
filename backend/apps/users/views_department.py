@@ -151,17 +151,56 @@ class DepartmentViewSet(viewsets.ModelViewSet):
         description="Create a new department (admin only)"
     )
     def create(self, request, *args, **kwargs):
+        # Validate user has an organization
+        if not request.user.organization:
+            return Response(
+                {'detail': 'User must belong to an organization to create departments'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        department = serializer.save(organization=request.user.organization)
 
-        # Create default settings
-        DepartmentSettings.objects.create(department=department)
+        try:
+            # Check for duplicate name within organization
+            name = serializer.validated_data.get('name', '')
+            code = serializer.validated_data.get('code', '')
 
-        return Response(
-            DepartmentDetailSerializer(department).data,
-            status=status.HTTP_201_CREATED
-        )
+            if Department.objects.filter(
+                organization=request.user.organization,
+                name__iexact=name
+            ).exists():
+                return Response(
+                    {'name': ['A department with this name already exists in your organization']},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            if Department.objects.filter(
+                organization=request.user.organization,
+                code__iexact=code
+            ).exists():
+                return Response(
+                    {'code': ['A department with this code already exists in your organization']},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            department = serializer.save(organization=request.user.organization)
+
+            # Create default settings
+            DepartmentSettings.objects.create(department=department)
+
+            return Response(
+                DepartmentDetailSerializer(department).data,
+                status=status.HTTP_201_CREATED
+            )
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.exception('Error creating department')
+            return Response(
+                {'detail': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @extend_schema(
         summary="Get department navigation",

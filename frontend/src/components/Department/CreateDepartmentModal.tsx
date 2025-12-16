@@ -8,6 +8,7 @@ import { X, Building2, Loader2 } from 'lucide-react'
 import { useAppDispatch } from '@/store'
 import departmentService from '@/services/departmentService'
 import { fetchNavigation } from '@/store/slices/departmentSlice'
+import { toast } from '@/utils/toast'
 import type { CreateDepartmentData } from '@/types/department'
 import { cn } from '@/utils/cn'
 
@@ -90,6 +91,7 @@ export function CreateDepartmentModal({ isOpen, onClose, onSuccess }: CreateDepa
       setError(null)
 
       try {
+        const departmentName = formData.name
         await departmentService.createDepartment(formData)
         // Refresh navigation to show new department
         dispatch(fetchNavigation())
@@ -100,14 +102,38 @@ export function CreateDepartmentModal({ isOpen, onClose, onSuccess }: CreateDepa
           description: '',
           storageQuotaGb: 100,
         })
+        toast.success(`Department "${departmentName}" created successfully`)
         onSuccess?.()
         onClose()
       } catch (err: any) {
-        const errorMessage =
-          err.response?.data?.message ||
-          err.response?.data?.detail ||
-          err.message ||
-          'Failed to create department'
+        // Parse error message - handle Django REST Framework validation errors
+        let errorMessage = 'Failed to create department'
+
+        if (err.response?.data) {
+          const data = err.response.data
+
+          // Handle field-level validation errors: {"name": ["error message"]}
+          if (typeof data === 'object' && !data.message && !data.detail) {
+            const fieldErrors: string[] = []
+            for (const [, messages] of Object.entries(data)) {
+              if (Array.isArray(messages)) {
+                fieldErrors.push(...messages.map((msg) => String(msg)))
+              } else if (typeof messages === 'string') {
+                fieldErrors.push(messages)
+              }
+            }
+            if (fieldErrors.length > 0) {
+              errorMessage = fieldErrors.join('. ')
+            }
+          } else if (data.message) {
+            errorMessage = data.message
+          } else if (data.detail) {
+            errorMessage = data.detail
+          }
+        } else if (err.message) {
+          errorMessage = err.message
+        }
+
         setError(errorMessage)
       } finally {
         setLoading(false)
