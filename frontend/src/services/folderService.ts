@@ -82,15 +82,27 @@ export const folderService = {
       highly_confidential: 'HIGHLY_CONFIDENTIAL',
     }
 
-    const response = await api.post<any>('/folders/', {
+    // Build the request payload
+    const payload: Record<string, any> = {
       name: data.name,
       parent: data.parentId, // Backend expects 'parent' not 'parent_id'
       confidentiality_level: data.confidentiality
         ? confidentialityMapping[data.confidentiality]
         : 'INTERNAL',
-      template_id: data.templateId,
       description: data.description || '',
-    })
+    }
+
+    // Add department if provided (required for root folders)
+    if (data.department !== undefined && data.department !== null) {
+      payload.department = data.department
+    }
+
+    // Add template_id if provided
+    if (data.templateId) {
+      payload.template_id = data.templateId
+    }
+
+    const response = await api.post<any>('/folders/', payload)
     return transformFolderFromBackend(response.data)
   },
 
@@ -309,12 +321,31 @@ export const folderService = {
 
 /**
  * Error handler helper
+ * Handles various error formats including Django REST Framework validation errors
  */
 export const handleFolderError = (error: any): string => {
   if (axios.isAxiosError(error)) {
     if (error.response) {
       // Server responded with error
       const data = error.response.data
+
+      // Handle Django REST Framework validation errors
+      // Format: {"field_name": ["error message 1", "error message 2"]}
+      if (typeof data === 'object' && !data.message && !data.detail) {
+        const fieldErrors: string[] = []
+        for (const [field, messages] of Object.entries(data)) {
+          if (Array.isArray(messages)) {
+            // Join multiple messages for the same field
+            fieldErrors.push(...messages.map((msg) => String(msg)))
+          } else if (typeof messages === 'string') {
+            fieldErrors.push(messages)
+          }
+        }
+        if (fieldErrors.length > 0) {
+          return fieldErrors.join('. ')
+        }
+      }
+
       if (typeof data === 'object' && data.message) {
         return data.message
       }

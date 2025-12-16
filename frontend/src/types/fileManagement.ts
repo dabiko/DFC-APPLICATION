@@ -71,6 +71,7 @@ export interface FileListItem {
   // Folder-specific properties (only if type === 'folder')
   itemCount?: number
   hasSubfolders?: boolean
+  departmentId?: number | string | null
 
   // Common properties
   parentFolderId?: string

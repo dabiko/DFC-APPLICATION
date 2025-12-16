@@ -109,6 +109,7 @@ export const CreateFolderModal: FC<CreateFolderModalProps> = ({
         parentId: parentFolder?.id || null,
         confidentiality,
         templateId: selectedTemplate?.id,
+        department: departmentId,
       })
       onClose()
     } catch (err) {

@@ -109,6 +109,8 @@ export interface CreateFolderData {
   confidentiality?: ConfidentialityLevel
   templateId?: string
   description?: string
+  /** Department ID - required for root folders, optional for subfolders (inherited from parent) */
+  department?: number | string
 }
 
 /**

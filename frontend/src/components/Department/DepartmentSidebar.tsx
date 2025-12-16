@@ -40,11 +40,27 @@ import {
   selectSelectedFolder,
   selectFolder,
   createFolder,
+  renameFolder,
+  moveFolder,
+  deleteFolder,
 } from '@/store/slices/folderSlice'
 import { FolderTree } from '@/components/Folder/FolderTree'
 import { CreateFolderModal } from '@/components/Folder/CreateFolderModal'
+import { RenameFolderModal } from '@/components/Folder/RenameFolderModal'
+import { MoveFolderModal } from '@/components/Folder/MoveFolderModal'
+import { DeleteFolderModal } from '@/components/Folder/DeleteFolderModal'
+import { FolderPropertiesModal } from '@/components/Folder/FolderPropertiesModal'
+import { ShareFolderModal, type FolderShareData } from '@/components/Folder/ShareFolderModal'
+import folderService from '@/services/folderService'
+import { toggleFolderFavorite } from '@/services/favoritesService'
+import { toast } from '@/utils/toast'
 import type { DepartmentNavigationItem } from '@/types/department'
-import type { Folder, FolderOperation, CreateFolderData } from '@/types/folder'
+import type {
+  Folder,
+  FolderOperation,
+  CreateFolderData,
+  ConfidentialityLevel,
+} from '@/types/folder'
 import { cn } from '@/utils/cn'
 
 interface DepartmentSidebarProps {
@@ -82,6 +98,12 @@ export function DepartmentSidebar({
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [createParentFolder, setCreateParentFolder] = useState<Folder | null>(null)
   const [showContextMenu, setShowContextMenu] = useState(false)
+
+  // Folder operation state
+  const [operationFolder, setOperationFolder] = useState<Folder | null>(null)
+  const [activeOperation, setActiveOperation] = useState<FolderOperation | null>(null)
+  const [folderToShare, setFolderToShare] = useState<Folder | null>(null)
+  const [favoriteFolderIds, setFavoriteFolderIds] = useState<Set<string>>(new Set())
 
   // Department context menu state
   const [deptContextMenu, setDeptContextMenu] = useState<{
@@ -217,13 +239,89 @@ export function DepartmentSidebar({
   )
 
   // Handle folder operations
-  const handleFolderOperation = useCallback((operation: FolderOperation, folder: Folder) => {
-    if (operation === 'create') {
-      setCreateParentFolder(folder)
-      setCreateModalOpen(true)
-    }
-    // Other operations handled by parent component
-  }, [])
+  const handleFolderOperation = useCallback(
+    async (operation: FolderOperation, folder: Folder) => {
+      switch (operation) {
+        case 'create':
+          setCreateParentFolder(folder)
+          setCreateModalOpen(true)
+          break
+
+        case 'rename':
+          setOperationFolder(folder)
+          setActiveOperation('rename')
+          break
+
+        case 'move':
+          setOperationFolder(folder)
+          setActiveOperation('move')
+          break
+
+        case 'delete':
+          setOperationFolder(folder)
+          setActiveOperation('delete')
+          break
+
+        case 'properties':
+          setOperationFolder(folder)
+          setActiveOperation('properties')
+          break
+
+        case 'share':
+          setFolderToShare(folder)
+          break
+
+        case 'lock':
+          try {
+            await folderService.lockFolder(folder.id)
+            await dispatch(fetchFolders({ filters: { parentId: undefined } })).unwrap()
+            toast.success(`Folder "${folder.name}" has been locked`)
+          } catch (error) {
+            console.error('Failed to lock folder:', error)
+            toast.error('Failed to lock folder. Please try again.')
+          }
+          break
+
+        case 'unlock':
+          try {
+            await folderService.unlockFolder(folder.id)
+            await dispatch(fetchFolders({ filters: { parentId: undefined } })).unwrap()
+            toast.success(`Folder "${folder.name}" has been unlocked`)
+          } catch (error) {
+            console.error('Failed to unlock folder:', error)
+            toast.error('Failed to unlock folder. Please try again.')
+          }
+          break
+
+        case 'favorite':
+          try {
+            const result = await toggleFolderFavorite(folder.id)
+            setFavoriteFolderIds((prev) => {
+              const newSet = new Set(prev)
+              if (result.is_favorite) {
+                newSet.add(folder.id)
+              } else {
+                newSet.delete(folder.id)
+              }
+              return newSet
+            })
+            if (result.is_favorite) {
+              toast.success(`Added "${folder.name}" to favorites`)
+            } else {
+              toast.success(`Removed "${folder.name}" from favorites`)
+            }
+          } catch (error) {
+            console.error('Failed to toggle folder favorite:', error)
+            toast.error('Failed to update favorites. Please try again.')
+          }
+          break
+
+        default:
+          console.warn('Unhandled folder operation:', operation)
+      }
+    },
+    [dispatch]
+  )
 
   // Handle create folder
   const handleCreateFolder = useCallback(
@@ -232,12 +330,90 @@ export function DepartmentSidebar({
         await dispatch(createFolder(data)).unwrap()
         setCreateModalOpen(false)
         setCreateParentFolder(null)
-      } catch (err) {
+
+        // Refresh folders to ensure all data is properly loaded
+        // This ensures departmentId and other properties are correctly set
+        try {
+          await dispatch(fetchFolders({ filters: { parentId: undefined } })).unwrap()
+        } catch (refreshError) {
+          console.error('Failed to refresh folders:', refreshError)
+        }
+      } catch (err: any) {
         console.error('Failed to create folder:', err)
+        // Re-throw error so the modal can display the proper error message
+        throw new Error(typeof err === 'string' ? err : err?.message || 'Failed to create folder')
       }
     },
     [dispatch]
   )
+
+  // Handle rename folder
+  const handleRenameFolder = useCallback(
+    async (folderId: string, newName: string, confidentiality?: ConfidentialityLevel) => {
+      try {
+        await dispatch(renameFolder({ folderId, newName, confidentiality })).unwrap()
+        setActiveOperation(null)
+        setOperationFolder(null)
+        toast.success('Folder updated successfully')
+        // Refresh folders
+        await dispatch(fetchFolders({ filters: { parentId: undefined } })).unwrap()
+      } catch (error) {
+        console.error('Failed to update folder:', error)
+        toast.error('Failed to update folder. Please try again.')
+      }
+    },
+    [dispatch]
+  )
+
+  // Handle move folder
+  const handleMoveFolder = useCallback(
+    async (targetFolderId: string | null) => {
+      if (!operationFolder) return
+      const folderName = operationFolder.name
+      try {
+        await dispatch(
+          moveFolder({ folderId: operationFolder.id, newParentId: targetFolderId })
+        ).unwrap()
+        setActiveOperation(null)
+        setOperationFolder(null)
+        toast.success(`Folder "${folderName}" moved successfully`)
+        // Refresh folders
+        await dispatch(fetchFolders({ filters: { parentId: undefined } })).unwrap()
+      } catch (error) {
+        console.error('Failed to move folder:', error)
+        toast.error(`Failed to move folder "${folderName}". Please try again.`)
+      }
+    },
+    [dispatch, operationFolder]
+  )
+
+  // Handle delete folder
+  const handleDeleteFolder = useCallback(
+    async (folderId: string, force?: boolean) => {
+      if (!folderId) return
+      const folderName = operationFolder?.name || 'folder'
+      try {
+        await dispatch(deleteFolder({ folderId, force: force || false })).unwrap()
+        setActiveOperation(null)
+        setOperationFolder(null)
+        toast.success(`Folder "${folderName}" moved to trash`)
+        // Refresh folders
+        await dispatch(fetchFolders({ filters: { parentId: undefined } })).unwrap()
+      } catch (error) {
+        console.error('Failed to delete folder:', error)
+        toast.error(`Failed to delete folder "${folderName}". Please try again.`)
+      }
+    },
+    [dispatch, operationFolder]
+  )
+
+  // Handle share folder
+  const handleShareFolder = useCallback(async (shareData: FolderShareData) => {
+    // TODO: Implement folder share API call when backend supports it
+    console.log('Share folder data:', shareData)
+    setFolderToShare(null)
+    toast.info('Folder sharing configured! (Backend integration pending)')
+  }, [])
 
   // Handle refresh
   const handleRefresh = useCallback(() => {
@@ -494,6 +670,7 @@ export function DepartmentSidebar({
           </button>
         ))}
 
+        {/* Create Folder Modal */}
         <CreateFolderModal
           isOpen={createModalOpen}
           parentFolder={createParentFolder}
@@ -502,6 +679,58 @@ export function DepartmentSidebar({
             setCreateParentFolder(null)
           }}
           onCreate={handleCreateFolder}
+        />
+
+        {/* Rename Folder Modal */}
+        <RenameFolderModal
+          isOpen={activeOperation === 'rename'}
+          folder={operationFolder}
+          onClose={() => {
+            setActiveOperation(null)
+            setOperationFolder(null)
+          }}
+          onRename={handleRenameFolder}
+        />
+
+        {/* Move Folder Modal */}
+        <MoveFolderModal
+          isOpen={activeOperation === 'move'}
+          folder={operationFolder}
+          folders={folders}
+          onClose={() => {
+            setActiveOperation(null)
+            setOperationFolder(null)
+          }}
+          onMove={handleMoveFolder}
+        />
+
+        {/* Delete Folder Modal */}
+        <DeleteFolderModal
+          isOpen={activeOperation === 'delete'}
+          folder={operationFolder}
+          onClose={() => {
+            setActiveOperation(null)
+            setOperationFolder(null)
+          }}
+          onDelete={handleDeleteFolder}
+        />
+
+        {/* Folder Properties Modal */}
+        <FolderPropertiesModal
+          isOpen={activeOperation === 'properties'}
+          folder={operationFolder}
+          onClose={() => {
+            setActiveOperation(null)
+            setOperationFolder(null)
+          }}
+        />
+
+        {/* Share Folder Modal */}
+        <ShareFolderModal
+          isOpen={!!folderToShare}
+          folder={folderToShare}
+          onClose={() => setFolderToShare(null)}
+          onShareCreated={handleShareFolder}
         />
       </div>
     )
@@ -870,6 +1099,58 @@ export function DepartmentSidebar({
           setCreateParentFolder(null)
         }}
         onCreate={handleCreateFolder}
+      />
+
+      {/* Rename Folder Modal */}
+      <RenameFolderModal
+        isOpen={activeOperation === 'rename'}
+        folder={operationFolder}
+        onClose={() => {
+          setActiveOperation(null)
+          setOperationFolder(null)
+        }}
+        onRename={handleRenameFolder}
+      />
+
+      {/* Move Folder Modal */}
+      <MoveFolderModal
+        isOpen={activeOperation === 'move'}
+        folder={operationFolder}
+        folders={folders}
+        onClose={() => {
+          setActiveOperation(null)
+          setOperationFolder(null)
+        }}
+        onMove={handleMoveFolder}
+      />
+
+      {/* Delete Folder Modal */}
+      <DeleteFolderModal
+        isOpen={activeOperation === 'delete'}
+        folder={operationFolder}
+        onClose={() => {
+          setActiveOperation(null)
+          setOperationFolder(null)
+        }}
+        onDelete={handleDeleteFolder}
+      />
+
+      {/* Folder Properties Modal */}
+      <FolderPropertiesModal
+        isOpen={activeOperation === 'properties'}
+        folder={operationFolder}
+        onClose={() => {
+          setActiveOperation(null)
+          setOperationFolder(null)
+        }}
+      />
+
+      {/* Share Folder Modal */}
+      <ShareFolderModal
+        isOpen={!!folderToShare}
+        folder={folderToShare}
+        onClose={() => setFolderToShare(null)}
+        onShareCreated={handleShareFolder}
       />
     </div>
   )

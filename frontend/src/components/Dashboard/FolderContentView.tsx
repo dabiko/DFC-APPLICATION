@@ -357,6 +357,7 @@ export const FolderContentView: FC = () => {
       type: 'folder' as const,
       itemCount: (folder.childrenCount || 0) + (folder.documentCount || 0),
       hasSubfolders: (folder.childrenCount || 0) > 0,
+      departmentId: folder.departmentId,
       path: folder.path,
       createdBy: folder.createdBy,
       createdAt: folder.createdAt,
@@ -1035,9 +1036,9 @@ export const FolderContentView: FC = () => {
   // Folder operations handlers
   const handleCreateFolder = useCallback(
     async (data: any) => {
+      // Use operationFolder as parent if creating from context menu, otherwise use current folder
+      const parentId = operationFolder?.id || folderId || null
       try {
-        // Use operationFolder as parent if creating from context menu, otherwise use current folder
-        const parentId = operationFolder?.id || folderId || null
         await dispatch(
           createFolder({
             ...data,
@@ -1048,14 +1049,23 @@ export const FolderContentView: FC = () => {
         setOperationFolder(null)
         toast.success(`Folder "${data.name}" created successfully`)
 
-        // Show loading state briefly to refresh the view
+        // Refresh folders to ensure all data is properly loaded
+        // This ensures departmentId and other properties are correctly set
         setIsNavigating(true)
-        setTimeout(() => {
+        try {
+          await dispatch(fetchFolders({})).unwrap()
+        } catch (refreshError) {
+          console.error('Failed to refresh folders:', refreshError)
+        } finally {
           setIsNavigating(false)
-        }, 300)
-      } catch (error) {
+        }
+      } catch (error: any) {
         console.error('Failed to create folder:', error)
-        toast.error('Failed to create folder. Please try again.')
+        // Re-throw error so the modal can display the proper error message
+        // The error message is already formatted by handleFolderError in the slice
+        throw new Error(
+          typeof error === 'string' ? error : error?.message || 'Failed to create folder'
+        )
       }
     },
     [dispatch, folderId, operationFolder]
