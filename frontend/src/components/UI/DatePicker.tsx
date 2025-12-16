@@ -208,13 +208,21 @@ export function DatePicker({
           {value ? formatDisplayDate(value) : placeholder}
         </span>
         {value && (
-          <button
-            type="button"
+          <span
+            role="button"
+            tabIndex={0}
             onClick={clearDate}
-            className="p-0.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                clearDate(e as unknown as React.MouseEvent)
+              }
+            }}
+            className="p-0.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors cursor-pointer"
+            aria-label="Clear date"
           >
             <X className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
-          </button>
+          </span>
         )}
       </button>
 

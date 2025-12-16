@@ -295,6 +295,7 @@ export interface SearchResultsListProps {
   onSelectionChange?: (selectedIds: Set<string>) => void
   onResultClick?: (result: SearchResult) => void
   onResultPreview?: (result: SearchResult) => void
+  onResultDownload?: (result: SearchResult) => void
   isLoading?: boolean
   emptyState?: React.ReactNode
   className?: string

@@ -71,7 +71,7 @@ export const SearchResultCard: FC<SearchResultCardProps> = ({
   }
 
   const renderHighlight = () => {
-    if (!showHighlights || highlights.length === 0) return null
+    if (!showHighlights || !highlights || highlights.length === 0) return null
 
     const primaryHighlight = highlights[0]
     return (

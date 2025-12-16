@@ -15,6 +15,7 @@ export const SearchResultsList: FC<SearchResultsListProps> = ({
   onSelectionChange,
   onResultClick,
   onResultPreview,
+  onResultDownload,
   isLoading = false,
   emptyState,
   className,
@@ -52,9 +53,9 @@ export const SearchResultsList: FC<SearchResultsListProps> = ({
   }
 
   const handleResultDownload = (result: SearchResult) => {
-    // Download logic would go here
-    // TODO: Implement download functionality
-    void result.documentId
+    if (onResultDownload) {
+      onResultDownload(result)
+    }
   }
 
   // Loading state
@@ -70,7 +71,7 @@ export const SearchResultsList: FC<SearchResultsListProps> = ({
   }
 
   // Empty state
-  if (results.length === 0) {
+  if (!results || results.length === 0) {
     return (
       <div className={cn('flex items-center justify-center min-h-[400px]', className)}>
         {emptyState || (

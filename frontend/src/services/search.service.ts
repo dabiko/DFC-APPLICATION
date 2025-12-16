@@ -110,11 +110,58 @@ const MOCK_SEARCH_RESULTS: SearchResult[] = [
 ]
 
 /**
+ * Convert backend confidentiality level to frontend format
+ */
+const transformConfidentialityLevel = (level: string): string => {
+  const mapping: Record<string, string> = {
+    PUBLIC: 'Public',
+    INTERNAL: 'Internal',
+    CONFIDENTIAL: 'Confidential',
+    HIGHLY_CONFIDENTIAL: 'Highly Confidential',
+  }
+  return mapping[level?.toUpperCase()] || level || 'Internal'
+}
+
+/**
+ * Transform backend search result to frontend format
+ */
+const transformSearchResult = (backendResult: any): SearchResult => {
+  return {
+    id: String(backendResult.id),
+    documentId: String(backendResult.id),
+    fileName: backendResult.file_name || backendResult.title || 'Untitled',
+    filePath: backendResult.folder_path || `/${backendResult.department_name || 'Documents'}`,
+    fileSize: (backendResult.file_size_mb || 0) * 1024 * 1024, // Convert MB to bytes
+    mimeType: backendResult.file_type || 'application/octet-stream',
+    extension: backendResult.file_name?.split('.').pop() || backendResult.file_type || '',
+    score: backendResult.score || 100,
+    highlights: backendResult.highlights || [],
+    thumbnailUrl: backendResult.thumbnail_url,
+    createdAt: backendResult.created_at || new Date().toISOString(),
+    modifiedAt: backendResult.updated_at || backendResult.created_at || new Date().toISOString(),
+    createdBy: backendResult.owner_name || 'Unknown',
+    modifiedBy: backendResult.owner_name || 'Unknown',
+    confidentialityLevel: transformConfidentialityLevel(backendResult.confidentiality_level),
+    isShared: backendResult.is_shared || false,
+    isLocked: backendResult.is_locked || false,
+    hasVersions: (backendResult.version_number || 1) > 1,
+    currentVersion: backendResult.version_number || 1,
+    permissions: backendResult.permissions || {
+      canView: true,
+      canEdit: false,
+      canDelete: false,
+      canDownload: true,
+      canShare: false,
+    },
+  }
+}
+
+/**
  * Perform a search with filters
  */
 export const search = async (query: SearchQuery): Promise<SearchResponse> => {
   try {
-    const response = await apiClient.post<SearchResponse>('/search/', {
+    const response = await apiClient.post<any>('/search/', {
       query: query.query,
       mode: query.mode,
       scope: query.scope,
@@ -126,7 +173,22 @@ export const search = async (query: SearchQuery): Promise<SearchResponse> => {
       page: query.page || 1,
       page_size: query.pageSize || 20,
     })
-    return response.data
+
+    // Transform backend response to frontend format
+    const backendData = response.data
+    const transformedResults = (backendData.results || []).map(transformSearchResult)
+
+    return {
+      query: query,
+      results: transformedResults,
+      totalResults: backendData.count || backendData.total_results || 0,
+      totalPages: backendData.total_pages || 1,
+      currentPage: backendData.page || 1,
+      pageSize: backendData.page_size || 20,
+      executionTime: backendData.took_ms || 0,
+      facets: backendData.facets || {},
+      suggestions: backendData.suggestions,
+    }
   } catch (error) {
     console.error('Search error:', error)
     throw error

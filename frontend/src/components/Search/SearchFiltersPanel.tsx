@@ -8,6 +8,7 @@ import { ChevronDownIcon, ChevronUpIcon, XMarkIcon } from '@heroicons/react/24/o
 import { cn } from '@utils/cn'
 import type { SearchFiltersPanelProps, SearchFilters, FacetCount } from '@/types/search'
 import { FILE_SIZE_RANGES, DATE_RANGE_PRESETS } from '@/types/search'
+import { DatePicker } from '@/components/UI/DatePicker'
 
 export const SearchFiltersPanel: FC<SearchFiltersPanelProps> = ({
   filters,
@@ -197,48 +198,93 @@ export const SearchFiltersPanel: FC<SearchFiltersPanelProps> = ({
           'Date Modified',
           'dateRange',
           <>
-            {DATE_RANGE_PRESETS.map((preset) => (
-              <button
-                key={preset.label}
-                onClick={() => {
-                  const from = new Date()
-                  from.setDate(from.getDate() - preset.days)
-                  handleFilterChange('modifiedDateRange', {
-                    from: from.toISOString().split('T')[0],
-                    to: new Date().toISOString().split('T')[0],
-                  })
-                }}
-                className="w-full text-left text-sm text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 py-1"
-              >
-                {preset.label}
-              </button>
-            ))}
-            <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-              <div className="space-y-2">
-                <input
-                  type="date"
-                  value={filters.modifiedDateRange?.from || ''}
-                  onChange={(e) =>
-                    handleFilterChange('modifiedDateRange', {
-                      ...filters.modifiedDateRange,
-                      from: e.target.value,
-                    })
-                  }
-                  className="w-full text-sm rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"
-                  placeholder="From"
-                />
-                <input
-                  type="date"
-                  value={filters.modifiedDateRange?.to || ''}
-                  onChange={(e) =>
-                    handleFilterChange('modifiedDateRange', {
-                      ...filters.modifiedDateRange,
-                      to: e.target.value,
-                    })
-                  }
-                  className="w-full text-sm rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"
-                  placeholder="To"
-                />
+            {/* Quick Date Presets */}
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {DATE_RANGE_PRESETS.map((preset) => {
+                const isActive = (() => {
+                  if (!filters.modifiedDateRange?.from) return false
+                  const fromDate = new Date(filters.modifiedDateRange.from)
+                  const expectedFrom = new Date()
+                  expectedFrom.setDate(expectedFrom.getDate() - preset.days)
+                  // Check if dates are within 1 day of each other (to account for time differences)
+                  return Math.abs(fromDate.getTime() - expectedFrom.getTime()) < 86400000
+                })()
+
+                return (
+                  <button
+                    key={preset.label}
+                    onClick={() => {
+                      const from = new Date()
+                      from.setDate(from.getDate() - preset.days)
+                      handleFilterChange('modifiedDateRange', {
+                        from: from.toISOString().split('T')[0],
+                        to: new Date().toISOString().split('T')[0],
+                      })
+                    }}
+                    className={cn(
+                      'px-2.5 py-1 text-xs font-medium rounded-full transition-all duration-200',
+                      isActive
+                        ? 'bg-primary-600 text-white shadow-sm'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-primary-100 dark:hover:bg-primary-900/30 hover:text-primary-700 dark:hover:text-primary-400'
+                    )}
+                  >
+                    {preset.label}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Custom Date Range */}
+            <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">
+                Custom Range
+              </p>
+              <div className="space-y-3">
+                {/* From Date */}
+                <div>
+                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5">
+                    From
+                  </label>
+                  <DatePicker
+                    value={filters.modifiedDateRange?.from || ''}
+                    onChange={(date) =>
+                      handleFilterChange('modifiedDateRange', {
+                        ...filters.modifiedDateRange,
+                        from: date,
+                      })
+                    }
+                    placeholder="Start date"
+                    maxDate={filters.modifiedDateRange?.to}
+                  />
+                </div>
+
+                {/* To Date */}
+                <div>
+                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5">
+                    To
+                  </label>
+                  <DatePicker
+                    value={filters.modifiedDateRange?.to || ''}
+                    onChange={(date) =>
+                      handleFilterChange('modifiedDateRange', {
+                        ...filters.modifiedDateRange,
+                        to: date,
+                      })
+                    }
+                    placeholder="End date"
+                    minDate={filters.modifiedDateRange?.from}
+                  />
+                </div>
+
+                {/* Clear Date Filter Button */}
+                {(filters.modifiedDateRange?.from || filters.modifiedDateRange?.to) && (
+                  <button
+                    onClick={() => handleFilterChange('modifiedDateRange', undefined)}
+                    className="w-full px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                  >
+                    Clear date filter
+                  </button>
+                )}
               </div>
             </div>
           </>
