@@ -242,26 +242,30 @@ class Command(BaseCommand):
             {
                 'name': 'Financial Records - 7 Years',
                 'description': 'Standard retention for financial documents',
-                'retention_period_years': 7,
-                'applies_to_document_type': 'Invoice',
+                'retention_days': 2555,  # 7 years
+                'policy_type': 'DOCUMENT_TYPE',
+                'criteria': {'document_type': 'Invoice'},
             },
             {
                 'name': 'KYC Documents - 5 Years',
                 'description': 'Customer identification documents',
-                'retention_period_years': 5,
-                'applies_to_document_type': 'KYC Record',
+                'retention_days': 1825,  # 5 years
+                'policy_type': 'DOCUMENT_TYPE',
+                'criteria': {'document_type': 'KYC Record'},
             },
             {
                 'name': 'Contracts - 10 Years',
                 'description': 'Legal contracts and agreements',
-                'retention_period_years': 10,
-                'applies_to_document_type': 'Contract',
+                'retention_days': 3650,  # 10 years
+                'policy_type': 'DOCUMENT_TYPE',
+                'criteria': {'document_type': 'Contract'},
             },
             {
                 'name': 'General Documents - 3 Years',
                 'description': 'General business documents',
-                'retention_period_years': 3,
-                'applies_to_document_type': 'Report',
+                'retention_days': 1095,  # 3 years
+                'policy_type': 'DOCUMENT_TYPE',
+                'criteria': {'document_type': 'Report'},
             },
         ]
 
@@ -270,9 +274,9 @@ class Command(BaseCommand):
                 name=data['name'],
                 defaults={
                     'description': data['description'],
-                    'retention_period_years': data['retention_period_years'],
-                    'applies_to_document_type': data['applies_to_document_type'],
-                    'auto_delete': False,
+                    'retention_days': data['retention_days'],
+                    'policy_type': data['policy_type'],
+                    'criteria': data['criteria'],
                     'is_active': True,
                     'created_by': creator,
                 }
