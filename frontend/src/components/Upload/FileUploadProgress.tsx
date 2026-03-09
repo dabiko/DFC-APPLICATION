@@ -79,6 +79,8 @@ export const FileUploadProgress: FC<FileUploadProgressProps> = ({
         )
       case 'cancelled':
         return <PauseIcon className="w-5 h-5 text-gray-400" />
+      case 'pending':
+        return <CheckCircleIcon className="w-5 h-5 text-primary-500 dark:text-primary-400" />
       default:
         return <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded-full" />
     }
@@ -99,7 +101,7 @@ export const FileUploadProgress: FC<FileUploadProgressProps> = ({
       case 'cancelled':
         return 'Cancelled'
       case 'pending':
-        return 'Waiting...'
+        return `Ready — ${formatFileSize(file.size)}`
       default:
         return ''
     }
@@ -118,6 +120,8 @@ export const FileUploadProgress: FC<FileUploadProgressProps> = ({
         return 'text-primary-600 dark:text-primary-400'
       case 'cancelled':
         return 'text-gray-500 dark:text-gray-400'
+      case 'pending':
+        return 'text-primary-600 dark:text-primary-400'
       default:
         return 'text-gray-600 dark:text-gray-400'
     }
@@ -339,7 +343,7 @@ export const FileUploadProgress: FC<FileUploadProgressProps> = ({
           </>
         )}
 
-        {(status === 'completed' || status === 'cancelled') && onRemove && (
+        {(status === 'completed' || status === 'cancelled' || status === 'pending') && onRemove && (
           <button
             onClick={handleRemove}
             className="p-1.5 text-gray-400 hover:text-error-600 dark:hover:text-error-400 hover:bg-error-50 dark:hover:bg-error-900/20 rounded transition-colors"
