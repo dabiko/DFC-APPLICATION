@@ -412,6 +412,10 @@ export function getRelativeDateOptions(): { value: RelativeDate; label: string }
  * Build a human-readable description of the criteria
  */
 export function describeCriteria(criteria: SmartFolderCriteria): string {
+  if (!criteria) {
+    return 'No criteria defined'
+  }
+
   const parts: string[] = []
 
   if (criteria.name_contains) {

@@ -376,7 +376,7 @@ class SmartFolderListSerializer(serializers.ModelSerializer):
     class Meta:
         model = SmartFolder
         fields = [
-            'id', 'name', 'description', 'icon', 'color',
+            'id', 'name', 'description', 'criteria', 'icon', 'color',
             'is_personal', 'is_global', 'is_active',
             'owner', 'owner_name', 'department', 'department_name',
             'document_count', 'last_count_update',
