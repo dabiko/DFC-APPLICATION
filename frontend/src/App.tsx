@@ -26,6 +26,10 @@ import { PermissionAuditPage } from './pages/PermissionAuditPage'
 import { UsersRolesPage } from './pages/UsersRolesPage'
 import { RetentionDashboardPage } from './pages/RetentionDashboardPage'
 import { WorkflowCenterPage } from './pages/WorkflowCenterPage'
+import { ProcedureBuilderPage } from './pages/ProcedureBuilderPage'
+import { ProcedureDetailPage } from './pages/ProcedureDetailPage'
+import { ProcedureVersionPage } from './pages/ProcedureVersionPage'
+import { ProcedureVersionDiffPage } from './pages/ProcedureVersionDiffPage'
 import { WorkflowDesignerPage } from './pages/WorkflowDesignerPage'
 import { AutomationPage } from './pages/AutomationPage'
 import { ComplianceCenterPage } from './pages/ComplianceCenterPage'
@@ -33,6 +37,12 @@ import { SettingsPage } from './pages/SettingsPage'
 import { OrganizationSettingsPage } from './pages/OrganizationSettingsPage'
 import { IntegrationsPage } from './pages/IntegrationsPage'
 import { SystemSettingsPage } from './pages/SystemSettingsPage'
+import { ProceduresListPage } from './pages/ProceduresListPage'
+import { MyTrainingPage } from './pages/MyTrainingPage'
+import { TrainingPlayerPage } from './pages/TrainingPlayerPage'
+import { QuizTakingPage } from './pages/QuizTakingPage'
+import { TrainingAssignmentsPage } from './pages/TrainingAssignmentsPage'
+import { TrainingEvidencePage } from './pages/TrainingEvidencePage'
 import { Navigate } from 'react-router-dom'
 
 function App() {
@@ -257,6 +267,111 @@ function App() {
                 element={
                   <ProtectedRoute requiredRole={['admin', 'manager']} pageName="Workflow Designer">
                     <WorkflowDesignerPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Procedure Management */}
+              <Route
+                path="/procedures/new"
+                element={
+                  <ProtectedRoute requiredRole={['admin', 'manager']} pageName="New Procedure">
+                    <ProcedureBuilderPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/procedures/:id"
+                element={
+                  <ProtectedRoute requiredRole={['admin', 'manager']} pageName="Procedure Detail">
+                    <ProcedureDetailPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/procedures/:id/edit"
+                element={
+                  <ProtectedRoute requiredRole={['admin', 'manager']} pageName="Edit Procedure">
+                    <ProcedureBuilderPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/procedures/:id/versions/diff"
+                element={
+                  <ProtectedRoute requiredRole={['admin', 'manager']} pageName="Version Diff">
+                    <ProcedureVersionDiffPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/procedures/:id/versions/:versionNumber"
+                element={
+                  <ProtectedRoute requiredRole={['admin', 'manager']} pageName="Procedure Version">
+                    <ProcedureVersionPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Training Assignments - Admin/Manager */}
+              <Route
+                path="/procedures/assignments"
+                element={
+                  <ProtectedRoute
+                    requiredRole={['admin', 'manager']}
+                    pageName="Training Assignments"
+                  >
+                    <TrainingAssignmentsPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Training Evidence - Admin/Compliance */}
+              <Route
+                path="/procedures/evidence"
+                element={
+                  <ProtectedRoute requiredRole={['admin', 'manager']} pageName="Training Evidence">
+                    <TrainingEvidencePage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Browse Procedures - All authenticated users */}
+              <Route
+                path="/procedures"
+                element={
+                  <ProtectedRoute>
+                    <ProceduresListPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* My Training - All authenticated users */}
+              <Route
+                path="/my-training"
+                element={
+                  <ProtectedRoute>
+                    <MyTrainingPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Training Player - Step-by-step training delivery */}
+              <Route
+                path="/training/:attemptId"
+                element={
+                  <ProtectedRoute>
+                    <TrainingPlayerPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Quiz Taking - During training */}
+              <Route
+                path="/training/:attemptId/quiz/:quizId"
+                element={
+                  <ProtectedRoute>
+                    <QuizTakingPage />
                   </ProtectedRoute>
                 }
               />

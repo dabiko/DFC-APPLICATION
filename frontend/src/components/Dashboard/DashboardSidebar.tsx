@@ -9,12 +9,15 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   LayoutDashboard,
   FolderSearch,
+  ClipboardList,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
   Building2,
   FolderHeart,
   Cloud,
+  BookOpen,
+  GraduationCap,
 } from 'lucide-react'
 import { SmartFolderItem } from '@components/Folder'
 import {
@@ -29,6 +32,7 @@ import { cn } from '@utils/cn'
 const navLinks = [
   { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { path: '/smart-folders', icon: FolderSearch, label: 'Smart Folders' },
+  { path: '/workflows?tab=procedures', icon: ClipboardList, label: 'Procedures' },
 ]
 
 interface DashboardSidebarProps {
@@ -54,6 +58,10 @@ export function DashboardSidebar({
   })
   const [departmentsExpanded, setDepartmentsExpanded] = useState(() => {
     const saved = localStorage.getItem('sidebar-departments-expanded')
+    return saved ? JSON.parse(saved) : true
+  })
+  const [trainingExpanded, setTrainingExpanded] = useState(() => {
+    const saved = localStorage.getItem('sidebar-training-expanded')
     return saved ? JSON.parse(saved) : true
   })
 
@@ -88,6 +96,10 @@ export function DashboardSidebar({
     localStorage.setItem('sidebar-departments-expanded', JSON.stringify(departmentsExpanded))
   }, [departmentsExpanded])
 
+  useEffect(() => {
+    localStorage.setItem('sidebar-training-expanded', JSON.stringify(trainingExpanded))
+  }, [trainingExpanded])
+
   // Keyboard shortcut (Ctrl+B / Cmd+B)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -108,6 +120,10 @@ export function DashboardSidebar({
 
   const toggleDepartments = useCallback(() => {
     setDepartmentsExpanded((prev: boolean) => !prev)
+  }, [])
+
+  const toggleTraining = useCallback(() => {
+    setTrainingExpanded((prev: boolean) => !prev)
   }, [])
 
   return (
@@ -264,6 +280,79 @@ export function DashboardSidebar({
                   Smart System Folders
                 </div>
               </button>
+            </div>
+          )}
+        </div>
+
+        {/* Training Section - Collapsible */}
+        <div
+          className={cn('border-t border-gray-200 dark:border-gray-800', isCollapsed ? 'py-2' : '')}
+        >
+          {!isCollapsed ? (
+            <>
+              <button
+                onClick={toggleTraining}
+                className="w-full flex items-center justify-between px-6 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <GraduationCap className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                  <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                    TRAINING
+                  </span>
+                </div>
+                <ChevronDown
+                  className={cn(
+                    'w-4 h-4 text-gray-400 transition-transform duration-200',
+                    !trainingExpanded && '-rotate-90'
+                  )}
+                />
+              </button>
+
+              {trainingExpanded && (
+                <div className="px-3 pb-2 space-y-1">
+                  <NavLink
+                    to="/my-training"
+                    className={({ isActive }) =>
+                      cn(
+                        'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                        isActive
+                          ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                      )
+                    }
+                  >
+                    <BookOpen className="w-5 h-5 flex-shrink-0" />
+                    <span className="flex-1">My Training</span>
+                  </NavLink>
+                  <NavLink
+                    to="/procedures"
+                    className={({ isActive }) =>
+                      cn(
+                        'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                        isActive
+                          ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                      )
+                    }
+                  >
+                    <ClipboardList className="w-5 h-5 flex-shrink-0" />
+                    <span className="flex-1">Browse Procedures</span>
+                  </NavLink>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="flex justify-center">
+              <NavLink
+                to="/my-training"
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group relative"
+                title="My Training"
+              >
+                <GraduationCap className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
+                  Training
+                </div>
+              </NavLink>
             </div>
           )}
         </div>

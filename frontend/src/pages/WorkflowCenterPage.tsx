@@ -11,7 +11,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   GitBranch,
   Inbox,
@@ -34,6 +34,7 @@ import {
   Send,
   Eye,
   BarChart3,
+  ClipboardList,
 } from 'lucide-react'
 import { ThreePanelLayout } from '@/components/Layout/ThreePanelLayout'
 import { DashboardHeader } from '@/components/Dashboard/DashboardHeader'
@@ -41,6 +42,7 @@ import { DashboardSidebar } from '@/components/Dashboard/DashboardSidebar'
 import { cn } from '@/utils/cn'
 import { authService } from '@/services/auth.service'
 import { WorkflowAnalyticsDashboard } from '@/components/WorkflowAnalytics'
+import { ProceduresTab } from '@/components/procedures/ProceduresTab'
 import {
   getMyTasks,
   getWorkflowInstances,
@@ -65,7 +67,7 @@ import {
 // Types
 // =============================================================================
 
-type TabId = 'tasks' | 'workflows' | 'templates' | 'completed' | 'analytics'
+type TabId = 'tasks' | 'workflows' | 'templates' | 'completed' | 'analytics' | 'procedures'
 
 interface Tab {
   id: TabId
@@ -80,7 +82,9 @@ interface Tab {
 
 export function WorkflowCenterPage() {
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState<TabId>('tasks')
+  const [searchParams] = useSearchParams()
+  const initialTab = (searchParams.get('tab') as TabId) || 'tasks'
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab)
 
   // Data state
   const [tasks, setTasks] = useState<WorkflowTask[]>([])
@@ -245,6 +249,7 @@ export function WorkflowCenterPage() {
     { id: 'templates', label: 'Templates', icon: LayoutTemplate },
     { id: 'completed', label: 'Completed', icon: CheckCircle },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'procedures', label: 'Procedures', icon: ClipboardList },
   ]
 
   // ==========================================================================
@@ -937,6 +942,8 @@ export function WorkflowCenterPage() {
         return renderCompletedTab()
       case 'analytics':
         return <WorkflowAnalyticsDashboard />
+      case 'procedures':
+        return <ProceduresTab />
       default:
         return null
     }

@@ -4,9 +4,9 @@ import authReducer from './slices/authSlice'
 import folderReducer from './slices/folderSlice'
 import billingReducer from './slices/billingSlice'
 import departmentReducer from './slices/departmentSlice'
-
-// Import your reducers here as you create them
-// import documentsReducer from './slices/documentsSlice'
+import procedureReducer from './slices/procedureSlice'
+import trainingReducer from './slices/trainingSlice'
+import procedureReviewReducer from './slices/procedureReviewSlice'
 
 export const store = configureStore({
   reducer: {
@@ -14,8 +14,9 @@ export const store = configureStore({
     folder: folderReducer,
     billing: billingReducer,
     department: departmentReducer,
-    // Add more reducers here as you create them
-    // documents: documentsReducer,
+    procedures: procedureReducer,
+    training: trainingReducer,
+    procedureReview: procedureReviewReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
