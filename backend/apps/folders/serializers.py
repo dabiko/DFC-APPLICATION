@@ -584,7 +584,8 @@ class SmartFolderUpdateSerializer(serializers.ModelSerializer):
             'document_type', 'confidentiality_level', 'date_range',
             'folder_path', 'folder_id', 'tags', 'file_type',
             'file_size_min', 'file_size_max', 'owner_id', 'department_id',
-            'search_text', 'created_date_range'
+            'search_text', 'created_date_range',
+            'relative_date', 'state', 'name_contains'
         }
 
         invalid_keys = set(value.keys()) - supported_keys

@@ -16,6 +16,17 @@ import {
   MoreVertical,
   Grid,
   List,
+  Star,
+  Clock,
+  Filter,
+  Search,
+  Bookmark,
+  Tag,
+  Calendar,
+  Briefcase,
+  Shield,
+  CircleDot,
+  type LucideIcon,
 } from 'lucide-react'
 import { DashboardSidebar } from '@/components/Dashboard/DashboardSidebar'
 import { DashboardHeader } from '@/components/Dashboard/DashboardHeader'
@@ -24,13 +35,29 @@ import {
   getSmartFolder,
   getSmartFolderDocuments,
   refreshSmartFolderCount,
-  describeCriteria,
   getSmartFolderColorClasses,
+  getRelativeDateLabel,
   type SmartFolder,
+  type SmartFolderCriteria,
   type SmartFolderDocument,
 } from '@/services/smartFolderService'
 import { SmartFolderModal } from '@/components/SmartFolder'
 import { cn } from '@utils/cn'
+
+// Map icon names to Lucide components
+const ICON_MAP: Record<string, LucideIcon> = {
+  'folder-search': FolderSearch,
+  'folder-star': Star,
+  'folder-clock': Clock,
+  filter: Filter,
+  search: Search,
+  star: Star,
+  bookmark: Bookmark,
+  tag: Tag,
+  calendar: Calendar,
+  briefcase: Briefcase,
+  folder_special: FolderSearch,
+}
 
 // Helper to format file size
 function formatFileSize(bytes: number): string {
@@ -51,7 +78,64 @@ function formatDate(dateString: string): string {
   })
 }
 
-// Confidentiality badge colors
+// Friendly labels
+const DOC_TYPE_LABELS: Record<string, string> = {
+  CONTRACT: 'Contract',
+  INVOICE: 'Invoice',
+  REPORT: 'Report',
+  KYC_RECORD: 'KYC Record',
+  STATEMENT: 'Statement',
+  CORRESPONDENCE: 'Correspondence',
+  POLICY_DOCUMENT: 'Policy',
+  PROCEDURE_DOCUMENT: 'Procedure',
+  AUDIT_REPORT: 'Audit Report',
+  TAX_DOCUMENT: 'Tax Document',
+  LEGAL_DOCUMENT: 'Legal Document',
+}
+
+const CONF_LABELS: Record<string, { label: string; className: string }> = {
+  PUBLIC: {
+    label: 'Public',
+    className: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300',
+  },
+  INTERNAL: {
+    label: 'Internal',
+    className: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',
+  },
+  CONFIDENTIAL: {
+    label: 'Confidential',
+    className: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300',
+  },
+  HIGHLY_CONFIDENTIAL: {
+    label: 'Highly Confidential',
+    className: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300',
+  },
+}
+
+const STATE_LABELS: Record<string, { label: string; className: string }> = {
+  DRAFT: {
+    label: 'Draft',
+    className: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300',
+  },
+  IN_REVIEW: {
+    label: 'In Review',
+    className: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300',
+  },
+  APPROVED: {
+    label: 'Approved',
+    className: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
+  },
+  PUBLISHED: {
+    label: 'Published',
+    className: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',
+  },
+  ARCHIVED: {
+    label: 'Archived',
+    className: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300',
+  },
+}
+
+// Confidentiality badge colors for document table
 const CONFIDENTIALITY_COLORS: Record<string, { bg: string; text: string }> = {
   PUBLIC: { bg: 'bg-gray-100 dark:bg-gray-800', text: 'text-gray-600 dark:text-gray-400' },
   INTERNAL: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-600 dark:text-blue-400' },
@@ -65,7 +149,7 @@ const CONFIDENTIALITY_COLORS: Record<string, { bg: string; text: string }> = {
   },
 }
 
-// State badge colors
+// State badge colors for document table
 const STATE_COLORS: Record<string, { bg: string; text: string }> = {
   DRAFT: { bg: 'bg-gray-100 dark:bg-gray-800', text: 'text-gray-600 dark:text-gray-400' },
   IN_REVIEW: {
@@ -78,6 +162,143 @@ const STATE_COLORS: Record<string, { bg: string; text: string }> = {
     bg: 'bg-purple-100 dark:bg-purple-900/30',
     text: 'text-purple-600 dark:text-purple-400',
   },
+}
+
+/**
+ * Header criteria chips component for the detail page
+ */
+function HeaderCriteriaChips({ criteria }: { criteria: SmartFolderCriteria }) {
+  if (!criteria) return null
+
+  const toArray = (val: string | string[] | undefined): string[] => {
+    if (!val) return []
+    return Array.isArray(val) ? val : [val]
+  }
+
+  const docTypes = toArray(criteria.document_type)
+  const confLevels = toArray(criteria.confidentiality_level)
+  const states = toArray(criteria.state)
+  const tags = toArray(criteria.tags)
+  const hasNameFilter = !!criteria.name_contains
+  const hasDateFilter = !!criteria.relative_date
+
+  const hasAnyCriteria =
+    hasNameFilter ||
+    docTypes.length > 0 ||
+    confLevels.length > 0 ||
+    states.length > 0 ||
+    tags.length > 0 ||
+    hasDateFilter
+
+  if (!hasAnyCriteria) {
+    return <p className="text-sm text-gray-400 dark:text-gray-500 italic">No criteria defined</p>
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      {/* Name contains */}
+      {hasNameFilter && (
+        <div className="flex items-center gap-1.5">
+          <Search className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
+          <span className="text-sm text-gray-600 dark:text-gray-300">
+            &ldquo;{criteria.name_contains}&rdquo;
+          </span>
+        </div>
+      )}
+
+      {/* Document types */}
+      {docTypes.length > 0 && (
+        <div className="flex items-center gap-1.5">
+          <FileText className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+          <div className="flex flex-wrap gap-1">
+            {docTypes.map((type) => (
+              <span
+                key={type}
+                className="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300"
+              >
+                {DOC_TYPE_LABELS[type] || type}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Confidentiality levels */}
+      {confLevels.length > 0 && (
+        <div className="flex items-center gap-1.5">
+          <Shield className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+          <div className="flex flex-wrap gap-1">
+            {confLevels.map((level) => {
+              const conf = CONF_LABELS[level]
+              return (
+                <span
+                  key={level}
+                  className={cn(
+                    'inline-flex px-2 py-0.5 text-xs font-medium rounded-full',
+                    conf?.className ||
+                      'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                  )}
+                >
+                  {conf?.label || level}
+                </span>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Document states */}
+      {states.length > 0 && (
+        <div className="flex items-center gap-1.5">
+          <CircleDot className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+          <div className="flex flex-wrap gap-1">
+            {states.map((state) => {
+              const stateInfo = STATE_LABELS[state]
+              return (
+                <span
+                  key={state}
+                  className={cn(
+                    'inline-flex px-2 py-0.5 text-xs font-medium rounded-full',
+                    stateInfo?.className ||
+                      'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                  )}
+                >
+                  {stateInfo?.label || state}
+                </span>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Tags */}
+      {tags.length > 0 && (
+        <div className="flex items-center gap-1.5">
+          <Tag className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+          <div className="flex flex-wrap gap-1">
+            {tags.map((t) => (
+              <span
+                key={t}
+                className="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300"
+              >
+                {t}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Date filter */}
+      {hasDateFilter && (
+        <div className="flex items-center gap-1.5">
+          <Calendar className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
+          <span className="text-sm text-gray-600 dark:text-gray-300">
+            {getRelativeDateLabel(criteria.relative_date!)}
+          </span>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function SmartFolderResultsPage() {
@@ -163,6 +384,9 @@ export default function SmartFolderResultsPage() {
   // Get color classes for the smart folder
   const colorClasses = smartFolder ? getSmartFolderColorClasses(smartFolder.color) : null
 
+  // Get icon component
+  const IconComponent = smartFolder ? ICON_MAP[smartFolder.icon] || FolderSearch : FolderSearch
+
   // Loading state
   if (loading) {
     return (
@@ -207,38 +431,43 @@ export default function SmartFolderResultsPage() {
         <DashboardHeader user={user} notifications={[]} onLogout={handleLogout} />
         <main className="flex-1 flex flex-col overflow-hidden">
           {/* Header */}
-          <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
-            <div className="flex items-center gap-4">
+          <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+            {/* Top row: back button, title, actions */}
+            <div className="px-6 pt-4 pb-3 flex items-start gap-4">
               {/* Back button */}
               <button
                 onClick={() => navigate(-1)}
-                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors mt-0.5"
               >
                 <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
               </button>
 
-              {/* Smart folder icon and name */}
-              <div className="flex items-center gap-3 flex-1">
-                <div
-                  className={cn(
-                    'w-10 h-10 rounded-lg flex items-center justify-center',
-                    colorClasses?.bg
-                  )}
-                >
-                  <FolderSearch className={cn('w-5 h-5', colorClasses?.text)} />
-                </div>
-                <div>
-                  <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
-                    {smartFolder.name}
-                  </h1>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {describeCriteria(smartFolder.criteria)}
-                  </p>
+              {/* Icon + title + description */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3 mb-1">
+                  <div
+                    className={cn(
+                      'w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0',
+                      colorClasses?.bg
+                    )}
+                  >
+                    <IconComponent className={cn('w-5 h-5', colorClasses?.text)} />
+                  </div>
+                  <div className="min-w-0">
+                    <h1 className="text-xl font-semibold text-gray-900 dark:text-white truncate">
+                      {smartFolder.name}
+                    </h1>
+                    {smartFolder.description && (
+                      <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                        {smartFolder.description}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
 
               {/* Actions */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-shrink-0">
                 {/* View mode toggle */}
                 <div className="flex items-center border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
                   <button
@@ -286,27 +515,39 @@ export default function SmartFolderResultsPage() {
               </div>
             </div>
 
+            {/* Criteria chips row */}
+            <div className="px-6 pb-3 pl-[72px]">
+              <HeaderCriteriaChips criteria={smartFolder.criteria} />
+            </div>
+
             {/* Stats bar */}
-            <div className="flex items-center gap-6 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <div className="text-sm">
-                <span className="text-gray-500 dark:text-gray-400">Documents: </span>
-                <span className="font-medium text-gray-900 dark:text-white">
-                  {documents.length}
-                </span>
-              </div>
-              {smartFolder.last_count_update && (
-                <div className="text-sm">
-                  <span className="text-gray-500 dark:text-gray-400">Last updated: </span>
-                  <span className="font-medium text-gray-900 dark:text-white">
-                    {formatDate(smartFolder.last_count_update)}
+            <div className="px-6 pb-3 pl-[72px]">
+              <div className="flex items-center gap-5 pt-3 border-t border-gray-100 dark:border-gray-700">
+                <div className="flex items-center gap-1.5 text-sm">
+                  <span className="text-gray-500 dark:text-gray-400">Documents:</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">
+                    {documents.length}
                   </span>
                 </div>
-              )}
-              {smartFolder.description && (
-                <div className="text-sm text-gray-500 dark:text-gray-400">
-                  {smartFolder.description}
-                </div>
-              )}
+                {smartFolder.last_count_update && (
+                  <div className="flex items-center gap-1.5 text-sm">
+                    <span className="text-gray-500 dark:text-gray-400">Last updated:</span>
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      {formatDate(smartFolder.last_count_update)}
+                    </span>
+                  </div>
+                )}
+                {smartFolder.is_global && (
+                  <span className="px-2 py-0.5 text-xs font-medium text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/30 rounded-full">
+                    Global
+                  </span>
+                )}
+                {!smartFolder.is_personal && !smartFolder.is_global && (
+                  <span className="px-2 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 rounded-full">
+                    Department
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -377,7 +618,7 @@ export default function SmartFolderResultsPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
-                          {doc.document_type}
+                          {DOC_TYPE_LABELS[doc.document_type] || doc.document_type}
                         </td>
                         <td className="px-4 py-3">
                           <span
@@ -387,7 +628,8 @@ export default function SmartFolderResultsPage() {
                               CONFIDENTIALITY_COLORS[doc.confidentiality_level]?.text
                             )}
                           >
-                            {doc.confidentiality_level.replace('_', ' ')}
+                            {CONF_LABELS[doc.confidentiality_level]?.label ||
+                              doc.confidentiality_level.replace('_', ' ')}
                           </span>
                         </td>
                         <td className="px-4 py-3">
@@ -399,7 +641,7 @@ export default function SmartFolderResultsPage() {
                                 STATE_COLORS[doc.state]?.text
                               )}
                             >
-                              {doc.state.replace('_', ' ')}
+                              {STATE_LABELS[doc.state]?.label || doc.state.replace('_', ' ')}
                             </span>
                           ) : (
                             <span className="text-gray-400 text-xs">-</span>
@@ -415,7 +657,6 @@ export default function SmartFolderResultsPage() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
-                              // Open context menu or actions
                             }}
                             className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
                           >
@@ -453,7 +694,8 @@ export default function SmartFolderResultsPage() {
                           CONFIDENTIALITY_COLORS[doc.confidentiality_level]?.text
                         )}
                       >
-                        {doc.confidentiality_level.charAt(0)}
+                        {CONF_LABELS[doc.confidentiality_level]?.label?.charAt(0) ||
+                          doc.confidentiality_level.charAt(0)}
                       </span>
                       <span className="text-xs text-gray-500 dark:text-gray-400">
                         {formatFileSize(doc.file_size)}
