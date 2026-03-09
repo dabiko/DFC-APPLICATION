@@ -73,6 +73,9 @@ urlpatterns = [
     # API v1 - Workflows (Document Approvals & Reviews)
     path('api/v1/workflows/', include('apps.workflows.urls', namespace='workflows')),
 
+    # API v1 - Procedures (SOPs & Training)
+    path('api/v1/', include('apps.procedures.urls', namespace='procedures')),
+
     # API v1 - Document Intelligence (NLP, Table Extraction)
     path('api/v1/intelligence/', include('apps.intelligence.urls')),
 

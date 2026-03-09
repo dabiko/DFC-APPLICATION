@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'apps.events',  # Event-driven architecture (RabbitMQ)
     'apps.integrations',  # API keys, webhooks, and third-party integrations
     'apps.system',  # System administration (super admin)
+    'apps.procedures',  # Procedure management & training
 ]
 
 MIDDLEWARE = [
