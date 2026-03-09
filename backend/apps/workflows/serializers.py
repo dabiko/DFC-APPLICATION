@@ -226,8 +226,9 @@ class WorkflowTaskListSerializer(serializers.ModelSerializer):
         allow_null=True
     )
     workflow_id = serializers.UUIDField(source='workflow.id', read_only=True)
-    document_id = serializers.UUIDField(source='workflow.document.id', read_only=True)
-    document_title = serializers.CharField(source='workflow.document.title', read_only=True)
+    target_id = serializers.UUIDField(source='workflow.target_object_id', read_only=True)
+    target_title = serializers.CharField(source='workflow.target_title', read_only=True)
+    target_type = serializers.CharField(source='workflow.target_type', read_only=True)
     workflow_name = serializers.CharField(source='workflow.template_name', read_only=True)
     priority = serializers.CharField(source='workflow.priority', read_only=True)
     is_overdue = serializers.BooleanField(read_only=True)
@@ -235,7 +236,8 @@ class WorkflowTaskListSerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkflowTask
         fields = [
-            'id', 'workflow_id', 'document_id', 'document_title', 'workflow_name',
+            'id', 'workflow_id', 'target_id', 'target_title', 'target_type',
+            'workflow_name',
             'step_order', 'step_name', 'step_type',
             'assigned_to', 'assigned_to_name',
             'delegated_from', 'delegated_from_name',
@@ -274,16 +276,21 @@ class WorkflowTaskDetailSerializer(serializers.ModelSerializer):
     def get_workflow_detail(self, obj):
         """Get basic workflow info."""
         workflow = obj.workflow
+        target_info = {
+            'id': str(workflow.target_object_id),
+            'title': workflow.target_title,
+            'type': workflow.target_type,
+        }
+        # Add extra fields if the target is a document and is loaded
+        target = workflow.target
+        if target and workflow.is_document_workflow:
+            target_info['file_name'] = getattr(target, 'file_name', '')
         return {
             'id': str(workflow.id),
             'template_name': workflow.template_name,
             'status': workflow.status,
             'priority': workflow.priority,
-            'document': {
-                'id': str(workflow.document.id),
-                'title': workflow.document.title,
-                'file_name': workflow.document.file_name,
-            },
+            'target': target_info,
             'initiated_by': {
                 'id': workflow.initiated_by.id,
                 'name': workflow.initiated_by.get_full_name(),
@@ -332,7 +339,9 @@ class TaskActionSerializer(serializers.Serializer):
 class WorkflowInstanceListSerializer(serializers.ModelSerializer):
     """Serializer for listing workflow instances."""
     initiated_by_name = serializers.CharField(source='initiated_by.get_full_name', read_only=True)
-    document_title = serializers.CharField(source='document.title', read_only=True)
+    target_id = serializers.UUIDField(source='target_object_id', read_only=True)
+    target_title = serializers.CharField(read_only=True)
+    target_type = serializers.CharField(read_only=True)
     current_step_name = serializers.SerializerMethodField()
     current_assignee = serializers.SerializerMethodField()
     is_overdue = serializers.BooleanField(read_only=True)
@@ -342,7 +351,8 @@ class WorkflowInstanceListSerializer(serializers.ModelSerializer):
         model = WorkflowInstance
         fields = [
             'id', 'template', 'template_name',
-            'document', 'document_title',
+            'target_id', 'target_title', 'target_type',
+            'target_content_type',
             'status', 'priority',
             'current_step', 'current_step_name', 'current_assignee',
             'due_date', 'started_at', 'completed_at',
@@ -378,7 +388,8 @@ class WorkflowInstanceListSerializer(serializers.ModelSerializer):
 class WorkflowInstanceDetailSerializer(serializers.ModelSerializer):
     """Serializer for workflow instance details."""
     initiated_by_detail = UserMinimalSerializer(source='initiated_by', read_only=True)
-    document_detail = serializers.SerializerMethodField()
+    target_detail = serializers.SerializerMethodField()
+    target_type = serializers.CharField(read_only=True)
     template_detail = serializers.SerializerMethodField()
     tasks = WorkflowTaskListSerializer(many=True, read_only=True)
     comments = serializers.SerializerMethodField()
@@ -390,7 +401,8 @@ class WorkflowInstanceDetailSerializer(serializers.ModelSerializer):
         model = WorkflowInstance
         fields = [
             'id', 'template', 'template_name', 'template_detail',
-            'document', 'document_detail',
+            'target_content_type', 'target_object_id', 'target_title',
+            'target_type', 'target_detail',
             'status', 'priority', 'current_step',
             'due_date', 'started_at', 'completed_at',
             'is_overdue', 'days_remaining',
@@ -401,17 +413,27 @@ class WorkflowInstanceDetailSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = fields
 
-    def get_document_detail(self, obj):
-        """Get document details."""
-        doc = obj.document
-        return {
-            'id': str(doc.id),
-            'title': doc.title,
-            'file_name': doc.file_name,
-            'file_type': doc.file_type,
-            'document_type': doc.document_type,
-            'confidentiality_level': doc.confidentiality_level,
+    def get_target_detail(self, obj):
+        """Get target object details (Document, Procedure, etc.)."""
+        target = obj.target
+        detail = {
+            'id': str(obj.target_object_id),
+            'title': obj.target_title,
+            'type': obj.target_type,
         }
+        if target and obj.is_document_workflow:
+            detail.update({
+                'file_name': getattr(target, 'file_name', ''),
+                'file_type': getattr(target, 'file_type', ''),
+                'document_type': getattr(target, 'document_type', ''),
+                'confidentiality_level': getattr(target, 'confidentiality_level', ''),
+            })
+        elif target and obj.is_procedure_workflow:
+            detail.update({
+                'status': getattr(target, 'status', ''),
+                'current_version': getattr(target, 'current_version', None),
+            })
+        return detail
 
     def get_template_detail(self, obj):
         """Get template details if still exists."""
@@ -438,7 +460,15 @@ class WorkflowInstanceDetailSerializer(serializers.ModelSerializer):
 class WorkflowInstanceCreateSerializer(serializers.Serializer):
     """Serializer for starting a new workflow."""
     template_id = serializers.UUIDField()
-    document_id = serializers.UUIDField()
+    # Generic target: provide target_type + target_id
+    # target_type is the model name (e.g. 'document', 'procedure')
+    target_type = serializers.CharField(
+        default='document',
+        help_text='Model name of the target: "document" or "procedure"'
+    )
+    target_id = serializers.UUIDField(
+        help_text='UUID of the target object (document or procedure)'
+    )
     priority = serializers.ChoiceField(
         choices=WorkflowPriority.choices,
         default=WorkflowPriority.MEDIUM
@@ -456,14 +486,41 @@ class WorkflowInstanceCreateSerializer(serializers.Serializer):
         except WorkflowTemplate.DoesNotExist:
             raise serializers.ValidationError('Template not found or inactive')
 
-    def validate_document_id(self, value):
-        """Validate document exists."""
-        from apps.documents.models import Document
+    def validate(self, data):
+        """Validate target object exists based on target_type."""
+        from django.contrib.contenttypes.models import ContentType
+
+        target_type = data.get('target_type', 'document')
+        target_id = data.get('target_id')
+
+        # Resolve content type
+        app_label_map = {
+            'document': 'documents',
+            'procedure': 'procedures',
+        }
+        app_label = app_label_map.get(target_type)
+        if not app_label:
+            raise serializers.ValidationError({
+                'target_type': f'Unsupported target type: {target_type}. '
+                               f'Supported: {", ".join(app_label_map.keys())}'
+            })
+
         try:
-            Document.objects.get(pk=value)
-            return value
-        except Document.DoesNotExist:
-            raise serializers.ValidationError('Document not found')
+            ct = ContentType.objects.get(app_label=app_label, model=target_type)
+        except ContentType.DoesNotExist:
+            raise serializers.ValidationError({
+                'target_type': f'Content type not found for {target_type}'
+            })
+
+        # Verify the object exists
+        model_class = ct.model_class()
+        if model_class and not model_class.objects.filter(pk=target_id).exists():
+            raise serializers.ValidationError({
+                'target_id': f'{target_type.capitalize()} not found'
+            })
+
+        data['content_type'] = ct
+        return data
 
 
 # =============================================================================

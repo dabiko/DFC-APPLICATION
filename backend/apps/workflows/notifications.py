@@ -255,7 +255,7 @@ class EmailNotificationService:
                 'workflow_id': str(context.workflow.id),
                 'workflow_name': context.workflow.template_name,
                 'workflow_status': context.workflow.status,
-                'document_title': context.workflow.document.title if context.workflow.document else 'Unknown',
+                'document_title': context.workflow.target_title or 'Unknown',
                 'workflow_url': f"{email_context['app_url']}/workflows?workflow={context.workflow.id}",
             })
 
@@ -358,7 +358,7 @@ class WorkflowNotificationService:
             recipient=task.assigned_to,
             notification_type=NotificationType.TASK_ASSIGNED,
             title=f"New Task: {task.step_name}",
-            message=f"You have been assigned a new task for document '{task.workflow.document.title}'",
+            message=f"You have been assigned a new task for '{task.workflow.target_title}'",
             workflow=task.workflow,
             task=task
         )
@@ -514,7 +514,7 @@ class WorkflowNotificationService:
             recipient=workflow.initiated_by,
             notification_type=notification_type,
             title=f"Workflow {status_text.capitalize()}: {workflow.template_name}",
-            message=f"Your workflow for '{workflow.document.title}' has been {status_text}",
+            message=f"Your workflow for '{workflow.target_title}' has been {status_text}",
             workflow=workflow
         )
 

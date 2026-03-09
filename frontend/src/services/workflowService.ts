@@ -86,8 +86,9 @@ export interface WorkflowTemplate {
 export interface WorkflowTask {
   id: string
   workflow_id: string
-  document_id: string
-  document_title: string
+  target_id: string
+  target_title: string
+  target_type: string
   workflow_name: string
   step_order: number
   step_name: string
@@ -112,8 +113,22 @@ export interface WorkflowInstance {
   id: string
   template?: string
   template_name: string
-  document: string
-  document_title: string
+  target_id: string
+  target_title: string
+  target_type: string
+  target_content_type?: number
+  target_object_id?: string
+  target_detail?: {
+    id: string
+    title: string
+    type: string
+    file_name?: string
+    file_type?: string
+    document_type?: string
+    confidentiality_level?: string
+    status?: string
+    current_version?: number
+  }
   status: WorkflowInstanceStatus
   priority: WorkflowPriority
   current_step: number
@@ -330,7 +345,9 @@ export async function getTemplateCategories(): Promise<string[]> {
 export async function getWorkflowInstances(params?: {
   status?: WorkflowInstanceStatus
   my_initiated?: boolean
-  document_id?: string
+  target_id?: string
+  target_type?: string
+  document_id?: string // backward-compatible alias for target_id with type=document
   overdue?: boolean
 }): Promise<WorkflowInstance[]> {
   const response = await apiClient.get('/workflows/instances/', { params })
@@ -350,7 +367,8 @@ export async function getWorkflowInstance(id: string): Promise<WorkflowInstance>
  */
 export async function startWorkflow(data: {
   template_id: string
-  document_id: string
+  target_type?: string // 'document' | 'procedure' (defaults to 'document')
+  target_id: string
   priority?: WorkflowPriority
   due_date?: string
   notes?: string

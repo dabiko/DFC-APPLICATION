@@ -144,7 +144,7 @@ class ExternalWorkflowAPIView(views.APIView):
         """Get detailed workflow status."""
         try:
             workflow = WorkflowInstance.objects.select_related(
-                'template', 'document', 'initiated_by'
+                'template', 'target_content_type', 'initiated_by'
             ).prefetch_related('tasks').get(pk=workflow_id)
         except WorkflowInstance.DoesNotExist:
             return Response(
@@ -158,10 +158,10 @@ class ExternalWorkflowAPIView(views.APIView):
             'status': workflow.status,
             'priority': workflow.priority,
             'current_step': workflow.current_step,
-            'document': {
-                'id': str(workflow.document.id),
-                'title': workflow.document.title,
-                'file_name': workflow.document.file_name,
+            'target': {
+                'id': str(workflow.target_object_id),
+                'title': workflow.target_title,
+                'type': workflow.target_type,
             },
             'initiated_by': workflow.initiated_by.get_full_name(),
             'due_date': workflow.due_date.isoformat() if workflow.due_date else None,
@@ -187,7 +187,7 @@ class ExternalWorkflowAPIView(views.APIView):
     def list_workflows(self, request):
         """List workflows with filtering."""
         queryset = WorkflowInstance.objects.select_related(
-            'document', 'initiated_by'
+            'target_content_type', 'initiated_by'
         )
 
         # Apply filters
@@ -195,9 +195,22 @@ class ExternalWorkflowAPIView(views.APIView):
         if status_filter:
             queryset = queryset.filter(status=status_filter)
 
+        target_id = request.query_params.get('target_id')
+        if target_id:
+            queryset = queryset.filter(target_object_id=target_id)
+
+        # Backward-compatible: also accept document_id
         document_id = request.query_params.get('document_id')
         if document_id:
-            queryset = queryset.filter(document_id=document_id)
+            queryset = queryset.filter(
+                target_content_type__model='document',
+                target_object_id=document_id,
+            )
+
+        # Filter by target type
+        target_type = request.query_params.get('target_type')
+        if target_type:
+            queryset = queryset.filter(target_content_type__model=target_type)
 
         # Pagination
         limit = min(int(request.query_params.get('limit', 50)), 100)
@@ -211,8 +224,9 @@ class ExternalWorkflowAPIView(views.APIView):
                 {
                     'id': str(w.id),
                     'template_name': w.template_name,
-                    'document_id': str(w.document_id),
-                    'document_title': w.document.title,
+                    'target_id': str(w.target_object_id),
+                    'target_title': w.target_title,
+                    'target_type': w.target_type,
                     'status': w.status,
                     'priority': w.priority,
                     'current_step': w.current_step,
@@ -253,6 +267,7 @@ class ExternalWorkflowAPIView(views.APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
+        from django.contrib.contenttypes.models import ContentType
         from apps.documents.models import Document
         try:
             document = Document.objects.get(pk=document_id)
@@ -266,11 +281,16 @@ class ExternalWorkflowAPIView(views.APIView):
         due_days = due_days or template.default_due_days
         due_date = timezone.now() + timedelta(days=due_days)
 
+        # Resolve ContentType
+        doc_ct = ContentType.objects.get_for_model(Document)
+
         # Create workflow instance
         instance = WorkflowInstance.objects.create(
             template=template,
             template_name=template.name,
-            document=document,
+            target_content_type=doc_ct,
+            target_object_id=document.pk,
+            target_title=document.title or '',
             status=WorkflowInstanceStatus.DRAFT,
             priority=priority,
             due_date=due_date,

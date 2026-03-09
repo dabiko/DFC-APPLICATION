@@ -15,6 +15,8 @@ Key Concepts:
 """
 
 from django.conf import settings
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.utils import timezone
 from django.core.validators import MinValueValidator
@@ -303,11 +305,22 @@ class WorkflowInstance(models.Model):
         help_text='Snapshot of template name at time of creation'
     )
 
-    # Associated document
-    document = models.ForeignKey(
-        'documents.Document',
+    # Generic target — can point to Document, Procedure, or any future model
+    target_content_type = models.ForeignKey(
+        ContentType,
         on_delete=models.CASCADE,
-        related_name='workflow_instances'
+        related_name='workflow_instances',
+        help_text='Type of the target object (Document, Procedure, etc.)'
+    )
+    target_object_id = models.UUIDField(
+        help_text='UUID of the target object'
+    )
+    target = GenericForeignKey('target_content_type', 'target_object_id')
+    target_title = models.CharField(
+        max_length=500,
+        blank=True,
+        default='',
+        help_text='Snapshot of target title for display without joins'
     )
 
     # Status
@@ -358,12 +371,30 @@ class WorkflowInstance(models.Model):
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['status', 'due_date']),
-            models.Index(fields=['document']),
+            models.Index(
+                fields=['target_content_type', 'target_object_id'],
+                name='wf_instance_target_idx',
+            ),
             models.Index(fields=['initiated_by']),
         ]
 
     def __str__(self):
-        return f"{self.template_name} - {self.document.title}"
+        return f"{self.template_name} - {self.target_title or self.target_object_id}"
+
+    # ── Helper properties for backward compatibility ──
+
+    @property
+    def target_type(self) -> str:
+        """Return the model name of the target (e.g., 'document', 'procedure')."""
+        return self.target_content_type.model
+
+    @property
+    def is_document_workflow(self) -> bool:
+        return self.target_content_type.model == 'document'
+
+    @property
+    def is_procedure_workflow(self) -> bool:
+        return self.target_content_type.model == 'procedure'
 
     def start(self):
         """Start the workflow instance."""
@@ -966,12 +997,17 @@ class WorkflowAutoTriggerRule(models.Model):
         due_days = self.due_days_override or self.workflow_template.default_due_days
         due_date = timezone.now() + timezone.timedelta(days=due_days)
 
+        # Resolve ContentType for Document
+        doc_ct = ContentType.objects.get_for_model(document)
+
         # Create workflow instance
         instance = WorkflowInstance.objects.create(
             organization=self.organization,
             template=self.workflow_template,
             template_name=self.workflow_template.name,
-            document=document,
+            target_content_type=doc_ct,
+            target_object_id=document.pk,
+            target_title=getattr(document, 'title', '') or '',
             status=WorkflowInstanceStatus.DRAFT,
             priority=self.default_priority,
             due_date=due_date,

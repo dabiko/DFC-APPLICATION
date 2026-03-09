@@ -68,12 +68,17 @@ class TaskAssignmentError(WorkflowEngineError):
 @dataclass
 class ConditionContext:
     """Context for evaluating workflow conditions."""
-    document: Any
+    target: Any  # The target object (Document, Procedure, etc.)
     workflow: WorkflowInstance
     current_step: WorkflowStep
     previous_tasks: List[WorkflowTask]
     user: Any
     metadata: Dict[str, Any]
+
+    @property
+    def document(self):
+        """Backward-compatible alias — returns target if it's a Document."""
+        return self.target
 
 
 @dataclass
@@ -174,8 +179,8 @@ class ConditionEvaluator:
         """Get a value from the context using dot notation."""
         parts = field.split('.')
 
-        if parts[0] == 'document':
-            obj = context.document
+        if parts[0] in ('document', 'target'):
+            obj = context.target
         elif parts[0] == 'workflow':
             obj = context.workflow
         elif parts[0] == 'step':
@@ -257,13 +262,18 @@ class TaskAssignmentEngine:
             assignment_type = 'department'
             reason = f'Users in department: {step.department_name}'
 
-        # Priority 4: Document owner
+        # Priority 4: Target owner (e.g. document uploader, procedure creator)
         elif step.step_type == WorkflowStepType.NOTIFICATION:
-            # For notifications, assign to document owner
-            if workflow.document and hasattr(workflow.document, 'uploaded_by'):
-                users = [workflow.document.uploaded_by]
-                assignment_type = 'owner'
-                reason = 'Document owner'
+            target = workflow.target
+            if target:
+                owner = (
+                    getattr(target, 'uploaded_by', None)
+                    or getattr(target, 'created_by', None)
+                )
+                if owner:
+                    users = [owner]
+                    assignment_type = 'owner'
+                    reason = 'Target owner'
 
         if not users:
             raise TaskAssignmentError(
@@ -343,50 +353,75 @@ class WorkflowEngine:
     def start_workflow(
         self,
         template: WorkflowTemplate,
-        document,
+        target,
         initiated_by,
         priority: Optional[WorkflowPriority] = None,
         due_date=None,
-        notes: str = ''
+        notes: str = '',
+        # Backward-compatible alias
+        document=None,
     ) -> WorkflowInstance:
         """
         Start a new workflow instance from a template.
 
         Args:
             template: The workflow template to instantiate
-            document: The document to process
+            target: The target object (Document, Procedure, etc.)
             initiated_by: User who initiated the workflow
             priority: Override priority (uses template default if not provided)
             due_date: Override due date
             notes: Optional notes for the workflow
+            document: Deprecated alias for target (backward compatibility)
 
         Returns:
             The created WorkflowInstance
         """
+        from django.contrib.contenttypes.models import ContentType
+
+        # Support the old `document=` kwarg for backward compatibility
+        if target is None and document is not None:
+            target = document
+
+        if target is None:
+            raise WorkflowValidationError("A target object is required")
+
         # Validate template is active
         if not template.is_active:
             raise WorkflowValidationError(f"Template '{template.name}' is not active")
 
-        # Check for existing active workflow on this document
+        # Resolve ContentType
+        target_ct = ContentType.objects.get_for_model(target)
+
+        # Check for existing active workflow on this target
         existing = WorkflowInstance.objects.filter(
-            document=document,
+            target_content_type=target_ct,
+            target_object_id=target.pk,
             status__in=[WorkflowInstanceStatus.ACTIVE, WorkflowInstanceStatus.PENDING]
         ).first()
 
         if existing:
             raise WorkflowValidationError(
-                f"Document already has an active workflow: {existing.template_name}"
+                f"Target already has an active workflow: {existing.template_name}"
             )
 
         # Calculate due date if not provided
         if not due_date and template.default_due_days:
             due_date = timezone.now() + timedelta(days=template.default_due_days)
 
+        # Derive a title from the target for snapshot storage
+        target_title = (
+            getattr(target, 'title', '')
+            or getattr(target, 'name', '')
+            or str(target)
+        )
+
         # Create workflow instance
         workflow = WorkflowInstance.objects.create(
             template=template,
             template_name=template.name,
-            document=document,
+            target_content_type=target_ct,
+            target_object_id=target.pk,
+            target_title=target_title,
             organization=initiated_by.organization,
             status=WorkflowInstanceStatus.ACTIVE,
             priority=priority or template.default_priority,
@@ -406,7 +441,7 @@ class WorkflowEngine:
             workflow=workflow,
             action='workflow_started',
             actor=initiated_by,
-            details=f"Started workflow '{template.name}' on document '{document}'"
+            details=f"Started workflow '{template.name}' on '{target_title}'"
         )
 
         # Create tasks for first step(s)
@@ -921,7 +956,7 @@ class WorkflowEngine:
         ).order_by('step_order', 'completed_at'))
 
         return ConditionContext(
-            document=workflow.document,
+            target=workflow.target,
             workflow=workflow,
             current_step=step,
             previous_tasks=previous_tasks,

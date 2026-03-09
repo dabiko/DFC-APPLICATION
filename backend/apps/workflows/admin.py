@@ -74,16 +74,19 @@ class WorkflowTaskInline(admin.TabularInline):
 @admin.register(WorkflowInstance)
 class WorkflowInstanceAdmin(admin.ModelAdmin):
     """Admin for workflow instances."""
-    list_display = ['template_name', 'document', 'status', 'priority', 'current_step', 'due_date', 'initiated_by', 'created_at']
-    list_filter = ['status', 'priority', 'organization']
-    search_fields = ['template_name', 'document__title', 'initiated_by__username']
-    readonly_fields = ['id', 'template_name', 'started_at', 'completed_at', 'created_at', 'updated_at']
+    list_display = ['template_name', 'target_title', 'target_content_type', 'status', 'priority', 'current_step', 'due_date', 'initiated_by', 'created_at']
+    list_filter = ['status', 'priority', 'organization', 'target_content_type']
+    search_fields = ['template_name', 'target_title', 'initiated_by__username']
+    readonly_fields = ['id', 'template_name', 'target_title', 'target_object_id', 'started_at', 'completed_at', 'created_at', 'updated_at']
     date_hierarchy = 'created_at'
     inlines = [WorkflowTaskInline]
 
     fieldsets = (
         (None, {
-            'fields': ('id', 'template', 'template_name', 'document', 'organization')
+            'fields': ('id', 'template', 'template_name', 'organization')
+        }),
+        ('Target', {
+            'fields': ('target_content_type', 'target_object_id', 'target_title')
         }),
         ('Status', {
             'fields': ('status', 'priority', 'current_step', 'due_date')

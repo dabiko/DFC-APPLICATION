@@ -158,7 +158,7 @@ class WorkflowInstanceViewSet(viewsets.ModelViewSet):
         queryset = WorkflowInstance.objects.filter(
             organization=user.organization
         ).select_related(
-            'document', 'template', 'initiated_by'
+            'target_content_type', 'template', 'initiated_by'
         ).prefetch_related('tasks')
 
         # Filter by status
@@ -171,10 +171,27 @@ class WorkflowInstanceViewSet(viewsets.ModelViewSet):
         if my_initiated and my_initiated.lower() == 'true':
             queryset = queryset.filter(initiated_by=user)
 
-        # Filter by document
+        # Filter by target (generic — works for documents, procedures, etc.)
+        target_id = self.request.query_params.get('target_id')
+        if target_id:
+            queryset = queryset.filter(target_object_id=target_id)
+
+        # Backward-compatible: also accept document_id
         document_id = self.request.query_params.get('document_id')
         if document_id:
-            queryset = queryset.filter(document_id=document_id)
+            from django.contrib.contenttypes.models import ContentType
+            doc_ct = ContentType.objects.get(app_label='documents', model='document')
+            queryset = queryset.filter(
+                target_content_type=doc_ct,
+                target_object_id=document_id,
+            )
+
+        # Filter by target type
+        target_type = self.request.query_params.get('target_type')
+        if target_type:
+            queryset = queryset.filter(
+                target_content_type__model=target_type
+            )
 
         # Filter by overdue
         overdue = self.request.query_params.get('overdue')
@@ -199,15 +216,18 @@ class WorkflowInstanceViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
 
         try:
-            # Get template and document
+            # Get template and target object
             template = WorkflowTemplate.objects.get(pk=serializer.validated_data['template_id'])
-            from apps.documents.models import Document
-            document = Document.objects.get(pk=serializer.validated_data['document_id'])
+
+            # Resolve the target object via ContentType
+            ct = serializer.validated_data['content_type']
+            model_class = ct.model_class()
+            target = model_class.objects.get(pk=serializer.validated_data['target_id'])
 
             # Use workflow engine to start the workflow
             instance = workflow_engine.start_workflow(
                 template=template,
-                document=document,
+                target=target,
                 initiated_by=request.user,
                 priority=serializer.validated_data.get('priority'),
                 due_date=serializer.validated_data.get('due_date'),
@@ -305,10 +325,10 @@ class WorkflowInstanceViewSet(viewsets.ModelViewSet):
                         status=status.HTTP_404_NOT_FOUND
                     )
 
-            # Start the workflow
+            # Start the workflow (document is the target)
             instance = workflow_engine.start_workflow(
                 template=template,
-                document=document,
+                target=document,
                 initiated_by=request.user,
                 priority=request.data.get('priority'),
                 notes=request.data.get('notes', '')
@@ -363,7 +383,7 @@ class WorkflowTaskViewSet(viewsets.ReadOnlyModelViewSet):
         queryset = WorkflowTask.objects.filter(
             assigned_to=user
         ).select_related(
-            'workflow', 'workflow__document', 'workflow__initiated_by',
+            'workflow', 'workflow__target_content_type', 'workflow__initiated_by',
             'assigned_to', 'delegated_from'
         )
 

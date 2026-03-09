@@ -350,7 +350,7 @@ export function WorkflowCenterPage() {
                 {tasks
                   .filter(
                     (task) =>
-                      task.document_title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      task.target_title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                       task.workflow_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                       task.step_name.toLowerCase().includes(searchQuery.toLowerCase())
                   )
@@ -372,7 +372,7 @@ export function WorkflowCenterPage() {
                           <div className="flex items-center gap-2 mb-1">
                             <FileText className="w-4 h-4 text-gray-400" />
                             <span className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                              {task.document_title}
+                              {task.target_title}
                             </span>
                             {task.is_overdue && (
                               <span className="px-1.5 py-0.5 text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 rounded">
@@ -683,7 +683,7 @@ export function WorkflowCenterPage() {
                       <div className="flex items-center gap-3">
                         <FileText className="w-5 h-5 text-gray-400" />
                         <span className="text-sm font-medium text-gray-900 dark:text-white">
-                          {workflow.document_title}
+                          {workflow.target_title}
                         </span>
                       </div>
                     </td>
@@ -855,7 +855,7 @@ export function WorkflowCenterPage() {
                   >
                     <td className="px-4 py-3">
                       <span className="text-sm font-medium text-gray-900 dark:text-white">
-                        {workflow.document_title}
+                        {workflow.target_title}
                       </span>
                     </td>
                     <td className="px-4 py-3">
