@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { SharedByMeView } from './SharedByMeView'
 import { SharedWithMeView } from './SharedWithMeView'
 import type { SharedByMeItem, SharedWithMeItem, User } from '@/types/sharing'

@@ -2,7 +2,7 @@
  * FilePreviewModal Storybook Stories
  */
 
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { useState } from 'react'
 import { FilePreviewModal } from './FilePreviewModal'
 import type { FilePreview } from '@/types/fileManagement'

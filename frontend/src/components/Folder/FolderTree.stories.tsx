@@ -2,7 +2,7 @@
  * FolderTree Storybook Stories
  */
 
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { useState } from 'react'
 import { FolderTree } from './FolderTree'
 import type { Folder, FolderOperation } from '@/types/folder'

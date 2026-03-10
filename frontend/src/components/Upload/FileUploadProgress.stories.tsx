@@ -2,7 +2,7 @@
  * FileUploadProgress Storybook Stories
  */
 
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { FileUploadProgress } from './FileUploadProgress'
 import type { FileUploadItem } from '@/types/upload'
 

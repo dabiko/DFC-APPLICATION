@@ -2,7 +2,7 @@
  * FileCard Storybook Stories
  */
 
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { FileCard } from './FileCard'
 import type { FileListItem } from '@/types/fileManagement'
 

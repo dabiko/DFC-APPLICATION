@@ -35,3 +35,27 @@ export { VersionCard } from './versioning/VersionCard'
 export { VersionDiffViewer } from './versioning/VersionDiffViewer'
 export { DiffStepCard } from './versioning/DiffStepCard'
 export { VersionSelector } from './versioning/VersionSelector'
+
+// Assignments
+export {
+  AssignmentStatusBadge,
+  AssignmentCard,
+  AssignmentList,
+  AssignmentDashboard,
+  AssignmentForm,
+  DepartmentBreakdownChart,
+  ProcedureBreakdownChart,
+  OverdueAlertList,
+  ExpirationWarningList,
+} from './assignments'
+
+// Evidence
+export {
+  StepEvidenceRow,
+  QuizEvidenceRow,
+  AttemptTimeline,
+  EvidenceDetailModal,
+  EvidenceExportButton,
+  ComplianceReportCard,
+  EvidenceTable,
+} from './evidence'

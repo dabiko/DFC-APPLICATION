@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { useState } from 'react'
 import { AccessControlList } from './AccessControlList'
 import type { AccessControlList as ACLType, PermissionGrantRequest } from '@/types/rbac'

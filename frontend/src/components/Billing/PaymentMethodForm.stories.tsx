@@ -2,7 +2,7 @@
  * PaymentMethodForm Storybook Stories
  */
 
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { PaymentMethodForm } from './PaymentMethodForm'
 import type { PaymentFormData } from '../../types/billing'
 

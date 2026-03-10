@@ -2,7 +2,7 @@
  * Storybook Stories for ProrationBreakdown Component
  */
 
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { ProrationBreakdown } from './ProrationBreakdown'
 
 const meta: Meta<typeof ProrationBreakdown> = {

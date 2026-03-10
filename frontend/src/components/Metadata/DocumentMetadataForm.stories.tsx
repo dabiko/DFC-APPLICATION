@@ -2,7 +2,7 @@
  * DocumentMetadataForm Storybook Stories
  */
 
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { DocumentMetadataForm } from './DocumentMetadataForm'
 import type { CreateDocumentMetadata } from '@/types/metadata'
 

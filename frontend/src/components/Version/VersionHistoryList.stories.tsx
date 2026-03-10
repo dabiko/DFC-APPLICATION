@@ -2,7 +2,7 @@
  * VersionHistoryList Storybook Stories
  */
 
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { VersionHistoryList } from './VersionHistoryList'
 import type { DocumentVersion } from '@/types/version'
 

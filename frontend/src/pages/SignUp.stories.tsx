@@ -2,7 +2,7 @@
  * SignUp Page Storybook Stories
  */
 
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { SignUp } from './SignUp'
 
 const meta: Meta<typeof SignUp> = {

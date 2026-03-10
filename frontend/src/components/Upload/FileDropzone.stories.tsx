@@ -2,7 +2,7 @@
  * FileDropzone Storybook Stories
  */
 
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { FileDropzone } from './FileDropzone'
 import { useState } from 'react'
 

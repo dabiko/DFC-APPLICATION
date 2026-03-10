@@ -3,7 +3,7 @@
  * Combined stories for all folder operation modals
  */
 
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { useState } from 'react'
 import { CreateFolderModal } from './CreateFolderModal'
 import { RenameFolderModal } from './RenameFolderModal'

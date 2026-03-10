@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { useState } from 'react'
 import { Input, Textarea } from './index'
 import { MagnifyingGlassIcon, EnvelopeIcon, UserIcon, PhoneIcon } from '@heroicons/react/24/outline'

@@ -2,7 +2,7 @@
  * MetadataDisplay Storybook Stories
  */
 
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { MetadataDisplay } from './MetadataDisplay'
 import type { DocumentMetadata } from '@/types/metadata'
 

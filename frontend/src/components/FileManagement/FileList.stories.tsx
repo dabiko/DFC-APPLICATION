@@ -2,7 +2,7 @@
  * FileList Storybook Stories
  */
 
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { useState } from 'react'
 import { FileList } from './FileList'
 import type { FileListItem, ViewMode, SortField, SortOrder } from '@/types/fileManagement'

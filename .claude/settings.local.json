@@ -16,7 +16,10 @@
       "Bash(python manage.py shell:*)",
       "Bash(python manage.py makemigrations:*)",
       "Bash(python manage.py migrate:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx vite:*)",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []

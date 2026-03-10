@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { PermissionBadge } from './PermissionBadge'
 import { ALL_PERMISSIONS } from '@/types/rbac'
 

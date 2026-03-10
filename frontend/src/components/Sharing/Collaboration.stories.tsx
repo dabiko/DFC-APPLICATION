@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { ShareNotifications } from './ShareNotifications'
 import { CollaborationPanel } from './CollaborationPanel'
 import type {

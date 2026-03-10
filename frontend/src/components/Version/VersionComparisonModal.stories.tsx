@@ -2,7 +2,7 @@
  * VersionComparisonModal Storybook Stories
  */
 
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { useState } from 'react'
 import { VersionComparisonModal } from './VersionComparisonModal'
 import { Button } from '@components/Button/Button'

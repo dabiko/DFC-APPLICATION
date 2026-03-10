@@ -2,7 +2,7 @@
  * CurrentSubscription Storybook Stories
  */
 
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { CurrentSubscription } from './CurrentSubscription'
 import { SUBSCRIPTION_PLANS } from '../../config/subscriptionPlans'
 import { SubscriptionStatus, BillingCycle } from '../../types/billing'

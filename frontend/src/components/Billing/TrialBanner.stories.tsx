@@ -2,7 +2,7 @@
  * Storybook Stories for TrialBanner Component
  */
 
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { TrialBanner } from './TrialBanner'
 import type { TrialStatus } from '@/types/billing'
 

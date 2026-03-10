@@ -1,5 +1,5 @@
 import React from 'react'
-import type { Preview } from '@storybook/react'
+import type { Preview } from '@storybook/react-vite'
 import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
 import { MemoryRouter } from 'react-router-dom'
@@ -96,7 +96,7 @@ const preview: Preview = {
       },
     },
     backgrounds: {
-      disable: true, // Disable default backgrounds since we're using dark mode
+      disabled: true,
     },
   },
   globalTypes: {

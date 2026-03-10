@@ -2,7 +2,7 @@
  * UsageMetrics Storybook Stories
  */
 
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { UsageMetrics } from './UsageMetrics'
 import type { UsageMetrics as UsageMetricsType } from '../../types/billing'
 

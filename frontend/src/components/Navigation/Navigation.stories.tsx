@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { useState } from 'react'
 import { Breadcrumbs, Tabs, Pagination, SimplePagination, TreeView } from './index'
 import type { TreeNode } from './TreeView'

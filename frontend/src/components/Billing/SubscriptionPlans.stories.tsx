@@ -2,7 +2,7 @@
  * SubscriptionPlans Storybook Stories
  */
 
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { SubscriptionPlans } from './SubscriptionPlans'
 
 const meta: Meta<typeof SubscriptionPlans> = {

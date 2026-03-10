@@ -3,7 +3,7 @@
  * Combined stories for UpgradeDowngradeModal and CancellationModal
  */
 
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { useState } from 'react'
 import { UpgradeDowngradeModal } from './UpgradeDowngradeModal'
 import { CancellationModal } from './CancellationModal'

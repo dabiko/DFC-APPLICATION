@@ -2,7 +2,7 @@
  * Storybook Stories for Billing Skeleton Components
  */
 
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import {
   Skeleton,
   PlanCardSkeleton,

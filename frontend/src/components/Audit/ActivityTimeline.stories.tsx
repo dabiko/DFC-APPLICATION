@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { useState } from 'react'
 import { ActivityTimeline } from './ActivityTimeline'
 import type { TimelineEvent, AuditLogEntry } from '@/types/audit'

@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { MFAStatus } from './MFAStatus'
 import type { MFAConfig } from '@/types/mfa'
 

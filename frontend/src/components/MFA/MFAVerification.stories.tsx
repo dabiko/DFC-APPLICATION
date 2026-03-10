@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { MFAVerification } from './MFAVerification'
 import type { MFAVerificationProps, MFAVerificationResponse } from '@/types/mfa'
 

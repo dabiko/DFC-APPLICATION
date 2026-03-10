@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { LegalHoldManager } from './LegalHoldManager'
 import type { LegalHold } from '@/types/retention'
 

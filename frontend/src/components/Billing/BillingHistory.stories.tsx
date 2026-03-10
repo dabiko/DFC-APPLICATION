@@ -2,7 +2,7 @@
  * BillingHistory Storybook Stories
  */
 
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { BillingHistory } from './BillingHistory'
 import type { Invoice } from '../../types/billing'
 import { InvoiceStatus } from '../../types/billing'

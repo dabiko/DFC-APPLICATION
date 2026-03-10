@@ -2,7 +2,7 @@
  * BulkActionToolbar Storybook Stories
  */
 
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { BulkActionToolbar } from './BulkActionToolbar'
 import type { FileListItem } from '@/types/fileManagement'
 

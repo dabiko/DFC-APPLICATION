@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { TrustedDevices } from './TrustedDevices'
 import type { TrustedDevice } from '@/types/mfa'
 

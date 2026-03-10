@@ -2,7 +2,7 @@
  * SearchBar Storybook Stories
  */
 
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { SearchBar } from './SearchBar'
 import type { SearchSuggestion, RecentSearch } from '@/types/search'
 

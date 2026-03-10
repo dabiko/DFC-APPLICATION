@@ -2,7 +2,7 @@
  * SortFilterBar Storybook Stories
  */
 
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { useState } from 'react'
 import { SortFilterBar } from './SortFilterBar'
 import type { SortField, SortOrder, FilterOptions, ViewMode } from '@/types/fileManagement'

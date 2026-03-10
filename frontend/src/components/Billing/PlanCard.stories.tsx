@@ -2,7 +2,7 @@
  * PlanCard Storybook Stories
  */
 
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { PlanCard } from './PlanCard'
 import { SUBSCRIPTION_PLANS } from '../../config/subscriptionPlans'
 import { BillingCycle } from '../../types/billing'

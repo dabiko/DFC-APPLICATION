@@ -2,7 +2,7 @@
  * SearchResultCard Storybook Stories
  */
 
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 import { SearchResultCard } from './SearchResultCard'
 import type { SearchResult } from '@/types/search'
 
