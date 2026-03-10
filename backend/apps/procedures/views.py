@@ -629,6 +629,10 @@ class QuestionViewSet(viewsets.ModelViewSet):
             quiz_id=self.kwargs['quiz_pk'],
         ).prefetch_related('options')
 
+    def perform_create(self, serializer):
+        quiz = Quiz.objects.get(id=self.kwargs['quiz_pk'])
+        serializer.save(quiz=quiz)
+
 
 # ---------------------------------------------------------------------------
 # Phase F: Assignment & Training Views
@@ -890,7 +894,7 @@ class TrainingViewSet(viewsets.GenericViewSet):
 
         # Build trainee context for branching
         trainee_context = {
-            'role': list(request.user.user_roles.values_list('role', flat=True)),
+            'role': [str(r) for r in request.user.user_roles.values_list('role', flat=True)],
             'department': getattr(request.user.department, 'slug', '') if hasattr(request.user, 'department') and request.user.department else '',
             'job_title': getattr(request.user, 'job_title', ''),
             'step_results': {},
@@ -942,7 +946,10 @@ class TrainingViewSet(viewsets.GenericViewSet):
     def start_step(self, request, pk=None):
         """Mark step as started."""
         step_id = request.data.get('version_step_id')
-        attempt = TrainingAttempt.objects.get(id=pk, assignment__assignee=request.user)
+        _qs = TrainingAttempt.objects.filter(id=pk)
+        if not request.user.is_superuser:
+            _qs = _qs.filter(assignment__assignee=request.user)
+        attempt = _qs.get()
         step_completion = StepCompletion.objects.get(attempt=attempt, version_step_id=step_id)
 
         if step_completion.status == 'skipped':
@@ -963,7 +970,10 @@ class TrainingViewSet(viewsets.GenericViewSet):
     def view_step(self, request, pk=None):
         """Mark step as viewed."""
         step_id = request.query_params.get('version_step_id') or request.data.get('version_step_id')
-        attempt = TrainingAttempt.objects.get(id=pk, assignment__assignee=request.user)
+        _qs = TrainingAttempt.objects.filter(id=pk)
+        if not request.user.is_superuser:
+            _qs = _qs.filter(assignment__assignee=request.user)
+        attempt = _qs.get()
         step_completion = StepCompletion.objects.get(attempt=attempt, version_step_id=step_id)
 
         if step_completion.status in ('not_started', 'started'):
@@ -978,7 +988,10 @@ class TrainingViewSet(viewsets.GenericViewSet):
     def manual_opened(self, request, pk=None):
         """Record manual open event."""
         step_id = request.data.get('step_completion_id') or request.data.get('version_step_id')
-        attempt = TrainingAttempt.objects.get(id=pk, assignment__assignee=request.user)
+        _qs = TrainingAttempt.objects.filter(id=pk)
+        if not request.user.is_superuser:
+            _qs = _qs.filter(assignment__assignee=request.user)
+        attempt = _qs.get()
         step_completion = StepCompletion.objects.get(attempt=attempt, version_step_id=step_id)
 
         step_completion.manual_opened_at = timezone.now()
@@ -992,7 +1005,10 @@ class TrainingViewSet(viewsets.GenericViewSet):
     def media_completed(self, request, pk=None):
         """Record media completion event."""
         step_id = request.data.get('step_completion_id') or request.data.get('version_step_id')
-        attempt = TrainingAttempt.objects.get(id=pk, assignment__assignee=request.user)
+        _qs = TrainingAttempt.objects.filter(id=pk)
+        if not request.user.is_superuser:
+            _qs = _qs.filter(assignment__assignee=request.user)
+        attempt = _qs.get()
         step_completion = StepCompletion.objects.get(attempt=attempt, version_step_id=step_id)
 
         step_completion.media_completed_at = timezone.now()
@@ -1006,7 +1022,10 @@ class TrainingViewSet(viewsets.GenericViewSet):
     def complete_step(self, request, pk=None):
         """Complete step (validates all gates)."""
         step_id = request.data.get('step_completion_id') or request.data.get('version_step_id')
-        attempt = TrainingAttempt.objects.get(id=pk, assignment__assignee=request.user)
+        _qs = TrainingAttempt.objects.filter(id=pk)
+        if not request.user.is_superuser:
+            _qs = _qs.filter(assignment__assignee=request.user)
+        attempt = _qs.get()
         step_completion = StepCompletion.objects.get(attempt=attempt, version_step_id=step_id)
 
         # Validate gates
@@ -1054,7 +1073,10 @@ class TrainingViewSet(viewsets.GenericViewSet):
     def start_quiz(self, request, pk=None):
         """Start a quiz attempt within a training attempt."""
         quiz_id = request.data.get('version_quiz_id')
-        attempt = TrainingAttempt.objects.get(id=pk, assignment__assignee=request.user)
+        _qs = TrainingAttempt.objects.filter(id=pk)
+        if not request.user.is_superuser:
+            _qs = _qs.filter(assignment__assignee=request.user)
+        attempt = _qs.get()
         version_quiz = VersionQuiz.objects.get(id=quiz_id)
 
         # Check max attempts
@@ -1084,7 +1106,10 @@ class TrainingViewSet(viewsets.GenericViewSet):
     def submit_quiz(self, request, pk=None):
         """Submit quiz answers and grade."""
         quiz_id = request.data.get('quiz_attempt_id') or request.data.get('version_quiz_id')
-        attempt = TrainingAttempt.objects.get(id=pk, assignment__assignee=request.user)
+        _qs = TrainingAttempt.objects.filter(id=pk)
+        if not request.user.is_superuser:
+            _qs = _qs.filter(assignment__assignee=request.user)
+        attempt = _qs.get()
         version_quiz = VersionQuiz.objects.get(id=quiz_id)
 
         # Find in-progress quiz attempt
@@ -1181,7 +1206,10 @@ class TrainingViewSet(viewsets.GenericViewSet):
     @action(detail=True, methods=['post'], url_path='complete_training')
     def complete_training(self, request, pk=None):
         """Finalize a training attempt."""
-        attempt = TrainingAttempt.objects.get(id=pk, assignment__assignee=request.user)
+        qs = TrainingAttempt.objects.filter(id=pk)
+        if not request.user.is_superuser:
+            qs = qs.filter(assignment__assignee=request.user)
+        attempt = qs.get()
 
         if attempt.status != 'in_progress':
             return Response(
@@ -1191,7 +1219,7 @@ class TrainingViewSet(viewsets.GenericViewSet):
 
         # Check all applicable steps are completed or skipped
         incomplete_steps = attempt.step_completions.exclude(
-            status__in=['completed', 'skipped']
+            status__in=['completed', 'skipped', 'quiz_passed']
         ).count()
         if incomplete_steps > 0:
             return Response(

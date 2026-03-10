@@ -6,7 +6,7 @@ Phase F (assignment & training), and Phase G (evidence & export) routes.
 
 from django.urls import path, include
 from rest_framework_nested import routers
-from rest_framework.routers import DefaultRouter
+from rest_framework.routers import DefaultRouter, SimpleRouter
 from . import views
 
 # Main router
@@ -29,7 +29,9 @@ quizzes_router = routers.NestedDefaultRouter(procedures_router, r'quizzes', look
 quizzes_router.register(r'questions', views.QuestionViewSet, basename='quiz-questions')
 
 # Phase F: Assignment & Training — top-level routes
-assignment_router = DefaultRouter()
+# Use SimpleRouter (not DefaultRouter) to avoid generating an API root view
+# that would intercept POST /procedures/ meant for ProcedureViewSet.
+assignment_router = SimpleRouter()
 assignment_router.register(r'assignments', views.ProcedureAssignmentViewSet, basename='assignment')
 assignment_router.register(r'training', views.TrainingViewSet, basename='training')
 

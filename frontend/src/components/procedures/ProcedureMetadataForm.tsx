@@ -5,7 +5,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { X, Plus, Loader2 } from 'lucide-react'
-import { useAppSelector } from '@store'
+import { useAppSelector, useAppDispatch } from '@store'
+import { fetchDepartments } from '@/store/slices/departmentSlice'
 import type { ProcedureDetail, Procedure } from '@/types/procedure'
 import { listProcedures } from '@/services/procedureService'
 
@@ -28,7 +29,15 @@ export function ProcedureMetadataForm({
   onCancel,
   isSubmitting = false,
 }: ProcedureMetadataFormProps) {
+  const dispatch = useAppDispatch()
   const departments = useAppSelector((state) => state.department.departments)
+
+  // Ensure departments are loaded
+  useEffect(() => {
+    if (departments.length === 0) {
+      dispatch(fetchDepartments())
+    }
+  }, [dispatch, departments.length])
 
   const [title, setTitle] = useState(initialData?.title || '')
   const [description, setDescription] = useState(initialData?.description || '')

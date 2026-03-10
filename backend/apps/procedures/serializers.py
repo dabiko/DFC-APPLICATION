@@ -19,7 +19,7 @@ class StepAttachmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = StepAttachment
         fields = '__all__'
-        read_only_fields = ['id', 'uploaded_by', 'uploaded_at', 'file_size',
+        read_only_fields = ['id', 'step', 'uploaded_by', 'uploaded_at', 'file_size',
                             'file_extension', 'mime_type', 'checksum_sha256']
 
 
@@ -29,7 +29,7 @@ class ProcedureStepSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProcedureStep
         fields = '__all__'
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'procedure', 'created_at', 'updated_at']
 
 
 class ProcedureListSerializer(serializers.ModelSerializer):
@@ -64,7 +64,8 @@ class ProcedureDetailSerializer(serializers.ModelSerializer):
 class ProcedureCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Procedure
-        fields = ['title', 'description', 'department', 'parent_procedure', 'tags']
+        fields = ['id', 'title', 'description', 'department', 'parent_procedure', 'tags']
+        read_only_fields = ['id']
 
 
 class StepReorderSerializer(serializers.Serializer):
@@ -76,7 +77,7 @@ class StepReorderSerializer(serializers.Serializer):
 
 class SubmitForReviewSerializer(serializers.Serializer):
     reviewers = serializers.ListField(
-        child=serializers.UUIDField(),
+        child=serializers.IntegerField(),
         min_length=1,
         help_text='List of reviewer user IDs'
     )
@@ -176,7 +177,7 @@ class AnswerOptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = AnswerOption
         fields = '__all__'
-        read_only_fields = ['id']
+        read_only_fields = ['id', 'question']
 
 
 class QuestionSerializer(serializers.ModelSerializer):
@@ -185,7 +186,7 @@ class QuestionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Question
         fields = '__all__'
-        read_only_fields = ['id']
+        read_only_fields = ['id', 'quiz']
 
     def create(self, validated_data):
         options_data = validated_data.pop('options', [])
@@ -220,9 +221,10 @@ class QuizSerializer(serializers.ModelSerializer):
 class QuizCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Quiz
-        fields = ['quiz_type', 'step', 'title', 'description',
+        fields = ['id', 'quiz_type', 'step', 'title', 'description',
                   'passing_score_percent', 'max_attempts', 'time_limit_minutes',
                   'shuffle_questions', 'shuffle_answers', 'show_correct_answers_after']
+        read_only_fields = ['id']
 
 
 # ---------------------------------------------------------------------------
@@ -243,8 +245,8 @@ class ProcedureAssignmentSerializer(serializers.ModelSerializer):
 
 class CreateAssignmentSerializer(serializers.Serializer):
     procedure_version_id = serializers.UUIDField()
-    assignees = serializers.ListField(child=serializers.UUIDField(), required=False, default=[])
-    departments = serializers.ListField(child=serializers.UUIDField(), required=False, default=[])
+    assignees = serializers.ListField(child=serializers.IntegerField(), required=False, default=[])
+    departments = serializers.ListField(child=serializers.IntegerField(), required=False, default=[])
     roles = serializers.ListField(child=serializers.CharField(), required=False, default=[])
     due_date = serializers.DateField()
 

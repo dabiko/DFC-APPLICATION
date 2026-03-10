@@ -759,7 +759,10 @@ export function WorkflowCenterPage() {
               className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
             />
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+          <button
+            onClick={() => navigate('/workflows/designer')}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
             <Plus className="w-4 h-4" />
             Create Template
           </button>
@@ -804,7 +807,10 @@ export function WorkflowCenterPage() {
           ))}
 
           {/* Add New Template Card */}
-          <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 p-5 flex flex-col items-center justify-center text-center cursor-pointer hover:border-blue-400 dark:hover:border-blue-500 transition-colors min-h-[200px]">
+          <div
+            onClick={() => navigate('/workflows/designer')}
+            className="bg-gray-50 dark:bg-gray-800/50 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 p-5 flex flex-col items-center justify-center text-center cursor-pointer hover:border-blue-400 dark:hover:border-blue-500 transition-colors min-h-[200px]"
+          >
             <div className="p-3 bg-gray-100 dark:bg-gray-700 rounded-full mb-3">
               <Plus className="w-6 h-6 text-gray-500 dark:text-gray-400" />
             </div>

@@ -92,8 +92,6 @@ class WorkflowTemplateViewSet(viewsets.ModelViewSet):
         user = self.request.user
         queryset = WorkflowTemplate.objects.filter(
             Q(organization=user.organization) | Q(organization__isnull=True)
-        ).annotate(
-            step_count=Count('steps')
         ).select_related('created_by', 'organization')
 
         # Filter by category

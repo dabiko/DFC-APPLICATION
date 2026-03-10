@@ -356,7 +356,7 @@ def create_assignments(data, assigned_by, org):
     # Role-based: all users with specified roles
     for role_name in data.get('roles', []):
         role_users = UserRole.objects.filter(
-            role=role_name, user__organization=org, user__is_active=True
+            role__name__iexact=role_name, user__organization=org, user__is_active=True
         ).values_list('user_id', flat=True)
         assignee_ids.update(str(uid) for uid in role_users)
 
