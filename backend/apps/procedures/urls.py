@@ -40,9 +40,11 @@ assignment_router.register(r'audit-log', views.ProcedureAuditLogViewSet, basenam
 app_name = 'procedures'
 
 urlpatterns = [
+    # Assignment/training/evidence/audit-log routes MUST come before the main
+    # router to prevent /procedures/{pk}/ from catching "evidence", "audit-log", etc.
+    path('procedures/', include(assignment_router.urls)),
     path('', include(router.urls)),
     path('', include(procedures_router.urls)),
     path('', include(steps_router.urls)),
     path('', include(quizzes_router.urls)),
-    path('procedures/', include(assignment_router.urls)),
 ]

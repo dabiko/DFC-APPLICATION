@@ -27,26 +27,31 @@ class IsAssignedReviewer(BasePermission):
 
 class IsProcedureAdmin(BasePermission):
     def has_permission(self, request, view):
+        if request.user.is_superuser:
+            return True
         from apps.permissions.models import UserRole
         return UserRole.objects.filter(
-            user=request.user, role__in=['admin', 'ADMIN']
+            user=request.user, role__name__iexact='admin', is_active=True
         ).exists()
 
 
 class IsProcedureManager(BasePermission):
     def has_permission(self, request, view):
+        if request.user.is_superuser:
+            return True
         from apps.permissions.models import UserRole
         return UserRole.objects.filter(
-            user=request.user, role__in=['admin', 'ADMIN', 'manager', 'MANAGER']
+            user=request.user, role__name__iregex=r'^(admin|manager)$', is_active=True
         ).exists()
 
 
 class CanCreateProcedure(BasePermission):
     def has_permission(self, request, view):
+        if request.user.is_superuser:
+            return True
         from apps.permissions.models import UserRole
         return UserRole.objects.filter(
-            user=request.user,
-            role__in=['admin', 'ADMIN', 'manager', 'MANAGER', 'editor', 'EDITOR']
+            user=request.user, role__name__iregex=r'^(admin|manager|editor)$', is_active=True
         ).exists()
 
 
@@ -54,9 +59,11 @@ class IsComplianceAuditor(BasePermission):
     def has_permission(self, request, view):
         if request.method not in SAFE_METHODS:
             return False
+        if request.user.is_superuser:
+            return True
         from apps.permissions.models import UserRole
         return UserRole.objects.filter(
-            user=request.user, role__in=['compliance_auditor', 'COMPLIANCE_AUDITOR']
+            user=request.user, role__name__iexact='compliance_auditor', is_active=True
         ).exists()
 
 

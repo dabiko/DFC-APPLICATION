@@ -19,7 +19,14 @@
       "Bash(python:*)",
       "Bash(npx tsc:*)",
       "Bash(npx vite:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(wc -l /c/Users/dabik/PycharmProjects/DFC-APPLICATION/backend/apps/procedures/*.py | tail -1)",
+      "Bash(ls -lh /c/Users/dabik/PycharmProjects/DFC-APPLICATION/frontend/src/pages/*Procedure* /c/Users/dabik/PycharmProjects/DFC-APPLICATION/frontend/src/pages/*Quiz* /c/Users/dabik/PycharmProjects/DFC-APPLICATION/frontend/src/pages/*Training*)",
+      "Bash(wc -l /c/Users/dabik/PycharmProjects/DFC-APPLICATION/backend/apps/workflows/*.py)",
+      "Bash(find /c/Users/dabik/PycharmProjects/DFC-APPLICATION -type f \\\\\\( -name \"*.py\" -o -name \"*.ts\" -o -name \"*.tsx\" \\\\\\) -path \"*procedure*\" -o -path \"*workflow*\" 2>/dev/null | grep -v node_modules | grep -v __pycache__ | grep -v \".venv\" | sort)",
+      "Bash(find /c/Users/dabik/PycharmProjects/DFC-APPLICATION/frontend/src/services -name \"*.ts\" | xargs grep -l \"training\\\\|assignment\" | head -5)",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzczMTQ2OTg4LCJpYXQiOjE3NzMxNDMzODgsImp0aSI6ImZjZmFhMDY2OWNkYzQxNDM5ZGRhYjUyMGZmZmMyMmMwIiwidXNlcl9pZCI6MTZ9.L8DpSyx2I1OciBpAZJ8DYYCNBLaezZpnuWzozLzDA64\" __NEW_LINE_09c19fd62f01614d__ echo \"=== 1. List Procedures ===\" curl -s http://localhost:8000/api/v1/procedures/ -H \"Authorization: Bearer $TOKEN\")",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzczMTQ2OTg4LCJpYXQiOjE3NzMxNDMzODgsImp0aSI6ImZjZmFhMDY2OWNkYzQxNDM5ZGRhYjUyMGZmZmMyMmMwIiwidXNlcl9pZCI6MTZ9.L8DpSyx2I1OciBpAZJ8DYYCNBLaezZpnuWzozLzDA64\"\n\necho \"=== 1. List Procedures ===\"\ncurl -s http://localhost:8000/api/v1/procedures/ -H \"Authorization: Bearer $TOKEN\" 2>&1)"
     ],
     "deny": [],
     "ask": []

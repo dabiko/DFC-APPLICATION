@@ -59,7 +59,7 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',  # CORS middleware - must be first!
     'django.middleware.security.SecurityMiddleware',
     'apps.core.middleware.SecurityHeadersMiddleware',  # Security headers
-    'django.middleware.gzip.GZipMiddleware',  # Response compression
+    # 'django.middleware.gzip.GZipMiddleware',  # Disabled: causes ERR_CONTENT_LENGTH_MISMATCH with dev server. Enable in production via reverse proxy (nginx) instead.
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',

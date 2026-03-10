@@ -83,7 +83,8 @@ export function MyTrainingPage() {
     setError(null)
     try {
       const data = await listAssignments()
-      setAssignments(data.results)
+      const items = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : []
+      setAssignments(items)
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Failed to load training assignments')
     } finally {

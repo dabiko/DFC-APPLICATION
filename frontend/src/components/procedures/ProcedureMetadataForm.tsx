@@ -44,7 +44,10 @@ export function ProcedureMetadataForm({
   // Load parent procedure options
   useEffect(() => {
     listProcedures()
-      .then((data) => setParentOptions(data.results))
+      .then((data) => {
+        const items = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : []
+        setParentOptions(items)
+      })
       .catch(() => {})
   }, [])
 

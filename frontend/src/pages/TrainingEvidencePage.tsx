@@ -43,7 +43,8 @@ export function TrainingEvidencePage() {
       const params: Record<string, string> = {}
       if (search) params.search = search
       const data = await listEvidence(params)
-      setEvidence(data.results)
+      const items = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : []
+      setEvidence(items)
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Failed to load evidence')
     } finally {

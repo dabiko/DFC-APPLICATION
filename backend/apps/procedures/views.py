@@ -90,9 +90,9 @@ class ProcedureViewSet(viewsets.ModelViewSet):
         if self.action in ['create']:
             return [permissions.IsAuthenticated(), CanCreateProcedure()]
         if self.action in ['update', 'partial_update']:
-            return [permissions.IsAuthenticated(), IsProcedureCreator() | IsProcedureAdmin()]
+            return [permissions.IsAuthenticated(), (IsProcedureCreator | IsProcedureAdmin)()]
         if self.action in ['destroy']:
-            return [permissions.IsAuthenticated(), IsProcedureCreator() | IsProcedureAdmin()]
+            return [permissions.IsAuthenticated(), (IsProcedureCreator | IsProcedureAdmin)()]
         return [permissions.IsAuthenticated()]
 
     def perform_create(self, serializer):
@@ -646,8 +646,8 @@ class ProcedureAssignmentViewSet(viewsets.ModelViewSet):
 
         # Non-admins see only their own assignments
         from apps.permissions.models import UserRole
-        is_admin = UserRole.objects.filter(
-            user=self.request.user, role__in=['admin', 'ADMIN', 'manager', 'MANAGER']
+        is_admin = self.request.user.is_superuser or UserRole.objects.filter(
+            user=self.request.user, role__name__iregex=r'^(admin|manager)$', is_active=True
         ).exists()
         if not is_admin:
             qs = qs.filter(assignee=self.request.user)
@@ -674,9 +674,9 @@ class ProcedureAssignmentViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action in ['create']:
-            return [permissions.IsAuthenticated(), IsProcedureAdmin() | IsProcedureManager()]
+            return [permissions.IsAuthenticated(), (IsProcedureAdmin | IsProcedureManager)()]
         if self.action in ['waive', 'dashboard']:
-            return [permissions.IsAuthenticated(), IsProcedureAdmin() | IsProcedureManager()]
+            return [permissions.IsAuthenticated(), (IsProcedureAdmin | IsProcedureManager)()]
         return [permissions.IsAuthenticated()]
 
     def create(self, request, *args, **kwargs):
@@ -850,26 +850,33 @@ class TrainingViewSet(viewsets.GenericViewSet):
 
     def retrieve(self, request, pk=None):
         """GET /training/{attempt_id}/ — Get attempt state (resume point)."""
-        attempt = TrainingAttempt.objects.select_related(
+        qs = TrainingAttempt.objects.select_related(
             'assignment__procedure_version',
         ).prefetch_related(
             'step_completions__version_step',
             'quiz_attempts__responses',
-        ).get(id=pk, assignment__assignee=request.user)
+        ).filter(id=pk)
+        if not request.user.is_superuser:
+            qs = qs.filter(assignment__assignee=request.user)
+        attempt = qs.first()
+        if not attempt:
+            return Response({'error': 'Training attempt not found.'}, status=status.HTTP_404_NOT_FOUND)
 
         return Response(TrainingAttemptSerializer(attempt).data)
 
-    @action(detail=False, methods=['post'], url_path='start')
-    def start_training(self, request):
-        """POST /training/start/ — Start new attempt for an assignment."""
-        assignment_id = request.data.get('assignment_id')
+    @action(detail=True, methods=['post'], url_path='start_training')
+    def start_training(self, request, pk=None):
+        """POST /training/{assignment_id}/start_training/ — Start new attempt for an assignment."""
+        assignment_id = pk
 
         try:
-            assignment = ProcedureAssignment.objects.get(
+            qs = ProcedureAssignment.objects.filter(
                 id=assignment_id,
-                assignee=request.user,
                 status__in=['assigned', 'in_progress'],
             )
+            if not request.user.is_superuser:
+                qs = qs.filter(assignee=request.user)
+            assignment = qs.get()
         except ProcedureAssignment.DoesNotExist:
             return Response(
                 {'error': 'Assignment not found or not available.'},
@@ -931,9 +938,10 @@ class TrainingViewSet(viewsets.GenericViewSet):
 
         return Response(TrainingAttemptSerializer(attempt).data, status=status.HTTP_201_CREATED)
 
-    @action(detail=True, methods=['post'], url_path=r'steps/(?P<step_id>[^/.]+)/start')
-    def start_step(self, request, pk=None, step_id=None):
+    @action(detail=True, methods=['post'], url_path='start_step')
+    def start_step(self, request, pk=None):
         """Mark step as started."""
+        step_id = request.data.get('version_step_id')
         attempt = TrainingAttempt.objects.get(id=pk, assignment__assignee=request.user)
         step_completion = StepCompletion.objects.get(attempt=attempt, version_step_id=step_id)
 
@@ -951,9 +959,10 @@ class TrainingViewSet(viewsets.GenericViewSet):
 
         return Response(StepCompletionSerializer(step_completion).data)
 
-    @action(detail=True, methods=['post'], url_path=r'steps/(?P<step_id>[^/.]+)/view')
-    def view_step(self, request, pk=None, step_id=None):
+    @action(detail=True, methods=['get', 'post'], url_path='view_step')
+    def view_step(self, request, pk=None):
         """Mark step as viewed."""
+        step_id = request.query_params.get('version_step_id') or request.data.get('version_step_id')
         attempt = TrainingAttempt.objects.get(id=pk, assignment__assignee=request.user)
         step_completion = StepCompletion.objects.get(attempt=attempt, version_step_id=step_id)
 
@@ -965,9 +974,10 @@ class TrainingViewSet(viewsets.GenericViewSet):
 
         return Response(StepCompletionSerializer(step_completion).data)
 
-    @action(detail=True, methods=['post'], url_path=r'steps/(?P<step_id>[^/.]+)/manual-opened')
-    def manual_opened(self, request, pk=None, step_id=None):
+    @action(detail=True, methods=['post'], url_path='manual_opened')
+    def manual_opened(self, request, pk=None):
         """Record manual open event."""
+        step_id = request.data.get('step_completion_id') or request.data.get('version_step_id')
         attempt = TrainingAttempt.objects.get(id=pk, assignment__assignee=request.user)
         step_completion = StepCompletion.objects.get(attempt=attempt, version_step_id=step_id)
 
@@ -978,9 +988,10 @@ class TrainingViewSet(viewsets.GenericViewSet):
 
         return Response(StepCompletionSerializer(step_completion).data)
 
-    @action(detail=True, methods=['post'], url_path=r'steps/(?P<step_id>[^/.]+)/media-completed')
-    def media_completed(self, request, pk=None, step_id=None):
+    @action(detail=True, methods=['post'], url_path='media_completed')
+    def media_completed(self, request, pk=None):
         """Record media completion event."""
+        step_id = request.data.get('step_completion_id') or request.data.get('version_step_id')
         attempt = TrainingAttempt.objects.get(id=pk, assignment__assignee=request.user)
         step_completion = StepCompletion.objects.get(attempt=attempt, version_step_id=step_id)
 
@@ -991,9 +1002,10 @@ class TrainingViewSet(viewsets.GenericViewSet):
 
         return Response(StepCompletionSerializer(step_completion).data)
 
-    @action(detail=True, methods=['post'], url_path=r'steps/(?P<step_id>[^/.]+)/complete')
-    def complete_step(self, request, pk=None, step_id=None):
+    @action(detail=True, methods=['post'], url_path='complete_step')
+    def complete_step(self, request, pk=None):
         """Complete step (validates all gates)."""
+        step_id = request.data.get('step_completion_id') or request.data.get('version_step_id')
         attempt = TrainingAttempt.objects.get(id=pk, assignment__assignee=request.user)
         step_completion = StepCompletion.objects.get(attempt=attempt, version_step_id=step_id)
 
@@ -1038,9 +1050,10 @@ class TrainingViewSet(viewsets.GenericViewSet):
             'total_steps': attempt.total_steps,
         })
 
-    @action(detail=True, methods=['post'], url_path=r'quizzes/(?P<quiz_id>[^/.]+)/start')
-    def start_quiz(self, request, pk=None, quiz_id=None):
+    @action(detail=True, methods=['post'], url_path='start_quiz')
+    def start_quiz(self, request, pk=None):
         """Start a quiz attempt within a training attempt."""
+        quiz_id = request.data.get('version_quiz_id')
         attempt = TrainingAttempt.objects.get(id=pk, assignment__assignee=request.user)
         version_quiz = VersionQuiz.objects.get(id=quiz_id)
 
@@ -1067,9 +1080,10 @@ class TrainingViewSet(viewsets.GenericViewSet):
 
         return Response(QuizAttemptSerializer(quiz_attempt).data, status=status.HTTP_201_CREATED)
 
-    @action(detail=True, methods=['post'], url_path=r'quizzes/(?P<quiz_id>[^/.]+)/submit')
-    def submit_quiz(self, request, pk=None, quiz_id=None):
+    @action(detail=True, methods=['post'], url_path='submit_quiz')
+    def submit_quiz(self, request, pk=None):
         """Submit quiz answers and grade."""
+        quiz_id = request.data.get('quiz_attempt_id') or request.data.get('version_quiz_id')
         attempt = TrainingAttempt.objects.get(id=pk, assignment__assignee=request.user)
         version_quiz = VersionQuiz.objects.get(id=quiz_id)
 
@@ -1164,7 +1178,7 @@ class TrainingViewSet(viewsets.GenericViewSet):
             'result': result,
         })
 
-    @action(detail=True, methods=['post'], url_path='complete')
+    @action(detail=True, methods=['post'], url_path='complete_training')
     def complete_training(self, request, pk=None):
         """Finalize a training attempt."""
         attempt = TrainingAttempt.objects.get(id=pk, assignment__assignee=request.user)
@@ -1264,7 +1278,7 @@ class EvidenceViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ProcedureAssignmentSerializer
 
     def get_permissions(self):
-        return [permissions.IsAuthenticated(), IsProcedureAdmin() | IsComplianceAuditor()]
+        return [permissions.IsAuthenticated(), (IsProcedureAdmin | IsComplianceAuditor)()]
 
     def get_queryset(self):
         qs = ProcedureAssignment.objects.filter(
@@ -1467,7 +1481,7 @@ class ProcedureAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ProcedureAuditLogSerializer
 
     def get_permissions(self):
-        return [permissions.IsAuthenticated(), IsProcedureAdmin() | IsComplianceAuditor()]
+        return [permissions.IsAuthenticated(), (IsProcedureAdmin | IsComplianceAuditor)()]
 
     def get_queryset(self):
         qs = ProcedureAuditLog.objects.filter(

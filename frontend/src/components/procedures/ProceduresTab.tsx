@@ -27,7 +27,8 @@ export function ProceduresTab() {
       if (filters.search) cleanFilters.search = filters.search
 
       const data = await listProcedures(cleanFilters as Filters)
-      setProcedures(data.results)
+      const items = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : []
+      setProcedures(items)
     } catch (err: any) {
       console.error('Failed to load procedures:', err)
       setError(err?.response?.data?.detail || 'Failed to load procedures')

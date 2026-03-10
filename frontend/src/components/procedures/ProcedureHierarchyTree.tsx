@@ -44,7 +44,10 @@ export function ProcedureHierarchyTree({ onSelect, selectedId }: ProcedureHierar
 
   useEffect(() => {
     listProcedures()
-      .then((data) => setNodes(buildTree(data.results)))
+      .then((data) => {
+        const items = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : []
+        setNodes(buildTree(items))
+      })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
