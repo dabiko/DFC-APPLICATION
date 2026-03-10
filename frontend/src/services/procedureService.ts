@@ -121,6 +121,71 @@ export const uploadAttachment = async (
   return response.data
 }
 
+export const checkDuplicate = async (
+  procedureId: string,
+  stepId: string,
+  file: File
+): Promise<{
+  checksum: string
+  has_duplicates: boolean
+  matches: Array<{
+    source: 'document' | 'step_attachment'
+    id: string
+    title: string
+    file_name?: string
+    folder_path?: string | null
+    confidentiality_level?: string
+    document_url?: string
+    procedure_title?: string
+    step_title?: string
+  }>
+}> => {
+  const formData = new FormData()
+  formData.append('file', file)
+  const response = await apiClient.post(
+    `${BASE}/procedures/${procedureId}/steps/${stepId}/attachments/check-duplicate/`,
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } }
+  )
+  return response.data
+}
+
+export const searchDocuments = async (
+  procedureId: string,
+  stepId: string,
+  query: string
+): Promise<
+  Array<{
+    id: string
+    title: string
+    file_name: string
+    file_size: number
+    file_type: string
+    confidentiality_level: string
+    folder_path: string | null
+    department_name: string | null
+    document_url: string
+  }>
+> => {
+  const response = await apiClient.get(
+    `${BASE}/procedures/${procedureId}/steps/${stepId}/attachments/search-documents/`,
+    { params: { q: query } }
+  )
+  return response.data
+}
+
+export const linkDocument = async (
+  procedureId: string,
+  stepId: string,
+  data: { document_id: string; title: string; attachment_type: string }
+): Promise<StepAttachment> => {
+  const response = await apiClient.post(
+    `${BASE}/procedures/${procedureId}/steps/${stepId}/attachments/`,
+    data
+  )
+  return response.data
+}
+
 export const deleteAttachment = async (
   procedureId: string,
   stepId: string,
@@ -294,6 +359,9 @@ export const procedureService = {
   deleteStep,
   reorderSteps,
   uploadAttachment,
+  checkDuplicate,
+  searchDocuments,
+  linkDocument,
   deleteAttachment,
   listQuizzes,
   createQuiz,

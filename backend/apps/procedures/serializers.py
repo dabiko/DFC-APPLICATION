@@ -16,11 +16,31 @@ from .models import (
 
 
 class StepAttachmentSerializer(serializers.ModelSerializer):
+    document_info = serializers.SerializerMethodField()
+    is_linked = serializers.BooleanField(read_only=True)
+
     class Meta:
         model = StepAttachment
         fields = '__all__'
         read_only_fields = ['id', 'step', 'uploaded_by', 'uploaded_at', 'file_size',
-                            'file_extension', 'mime_type', 'checksum_sha256']
+                            'file_name', 'file_extension', 'mime_type', 'checksum_sha256']
+
+    def get_document_info(self, obj):
+        if not obj.document_reference_id:
+            return None
+        doc = obj.document_reference
+        if doc is None:
+            return None
+        return {
+            'id': str(doc.id),
+            'title': doc.title,
+            'file_name': doc.file_name,
+            'file_size': doc.file_size,
+            'file_type': doc.file_type,
+            'confidentiality_level': doc.confidentiality_level,
+            'folder_path': doc.folder.path if doc.folder_id else None,
+            'document_url': f'/documents/{doc.id}',
+        }
 
 
 class ProcedureStepSerializer(serializers.ModelSerializer):
@@ -107,9 +127,26 @@ class ProcedureStepCommentSerializer(serializers.ModelSerializer):
 
 # Version serializers
 class VersionStepAttachmentSerializer(serializers.ModelSerializer):
+    document_info = serializers.SerializerMethodField()
+    is_linked = serializers.BooleanField(read_only=True)
+
     class Meta:
         model = VersionStepAttachment
         fields = '__all__'
+
+    def get_document_info(self, obj):
+        if not obj.document_reference_id:
+            return None
+        doc = obj.document_reference
+        if doc is None:
+            return None
+        return {
+            'id': str(doc.id),
+            'title': doc.title,
+            'file_name': doc.file_name,
+            'folder_path': doc.folder.path if doc.folder_id else None,
+            'document_url': f'/documents/{doc.id}',
+        }
 
 
 class ProcedureVersionStepSerializer(serializers.ModelSerializer):

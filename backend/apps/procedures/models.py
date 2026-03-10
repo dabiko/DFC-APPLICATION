@@ -159,13 +159,22 @@ class StepAttachment(models.Model):
     )
     attachment_type = models.CharField(max_length=20, choices=AttachmentType.choices)
     title = models.CharField(max_length=255)
-    file = models.FileField(upload_to='procedures/attachments/%Y/%m/')
-    file_name = models.CharField(max_length=255)
-    file_size = models.PositiveBigIntegerField()  # bytes
-    file_extension = models.CharField(max_length=10)
-    mime_type = models.CharField(max_length=100)
-    checksum_sha256 = models.CharField(max_length=64)
+    file = models.FileField(upload_to='procedures/attachments/%Y/%m/', blank=True)
+    file_name = models.CharField(max_length=255, blank=True)
+    file_size = models.PositiveBigIntegerField(default=0)  # bytes
+    file_extension = models.CharField(max_length=10, blank=True)
+    mime_type = models.CharField(max_length=100, blank=True)
+    checksum_sha256 = models.CharField(max_length=64, blank=True)
     order = models.PositiveIntegerField(default=0)
+
+    # Link to an existing DFC document instead of uploading a new file
+    document_reference = models.ForeignKey(
+        'documents.Document',
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='step_attachment_links',
+        help_text='If set, this attachment links to an existing document (file field will be blank).',
+    )
 
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -177,6 +186,17 @@ class StepAttachment(models.Model):
     class Meta:
         db_table = 'procedure_step_attachments'
         ordering = ['order']
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if not self.file and not self.document_reference_id:
+            raise ValidationError('Either a file or a document reference must be provided.')
+        if self.file and self.document_reference_id:
+            raise ValidationError('Cannot have both a file and a document reference.')
+
+    @property
+    def is_linked(self):
+        return self.document_reference_id is not None
 
     def __str__(self):
         return self.title
@@ -293,17 +313,29 @@ class VersionStepAttachment(models.Model):
     original_attachment_id = models.UUIDField()
     attachment_type = models.CharField(max_length=20)
     title = models.CharField(max_length=255)
-    file = models.FileField()  # Points to same MinIO object — immutable reference
-    file_name = models.CharField(max_length=255)
-    file_size = models.PositiveBigIntegerField()
-    file_extension = models.CharField(max_length=10)
-    mime_type = models.CharField(max_length=100)
-    checksum_sha256 = models.CharField(max_length=64)
+    file = models.FileField(blank=True)  # Points to same MinIO object — immutable reference
+    file_name = models.CharField(max_length=255, blank=True)
+    file_size = models.PositiveBigIntegerField(default=0)
+    file_extension = models.CharField(max_length=10, blank=True)
+    mime_type = models.CharField(max_length=100, blank=True)
+    checksum_sha256 = models.CharField(max_length=64, blank=True)
     order = models.PositiveIntegerField(default=0)
+
+    # Preserved link to an existing DFC document
+    document_reference = models.ForeignKey(
+        'documents.Document',
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='+',
+    )
 
     class Meta:
         db_table = 'version_step_attachments'
         ordering = ['order']
+
+    @property
+    def is_linked(self):
+        return self.document_reference_id is not None
 
     def __str__(self):
         return self.title

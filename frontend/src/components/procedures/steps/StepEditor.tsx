@@ -17,10 +17,18 @@ import {
   BookOpen,
   Video,
   HelpCircle,
+  Link2,
+  AlertTriangle,
 } from 'lucide-react'
 import type { ProcedureStep, StepAttachment, BranchCondition } from '@/types/procedure'
-import { uploadAttachment, deleteAttachment } from '@/services/procedureService'
+import {
+  uploadAttachment,
+  deleteAttachment,
+  checkDuplicate,
+  linkDocument,
+} from '@/services/procedureService'
 import { BranchConditionEditor } from '../branching/BranchConditionEditor'
+import DocumentSearchModal from './DocumentSearchModal'
 
 interface StepEditorProps {
   step: ProcedureStep
@@ -33,6 +41,26 @@ interface StepEditorProps {
 export function StepEditor({ step, procedureId, index, onUpdate, onDelete }: StepEditorProps) {
   const [expanded, setExpanded] = useState(true)
   const [uploading, setUploading] = useState(false)
+  const [linkModalOpen, setLinkModalOpen] = useState(false)
+  const [duplicateWarning, setDuplicateWarning] = useState<{
+    file: File
+    matches: Array<{
+      source: 'document' | 'step_attachment'
+      id: string
+      title: string
+      file_name?: string
+      folder_path?: string | null
+      confidentiality_level?: string
+      document_url?: string
+      procedure_title?: string
+      step_title?: string
+    }>
+  } | null>(null)
+  const [refForm, setRefForm] = useState<{
+    documentId: string
+    title: string
+    documentUrl: string
+  } | null>(null)
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
@@ -41,6 +69,19 @@ export function StepEditor({ step, procedureId, index, onUpdate, onDelete }: Ste
     setUploading(true)
     try {
       for (const file of Array.from(files)) {
+        // Check for duplicates first
+        try {
+          const dupResult = await checkDuplicate(procedureId, step.id, file)
+          if (dupResult.has_duplicates) {
+            setDuplicateWarning({ file, matches: dupResult.matches })
+            setUploading(false)
+            e.target.value = ''
+            return
+          }
+        } catch {
+          // If duplicate check fails, proceed with upload
+        }
+
         const formData = new FormData()
         formData.append('file', file)
         formData.append('title', file.name)
@@ -56,6 +97,49 @@ export function StepEditor({ step, procedureId, index, onUpdate, onDelete }: Ste
     } finally {
       setUploading(false)
       e.target.value = ''
+    }
+  }
+
+  const handleUseAsRef = (match: { id: string; title: string; document_url?: string }) => {
+    setDuplicateWarning(null)
+    setRefForm({
+      documentId: match.id,
+      title: match.title,
+      documentUrl: match.document_url || `/documents/${match.id}`,
+    })
+  }
+
+  const handleConfirmRef = async () => {
+    if (!refForm) return
+    try {
+      const newAttachment = await linkDocument(procedureId, step.id, {
+        document_id: refForm.documentId,
+        title: refForm.title,
+        attachment_type: 'reference',
+      })
+      onUpdate(step.id, {
+        attachments: [...step.attachments, newAttachment],
+      })
+    } catch (err) {
+      console.error('Link document failed:', err)
+    } finally {
+      setRefForm(null)
+    }
+  }
+
+  const handleLinkDocument = async (doc: { id: string; title: string }) => {
+    setLinkModalOpen(false)
+    try {
+      const newAttachment = await linkDocument(procedureId, step.id, {
+        document_id: doc.id,
+        title: doc.title,
+        attachment_type: 'reference',
+      })
+      onUpdate(step.id, {
+        attachments: [...step.attachments, newAttachment],
+      })
+    } catch (err) {
+      console.error('Link document failed:', err)
     }
   }
 
@@ -189,29 +273,51 @@ export function StepEditor({ step, procedureId, index, onUpdate, onDelete }: Ste
               <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
                 Attachments ({step.attachments.length})
               </label>
-              <label className="flex items-center gap-1 cursor-pointer text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400">
-                <Upload className="h-3 w-3" />
-                {uploading ? 'Uploading...' : 'Upload'}
-                <input
-                  type="file"
-                  multiple
-                  onChange={handleFileUpload}
-                  className="hidden"
-                  disabled={uploading}
-                />
-              </label>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setLinkModalOpen(true)}
+                  className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 dark:text-green-400"
+                >
+                  <Link2 className="h-3 w-3" />
+                  Link Existing
+                </button>
+                <label className="flex items-center gap-1 cursor-pointer text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400">
+                  <Upload className="h-3 w-3" />
+                  {uploading ? 'Uploading...' : 'Upload'}
+                  <input
+                    type="file"
+                    multiple
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    disabled={uploading}
+                  />
+                </label>
+              </div>
             </div>
             {step.attachments.length > 0 && (
               <div className="space-y-1">
                 {step.attachments.map((att) => (
                   <div
                     key={att.id}
-                    className="flex items-center gap-2 rounded-md bg-gray-50 px-2.5 py-1.5 text-xs dark:bg-gray-700"
+                    className={`flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs ${
+                      att.is_linked
+                        ? 'bg-green-50 border border-green-200 dark:bg-green-900/20 dark:border-green-800'
+                        : 'bg-gray-50 dark:bg-gray-700'
+                    }`}
                   >
-                    <AttachmentIcon type={att.attachment_type} />
+                    {att.is_linked ? (
+                      <Link2 className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />
+                    ) : (
+                      <AttachmentIcon type={att.attachment_type} />
+                    )}
                     <span className="flex-1 truncate text-gray-700 dark:text-gray-300">
                       {att.title || att.file_name}
                     </span>
+                    {att.is_linked && (
+                      <span className="rounded px-1 py-0.5 text-[10px] font-medium bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
+                        Linked
+                      </span>
+                    )}
                     <span className="text-gray-400">{formatFileSize(att.file_size)}</span>
                     <button
                       onClick={() => handleDeleteAttachment(att.id)}
@@ -224,6 +330,129 @@ export function StepEditor({ step, procedureId, index, onUpdate, onDelete }: Ste
               </div>
             )}
           </div>
+
+          {/* Duplicate Warning Modal */}
+          {duplicateWarning && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+              <div className="mx-4 w-full max-w-lg rounded-lg bg-white p-5 shadow-xl dark:bg-gray-800">
+                <div className="flex items-center gap-2 text-amber-600 mb-3">
+                  <AlertTriangle className="h-5 w-5" />
+                  <h3 className="text-sm font-semibold">Duplicate Document Detected</h3>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
+                  <strong>{duplicateWarning.file.name}</strong> already exists in the system:
+                </p>
+                <div className="space-y-2 mb-4 max-h-48 overflow-y-auto">
+                  {duplicateWarning.matches.map((match) => (
+                    <div
+                      key={match.id}
+                      className="rounded-md border border-amber-200 bg-amber-50 p-2.5 text-xs dark:border-amber-800 dark:bg-amber-900/20"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium text-gray-900 dark:text-white">
+                            {match.title}
+                          </div>
+                          {match.file_name && (
+                            <div className="text-gray-500 mt-0.5">{match.file_name}</div>
+                          )}
+                          {match.folder_path && (
+                            <div className="text-gray-400 mt-0.5">Path: {match.folder_path}</div>
+                          )}
+                          {match.procedure_title && (
+                            <div className="text-gray-400 mt-0.5">
+                              Procedure: {match.procedure_title} &rarr; {match.step_title}
+                            </div>
+                          )}
+                          <div className="mt-1 text-[10px] font-medium text-amber-700 dark:text-amber-400">
+                            Source:{' '}
+                            {match.source === 'document' ? 'Document Library' : 'Step Attachment'}
+                          </div>
+                        </div>
+                        {match.source === 'document' && (
+                          <button
+                            onClick={() => handleUseAsRef(match)}
+                            className="flex-shrink-0 flex items-center gap-1 rounded-md bg-green-600 px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-green-700"
+                          >
+                            <Link2 className="h-3 w-3" />
+                            Use as Ref
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => setDuplicateWarning(null)}
+                    className="rounded-md px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Reference Confirmation Form */}
+          {refForm && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+              <div className="mx-4 w-full max-w-lg rounded-lg bg-white p-5 shadow-xl dark:bg-gray-800">
+                <div className="flex items-center gap-2 text-green-600 mb-4">
+                  <Link2 className="h-5 w-5" />
+                  <h3 className="text-sm font-semibold">Link Document as Reference</h3>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                      Reference Title
+                    </label>
+                    <input
+                      type="text"
+                      value={refForm.title}
+                      onChange={(e) => setRefForm({ ...refForm, title: e.target.value })}
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                      Document Link
+                    </label>
+                    <input
+                      type="text"
+                      value={refForm.documentUrl}
+                      readOnly
+                      className="w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-600 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-400"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 mt-4">
+                  <button
+                    onClick={() => setRefForm(null)}
+                    className="rounded-md px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleConfirmRef}
+                    className="flex items-center gap-1 rounded-md bg-green-600 px-3 py-1.5 text-sm text-white hover:bg-green-700"
+                  >
+                    <Link2 className="h-3.5 w-3.5" />
+                    Confirm Link
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Link Document Modal */}
+          <DocumentSearchModal
+            procedureId={procedureId}
+            stepId={step.id}
+            open={linkModalOpen}
+            onClose={() => setLinkModalOpen(false)}
+            onSelect={handleLinkDocument}
+          />
         </div>
       )}
     </div>
@@ -244,8 +473,10 @@ function AttachmentIcon({ type }: { type: string }) {
 
 function detectType(file: File): string {
   if (file.type.startsWith('video/')) return 'video'
-  if (file.type === 'application/pdf' || file.type.includes('document')) return 'document'
-  return 'other'
+  if (file.type.startsWith('image/')) return 'image'
+  if (file.type === 'application/pdf' || file.type.includes('document')) return 'manual'
+  if (file.type.includes('spreadsheet') || file.type.includes('presentation')) return 'template'
+  return 'reference'
 }
 
 function formatFileSize(bytes: number): string {

@@ -127,6 +127,17 @@ export interface StepAttachment {
   order: number
   uploaded_by: string
   uploaded_at: string
+  is_linked: boolean
+  document_info: {
+    id: string
+    title: string
+    file_name: string
+    file_size: number
+    file_type: string
+    confidentiality_level: string
+    folder_path: string | null
+    document_url: string
+  } | null
 }
 
 // =============================================================================

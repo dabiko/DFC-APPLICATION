@@ -383,7 +383,8 @@ class ProcedureViewSet(viewsets.ModelViewSet):
                     original_attachment_id=att.id,
                     attachment_type=att.attachment_type,
                     title=att.title,
-                    file=att.file,  # Points to same MinIO object
+                    file=att.file if att.file else '',
+                    document_reference=att.document_reference,
                     file_name=att.file_name,
                     file_size=att.file_size,
                     file_extension=att.file_extension,
@@ -498,29 +499,60 @@ class ProcedureStepViewSet(viewsets.ModelViewSet):
 
 
 class StepAttachmentViewSet(viewsets.ModelViewSet):
-    """CRUD for step attachments."""
+    """CRUD for step attachments. Supports file upload and linking existing documents."""
     serializer_class = StepAttachmentSerializer
 
     def get_queryset(self):
         return StepAttachment.objects.filter(
             step_id=self.kwargs['step_pk'],
             step__procedure_id=self.kwargs['procedure_pk'],
+        ).select_related('document_reference', 'document_reference__folder')
+
+    def _get_step(self):
+        return ProcedureStep.objects.get(
+            id=self.kwargs['step_pk'],
+            procedure_id=self.kwargs['procedure_pk'],
         )
 
     def perform_create(self, serializer):
+        from rest_framework.exceptions import ValidationError
+
+        step = self._get_step()
+        document_id = self.request.data.get('document_id')
         file = self.request.FILES.get('file')
 
+        # --- Link mode: attach an existing DFC document ---
+        if document_id:
+            from apps.documents.models import Document
+            try:
+                doc = Document.objects.select_related('folder').get(
+                    id=document_id, is_deleted=False,
+                )
+            except Document.DoesNotExist:
+                raise ValidationError({'document_id': 'Document not found.'})
+
+            ext = doc.file_name.rsplit('.', 1)[-1].lower() if '.' in doc.file_name else ''
+            serializer.save(
+                step=step,
+                document_reference=doc,
+                file_name=doc.file_name,
+                file_size=doc.file_size,
+                file_extension=ext,
+                mime_type=doc.file_type or 'application/octet-stream',
+                checksum_sha256=doc.checksum or '',
+                uploaded_by=self.request.user,
+            )
+            return
+
+        # --- Upload mode: upload a new file ---
         if not file:
-            from rest_framework.exceptions import ValidationError
-            raise ValidationError('No file provided.')
+            raise ValidationError('Provide either a file or a document_id.')
 
         ext = file.name.rsplit('.', 1)[-1].lower() if '.' in file.name else ''
         if ext not in StepAttachment.ALLOWED_EXTENSIONS:
-            from rest_framework.exceptions import ValidationError
             raise ValidationError(f'File type .{ext} not allowed.')
 
         if file.size > StepAttachment.MAX_FILE_SIZE_MB * 1024 * 1024:
-            from rest_framework.exceptions import ValidationError
             raise ValidationError(f'File exceeds {StepAttachment.MAX_FILE_SIZE_MB}MB limit.')
 
         # Compute checksum
@@ -529,11 +561,6 @@ class StepAttachmentViewSet(viewsets.ModelViewSet):
             sha256.update(chunk)
         checksum = sha256.hexdigest()
         file.seek(0)  # Reset after reading
-
-        step = ProcedureStep.objects.get(
-            id=self.kwargs['step_pk'],
-            procedure_id=self.kwargs['procedure_pk'],
-        )
 
         serializer.save(
             step=step,
@@ -545,6 +572,85 @@ class StepAttachmentViewSet(viewsets.ModelViewSet):
             checksum_sha256=checksum,
             uploaded_by=self.request.user,
         )
+
+    @action(detail=False, methods=['post'], url_path='check-duplicate')
+    def check_duplicate(self, request, procedure_pk=None, step_pk=None):
+        """
+        Upload a file to check for duplicates without saving.
+        Returns matching documents/attachments with their paths.
+        """
+        file = request.FILES.get('file')
+        if not file:
+            return Response({'error': 'No file provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        sha256 = hashlib.sha256()
+        for chunk in file.chunks():
+            sha256.update(chunk)
+        checksum = sha256.hexdigest()
+
+        from apps.documents.models import Document
+
+        matches = []
+
+        # Check existing DFC documents
+        for doc in Document.objects.filter(
+            checksum=checksum, is_deleted=False,
+        ).select_related('folder')[:5]:
+            matches.append({
+                'source': 'document',
+                'id': str(doc.id),
+                'title': doc.title,
+                'file_name': doc.file_name,
+                'folder_path': doc.folder.path if doc.folder_id else None,
+                'confidentiality_level': doc.confidentiality_level,
+                'document_url': f'/documents/{doc.id}',
+            })
+
+        # Check existing step attachments
+        for att in StepAttachment.objects.filter(
+            checksum_sha256=checksum,
+        ).select_related('step__procedure')[:5]:
+            matches.append({
+                'source': 'step_attachment',
+                'id': str(att.id),
+                'title': att.title,
+                'procedure_title': att.step.procedure.title,
+                'step_title': att.step.title,
+            })
+
+        return Response({
+            'checksum': checksum,
+            'has_duplicates': len(matches) > 0,
+            'matches': matches,
+        })
+
+    @action(detail=False, methods=['get'], url_path='search-documents')
+    def search_documents(self, request, procedure_pk=None, step_pk=None):
+        """Search existing DFC documents for linking to a step."""
+        from apps.documents.models import Document
+        from django.db.models import Q
+
+        q = request.query_params.get('q', '').strip()
+        qs = Document.objects.filter(
+            is_deleted=False,
+            organization=request.user.organization,
+        )
+        if q:
+            qs = qs.filter(Q(title__icontains=q) | Q(file_name__icontains=q))
+
+        qs = qs.select_related('folder', 'department').order_by('-created_at')[:20]
+        results = [{
+            'id': str(d.id),
+            'title': d.title,
+            'file_name': d.file_name,
+            'file_size': d.file_size,
+            'file_type': d.file_type,
+            'confidentiality_level': d.confidentiality_level,
+            'folder_path': d.folder.path if d.folder_id else None,
+            'department_name': d.department.name if d.department_id else None,
+            'document_url': f'/documents/{d.id}',
+        } for d in qs]
+        return Response(results)
 
 
 class ProcedureStepCommentViewSet(viewsets.ModelViewSet):
