@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
+import { useAuth } from '@/hooks/useAuth'
 import {
   Loader2,
   AlertTriangle,
@@ -32,6 +33,7 @@ interface ProcedureReviewPanelProps {
 }
 
 export function ProcedureReviewPanel({ procedureId }: ProcedureReviewPanelProps) {
+  const { user: authUser } = useAuth()
   const [procedure, setProcedure] = useState<ProcedureDetail | null>(null)
   const [comments, setComments] = useState<ProcedureStepComment[]>([])
   const [loading, setLoading] = useState(true)
@@ -248,6 +250,7 @@ export function ProcedureReviewPanel({ procedureId }: ProcedureReviewPanelProps)
               key={step.id}
               step={step}
               comments={comments}
+              currentUserId={authUser?.id}
               onAddComment={handleAddComment}
               onResolve={handleResolve}
               onStepReview={handleStepReview}

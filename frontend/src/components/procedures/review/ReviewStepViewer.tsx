@@ -23,6 +23,7 @@ import type { ProcedureStep, ProcedureStepComment } from '@/types/procedure'
 interface ReviewStepViewerProps {
   step: ProcedureStep
   comments: ProcedureStepComment[]
+  currentUserId?: string | number | null
   onAddComment: (stepId: string, body: string, parentId?: string | null) => Promise<void>
   onResolve: (commentId: string) => Promise<void>
   onStepReview?: (
@@ -35,6 +36,7 @@ interface ReviewStepViewerProps {
 export function ReviewStepViewer({
   step,
   comments,
+  currentUserId,
   onAddComment,
   onResolve,
   onStepReview,
@@ -197,81 +199,84 @@ export function ReviewStepViewer({
                 </div>
               )}
 
-              {/* Step review actions */}
-              {onStepReview && step.reviewer && step.review_status !== 'approved' && (
-                <div className="pt-3 border-t border-gray-100 dark:border-gray-700 mt-3 space-y-2">
-                  <textarea
-                    value={reviewComment}
-                    onChange={(e) => {
-                      setReviewComment(e.target.value)
-                      setReviewError(null)
-                    }}
-                    placeholder="Provide your review comment (required)..."
-                    rows={2}
-                    disabled={reviewLoading}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white resize-none disabled:opacity-50"
-                  />
-                  {reviewError && (
-                    <p className="text-xs text-red-600 dark:text-red-400">{reviewError}</p>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={async () => {
-                        if (!reviewComment.trim()) {
-                          setReviewError('A comment is required to approve this step.')
-                          return
-                        }
-                        setReviewLoading(true)
+              {/* Step review actions — only visible to the assigned step reviewer */}
+              {onStepReview &&
+                step.reviewer &&
+                step.review_status !== 'approved' &&
+                (!currentUserId || String(step.reviewer) === String(currentUserId)) && (
+                  <div className="pt-3 border-t border-gray-100 dark:border-gray-700 mt-3 space-y-2">
+                    <textarea
+                      value={reviewComment}
+                      onChange={(e) => {
+                        setReviewComment(e.target.value)
                         setReviewError(null)
-                        try {
-                          await onStepReview(step.id, 'approve', reviewComment.trim())
-                          setReviewComment('')
-                        } catch (err: any) {
-                          setReviewError(err?.message || 'Failed to approve step')
-                        } finally {
-                          setReviewLoading(false)
-                        }
                       }}
+                      placeholder="Provide your review comment (required)..."
+                      rows={2}
                       disabled={reviewLoading}
-                      className="flex items-center gap-1 rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50"
-                    >
-                      {reviewLoading ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <CheckCircle className="h-3 w-3" />
-                      )}
-                      Approve Step
-                    </button>
-                    <button
-                      onClick={async () => {
-                        if (!reviewComment.trim()) {
-                          setReviewError('A comment is required to request changes.')
-                          return
-                        }
-                        setReviewLoading(true)
-                        setReviewError(null)
-                        try {
-                          await onStepReview(step.id, 'request_changes', reviewComment.trim())
-                          setReviewComment('')
-                        } catch (err: any) {
-                          setReviewError(err?.message || 'Failed to request changes')
-                        } finally {
-                          setReviewLoading(false)
-                        }
-                      }}
-                      disabled={reviewLoading}
-                      className="flex items-center gap-1 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50"
-                    >
-                      {reviewLoading ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <AlertOctagon className="h-3 w-3" />
-                      )}
-                      Request Changes
-                    </button>
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white resize-none disabled:opacity-50"
+                    />
+                    {reviewError && (
+                      <p className="text-xs text-red-600 dark:text-red-400">{reviewError}</p>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={async () => {
+                          if (!reviewComment.trim()) {
+                            setReviewError('A comment is required to approve this step.')
+                            return
+                          }
+                          setReviewLoading(true)
+                          setReviewError(null)
+                          try {
+                            await onStepReview(step.id, 'approve', reviewComment.trim())
+                            setReviewComment('')
+                          } catch (err: any) {
+                            setReviewError(err?.message || 'Failed to approve step')
+                          } finally {
+                            setReviewLoading(false)
+                          }
+                        }}
+                        disabled={reviewLoading}
+                        className="flex items-center gap-1 rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                      >
+                        {reviewLoading ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <CheckCircle className="h-3 w-3" />
+                        )}
+                        Approve Step
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (!reviewComment.trim()) {
+                            setReviewError('A comment is required to request changes.')
+                            return
+                          }
+                          setReviewLoading(true)
+                          setReviewError(null)
+                          try {
+                            await onStepReview(step.id, 'request_changes', reviewComment.trim())
+                            setReviewComment('')
+                          } catch (err: any) {
+                            setReviewError(err?.message || 'Failed to request changes')
+                          } finally {
+                            setReviewLoading(false)
+                          }
+                        }}
+                        disabled={reviewLoading}
+                        className="flex items-center gap-1 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+                      >
+                        {reviewLoading ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <AlertOctagon className="h-3 w-3" />
+                        )}
+                        Request Changes
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
             </div>
 
             {/* Comments sidebar */}
