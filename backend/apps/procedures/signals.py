@@ -17,6 +17,11 @@ def sync_procedure_state_on_task_update(sender, instance, **kwargs):
     """
     When a WorkflowTask is approved/rejected, check if the parent
     WorkflowInstance targets a Procedure and update its state accordingly.
+
+    Important: step-level "request changes" sets the task back to PENDING
+    (action_taken='CHANGES_REQUESTED'), NOT to REJECTED.  Only procedure-level
+    rejections (via the workflow take-action endpoint) use REJECTED status.
+    This prevents a single step revision request from killing the entire workflow.
     """
     workflow = instance.workflow
 
@@ -28,14 +33,22 @@ def sync_procedure_state_on_task_update(sender, instance, **kwargs):
     if workflow.target_content_type != procedure_ct:
         return
 
-    # Only process if the task was just completed
+    # Only process if the task was just completed (approved or rejected)
     if instance.status not in [WorkflowTaskStatus.APPROVED, WorkflowTaskStatus.REJECTED]:
+        return
+
+    # Only act when the workflow is still active
+    if workflow.status not in [WorkflowInstanceStatus.ACTIVE, WorkflowInstanceStatus.PENDING]:
         return
 
     tasks = workflow.tasks.all()
 
-    # Any rejection -> procedure returns to Draft
-    if tasks.filter(status=WorkflowTaskStatus.REJECTED).exists():
+    # A REJECTED task from a procedure-level reviewer (step_order=2 or
+    # step_name='Procedure Review') means the overall review is rejected.
+    # Step-level "request changes" should NOT use REJECTED status; instead
+    # the step_review_action sets them to PENDING with action_taken=CHANGES_REQUESTED.
+    rejected_tasks = tasks.filter(status=WorkflowTaskStatus.REJECTED)
+    if rejected_tasks.exists():
         workflow.complete(approved=False, reason='Rejected by reviewer')
         try:
             procedure = Procedure.objects.get(id=workflow.target_object_id)

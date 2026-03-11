@@ -408,25 +408,45 @@ class ProcedureViewSet(viewsets.ModelViewSet):
             },
         )
 
-        # Auto-complete the matching workflow task for this step reviewer
-        matching_task = WorkflowTask.objects.filter(
-            workflow__target_content_type=ct,
-            workflow__target_object_id=procedure.id,
-            workflow__status=WorkflowInstanceStatus.ACTIVE,
-            step_name=f'Step Review: {step.title}',
-            assigned_to=request.user,
-            status__in=[WorkflowTaskStatus.PENDING, WorkflowTaskStatus.IN_PROGRESS],
-        ).first()
+        # Auto-complete the matching workflow task for this step reviewer.
+        # Try exact step_name match first, then fall back to assigned_to + step_order
+        # to handle cases where step title was edited after review submission.
+        matching_task = None
+        if active_workflow:
+            matching_task = WorkflowTask.objects.filter(
+                workflow=active_workflow,
+                step_name=f'Step Review: {step.title}',
+                assigned_to=request.user,
+                status__in=[WorkflowTaskStatus.PENDING, WorkflowTaskStatus.IN_PROGRESS],
+            ).first()
+            if not matching_task:
+                # Fallback: find any step-review task assigned to this user at step_order=1
+                matching_task = WorkflowTask.objects.filter(
+                    workflow=active_workflow,
+                    step_order=1,
+                    step_name__startswith='Step Review:',
+                    assigned_to=request.user,
+                    status__in=[WorkflowTaskStatus.PENDING, WorkflowTaskStatus.IN_PROGRESS],
+                ).first()
+
         if matching_task:
             if action_type == 'approve':
                 matching_task.status = WorkflowTaskStatus.APPROVED
                 matching_task.action_taken = 'APPROVED'
             else:
-                matching_task.status = WorkflowTaskStatus.REJECTED
-                matching_task.action_taken = 'REJECTED'
+                # request_changes: mark as PENDING again (not REJECTED) so the
+                # workflow stays alive.  The step reviewer can re-approve later.
+                matching_task.status = WorkflowTaskStatus.PENDING
+                matching_task.action_taken = 'CHANGES_REQUESTED'
             matching_task.comment = comment
-            matching_task.completed_at = timezone.now()
+            matching_task.completed_at = timezone.now() if action_type == 'approve' else None
             matching_task.save()
+        else:
+            import logging
+            logging.getLogger('procedures').warning(
+                'step_review_action: no matching workflow task found for step=%s user=%s',
+                step.id, request.user.id,
+            )
 
         # Check overall step-review outcome:
         # - If ALL steps with reviewers are approved → auto-advance to procedure review
@@ -437,17 +457,23 @@ class ProcedureViewSet(viewsets.ModelViewSet):
             all_steps_approved = not reviewed_steps.exclude(review_status='approved').exists()
 
         # Check if procedure-level reviewers exist
-        has_procedure_reviewers = WorkflowTask.objects.filter(
-            workflow__target_content_type=ct,
-            workflow__target_object_id=procedure.id,
-            workflow__status=WorkflowInstanceStatus.ACTIVE,
-            step_name='Procedure Review',
-        ).exists()
+        has_procedure_reviewers = False
+        if active_workflow:
+            has_procedure_reviewers = WorkflowTask.objects.filter(
+                workflow=active_workflow,
+                step_name='Procedure Review',
+            ).exists()
 
         # Only auto-approve if all steps are approved AND there are no procedure reviewers
         if all_steps_approved and not has_procedure_reviewers and procedure.state == Procedure.State.IN_REVIEW:
             procedure.state = Procedure.State.APPROVED
             procedure.save(update_fields=['state', 'updated_at'])
+            # Also complete the workflow instance
+            if active_workflow and active_workflow.status == WorkflowInstanceStatus.ACTIVE:
+                active_workflow.status = WorkflowInstanceStatus.APPROVED
+                active_workflow.completed_at = timezone.now()
+                active_workflow.outcome_reason = 'All steps approved (no procedure-level reviewers)'
+                active_workflow.save(update_fields=['status', 'completed_at', 'outcome_reason', 'updated_at'])
 
         # Notify the procedure author about this step review
         ntype = (Notification.NotificationType.STEP_APPROVED
