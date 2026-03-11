@@ -47,7 +47,9 @@ export function ProcedureReviewPanel({ procedureId }: ProcedureReviewPanelProps)
         getReviewProgress(procedureId).catch(() => null),
       ])
       setProcedure(procData)
-      setComments(commentsData)
+      setComments(
+        Array.isArray(commentsData) ? commentsData : ((commentsData as any)?.results ?? [])
+      )
       setProgress(progressData)
       setError(null)
     } catch (err: any) {
@@ -97,14 +99,19 @@ export function ProcedureReviewPanel({ procedureId }: ProcedureReviewPanelProps)
     }
   }
 
-  const handleStepReview = async (stepId: string, action: 'approve' | 'request_changes') => {
+  const handleStepReview = async (
+    stepId: string,
+    action: 'approve' | 'request_changes',
+    comment: string
+  ) => {
     try {
-      await stepReviewAction(procedureId, stepId, action)
-      // Reload progress
-      const updated = await getReviewProgress(procedureId).catch(() => null)
-      setProgress(updated)
-    } catch (err) {
-      console.error('Step review action failed:', err)
+      const result = await stepReviewAction(procedureId, stepId, action, comment)
+      // Reload all data (progress + comments since backend creates a comment)
+      await loadData()
+      return result
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || 'Step review action failed'
+      throw new Error(msg)
     }
   }
 

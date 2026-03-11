@@ -28,6 +28,7 @@ import { RetentionDashboardPage } from './pages/RetentionDashboardPage'
 import { WorkflowCenterPage } from './pages/WorkflowCenterPage'
 import { ProcedureBuilderPage } from './pages/ProcedureBuilderPage'
 import { ProcedureDetailPage } from './pages/ProcedureDetailPage'
+import { ProcedureReviewPage } from './pages/ProcedureReviewPage'
 import { ProcedureVersionPage } from './pages/ProcedureVersionPage'
 import { ProcedureVersionDiffPage } from './pages/ProcedureVersionDiffPage'
 import { WorkflowDesignerPage } from './pages/WorkflowDesignerPage'
@@ -277,6 +278,14 @@ function App() {
                 element={
                   <ProtectedRoute requiredRole={['admin', 'manager']} pageName="New Procedure">
                     <ProcedureBuilderPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/procedures/:id/review"
+                element={
+                  <ProtectedRoute pageName="Procedure Review">
+                    <ProcedureReviewPage />
                   </ProtectedRoute>
                 }
               />

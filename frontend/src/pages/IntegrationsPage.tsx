@@ -85,14 +85,6 @@ export function IntegrationsPage() {
     is_superuser: userData?.is_superuser || false,
   }
 
-  const notifications: Array<{
-    id: string
-    title: string
-    message: string
-    time: string
-    read: boolean
-  }> = []
-
   const handleLogout = async () => {
     try {
       const refreshToken = authService.getRefreshToken()
@@ -306,7 +298,7 @@ export function IntegrationsPage() {
 
   return (
     <ThreePanelLayout
-      header={<DashboardHeader user={user} notifications={notifications} onLogout={handleLogout} />}
+      header={<DashboardHeader user={user} notifications={[]} onLogout={handleLogout} />}
       leftPanel={<DashboardSidebar />}
       leftPanelWidth="auto"
       collapsibleLeft={false}

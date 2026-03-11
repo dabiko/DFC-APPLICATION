@@ -90,15 +90,6 @@ export function OrganizationSettingsPage() {
     is_superuser: userData?.is_superuser || false,
   }
 
-  // Mock notifications for header
-  const notifications: Array<{
-    id: string
-    title: string
-    message: string
-    time: string
-    read: boolean
-  }> = []
-
   // Handle logout
   const handleLogout = async () => {
     try {
@@ -310,7 +301,7 @@ export function OrganizationSettingsPage() {
 
   return (
     <ThreePanelLayout
-      header={<DashboardHeader user={user} notifications={notifications} onLogout={handleLogout} />}
+      header={<DashboardHeader user={user} notifications={[]} onLogout={handleLogout} />}
       leftPanel={<DashboardSidebar />}
       leftPanelWidth="auto"
       collapsibleLeft={false}

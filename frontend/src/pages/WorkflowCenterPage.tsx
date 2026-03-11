@@ -52,6 +52,7 @@ import {
   approveTask,
   rejectTask,
   markTaskAsRead,
+  delegateTask,
   type WorkflowTask,
   type WorkflowInstance,
   type WorkflowTemplate,
@@ -62,6 +63,7 @@ import {
   formatStatus,
   formatPriority,
 } from '@/services/workflowService'
+import { getUsers } from '@/services/userManagementService'
 
 // =============================================================================
 // Types
@@ -101,7 +103,14 @@ export function WorkflowCenterPage() {
   const [selectedTask, setSelectedTask] = useState<WorkflowTask | null>(null)
   const [actionComment, setActionComment] = useState('')
   const [isActionLoading, setIsActionLoading] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [showDelegateModal, setShowDelegateModal] = useState(false)
+  const [delegateUsers, setDelegateUsers] = useState<
+    Array<{ id: number; username: string; full_name: string }>
+  >([])
+  const [delegateToId, setDelegateToId] = useState<number | null>(null)
+  const [delegateSearch, setDelegateSearch] = useState('')
 
   // User data
   const userData = authService.getUser()
@@ -112,16 +121,6 @@ export function WorkflowCenterPage() {
     is_staff: userData?.is_staff || false,
     is_superuser: userData?.is_superuser || false,
   }
-
-  const notifications = [
-    {
-      id: '1',
-      title: 'Task pending approval',
-      message: 'You have tasks waiting for your action',
-      time: '5m ago',
-      read: false,
-    },
-  ]
 
   const handleLogout = async () => {
     try {
@@ -201,28 +200,67 @@ export function WorkflowCenterPage() {
 
   // Task actions
   const handleApprove = async (task: WorkflowTask) => {
+    if (!actionComment.trim()) {
+      setActionError('A comment is required when approving.')
+      return
+    }
     setIsActionLoading(true)
+    setActionError(null)
     try {
       await approveTask(task.id, actionComment)
       setActionComment('')
       setSelectedTask(null)
       fetchData()
-    } catch (error) {
-      console.error('Failed to approve task:', error)
+    } catch (err: any) {
+      setActionError(
+        err?.response?.data?.error || err?.response?.data?.detail || 'Failed to approve task'
+      )
     } finally {
       setIsActionLoading(false)
     }
   }
 
   const handleReject = async (task: WorkflowTask) => {
+    if (!actionComment.trim()) {
+      setActionError('A comment/reason is required when rejecting.')
+      return
+    }
     setIsActionLoading(true)
+    setActionError(null)
     try {
       await rejectTask(task.id, actionComment)
       setActionComment('')
       setSelectedTask(null)
       fetchData()
-    } catch (error) {
-      console.error('Failed to reject task:', error)
+    } catch (err: any) {
+      setActionError(
+        err?.response?.data?.error || err?.response?.data?.detail || 'Failed to reject task'
+      )
+    } finally {
+      setIsActionLoading(false)
+    }
+  }
+
+  const handleDelegate = async () => {
+    if (!selectedTask || !delegateToId) return
+    if (!actionComment.trim()) {
+      setActionError('A comment is required when delegating.')
+      return
+    }
+    setIsActionLoading(true)
+    setActionError(null)
+    try {
+      await delegateTask(selectedTask.id, delegateToId, actionComment)
+      setActionComment('')
+      setSelectedTask(null)
+      setShowDelegateModal(false)
+      setDelegateToId(null)
+      setDelegateSearch('')
+      fetchData()
+    } catch (err: any) {
+      setActionError(
+        err?.response?.data?.error || err?.response?.data?.detail || 'Failed to delegate task'
+      )
     } finally {
       setIsActionLoading(false)
     }
@@ -455,13 +493,13 @@ export function WorkflowCenterPage() {
               </div>
 
               <div className="p-4 space-y-4 overflow-y-auto max-h-[calc(85vh-120px)] lg:max-h-[600px]">
-                {/* Document Info */}
+                {/* Target Info */}
                 <div>
                   <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    Document
+                    {selectedTask.target_type === 'procedure' ? 'Procedure' : 'Document'}
                   </label>
                   <p className="text-sm font-medium text-gray-900 dark:text-white mt-1 break-words">
-                    {selectedTask.document_title}
+                    {selectedTask.target_title}
                   </p>
                 </div>
 
@@ -519,62 +557,212 @@ export function WorkflowCenterPage() {
                   </div>
                 </div>
 
-                {/* Comment Input */}
-                <div>
-                  <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1 block">
-                    Comment (Optional)
-                  </label>
-                  <textarea
-                    value={actionComment}
-                    onChange={(e) => setActionComment(e.target.value)}
-                    placeholder="Add a comment..."
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm resize-none"
-                  />
-                </div>
+                {/* Step-review tasks: reviewer should use the Review Procedure page */}
+                {selectedTask.step_name.startsWith('Step Review:') ? (
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-900/20">
+                    <p className="text-sm text-blue-800 dark:text-blue-300">
+                      You are assigned as a <strong>step reviewer</strong>. Use the "Review
+                      Procedure" button below to review and approve or request changes on your
+                      assigned step(s).
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Comment Input — for procedure-level reviewers */}
+                    <div>
+                      <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1 block">
+                        Comment <span className="text-red-500">*</span>
+                      </label>
+                      <textarea
+                        value={actionComment}
+                        onChange={(e) => {
+                          setActionComment(e.target.value)
+                          setActionError(null)
+                        }}
+                        placeholder="Provide your reason/comment (required)..."
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm resize-none"
+                      />
+                      {actionError && (
+                        <p className="mt-1 text-xs text-red-600 dark:text-red-400">{actionError}</p>
+                      )}
+                    </div>
 
-                {/* Action Buttons - Larger touch targets on mobile */}
-                <div className="flex gap-3 pt-2">
-                  <button
-                    onClick={() => handleApprove(selectedTask)}
-                    disabled={isActionLoading}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 sm:py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 disabled:opacity-50 transition-colors touch-manipulation"
-                  >
-                    {isActionLoading ? (
-                      <Loader2 className="w-5 h-5 sm:w-4 sm:h-4 animate-spin" />
-                    ) : (
-                      <CheckCircle2 className="w-5 h-5 sm:w-4 sm:h-4" />
-                    )}
-                    <span className="font-medium">Approve</span>
-                  </button>
-                  <button
-                    onClick={() => handleReject(selectedTask)}
-                    disabled={isActionLoading}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 sm:py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 active:bg-red-800 disabled:opacity-50 transition-colors touch-manipulation"
-                  >
-                    {isActionLoading ? (
-                      <Loader2 className="w-5 h-5 sm:w-4 sm:h-4 animate-spin" />
-                    ) : (
-                      <XCircle className="w-5 h-5 sm:w-4 sm:h-4" />
-                    )}
-                    <span className="font-medium">Reject</span>
-                  </button>
-                </div>
+                    {/* Action Buttons — only for procedure-level reviewers */}
+                    <div className="flex gap-3 pt-2">
+                      <button
+                        onClick={() => handleApprove(selectedTask)}
+                        disabled={isActionLoading}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 sm:py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 disabled:opacity-50 transition-colors touch-manipulation"
+                      >
+                        {isActionLoading ? (
+                          <Loader2 className="w-5 h-5 sm:w-4 sm:h-4 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="w-5 h-5 sm:w-4 sm:h-4" />
+                        )}
+                        <span className="font-medium">Approve</span>
+                      </button>
+                      <button
+                        onClick={() => handleReject(selectedTask)}
+                        disabled={isActionLoading}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 sm:py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 active:bg-red-800 disabled:opacity-50 transition-colors touch-manipulation"
+                      >
+                        {isActionLoading ? (
+                          <Loader2 className="w-5 h-5 sm:w-4 sm:h-4 animate-spin" />
+                        ) : (
+                          <XCircle className="w-5 h-5 sm:w-4 sm:h-4" />
+                        )}
+                        <span className="font-medium">Reject</span>
+                      </button>
+                    </div>
+                  </>
+                )}
 
-                {/* Secondary Actions - Full width on mobile */}
+                {/* Secondary Actions */}
                 <div className="flex flex-col sm:flex-row gap-2 pt-2">
-                  <button className="flex-1 flex items-center justify-center gap-2 px-3 py-3 sm:py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 active:bg-gray-100 dark:active:bg-gray-600 text-sm text-gray-700 dark:text-gray-300 touch-manipulation">
-                    <Send className="w-5 h-5 sm:w-4 sm:h-4" />
-                    Delegate
-                  </button>
-                  <button className="flex-1 flex items-center justify-center gap-2 px-3 py-3 sm:py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 active:bg-gray-100 dark:active:bg-gray-600 text-sm text-gray-700 dark:text-gray-300 touch-manipulation">
-                    <Eye className="w-5 h-5 sm:w-4 sm:h-4" />
-                    View Document
-                  </button>
+                  {/* Delegate — only for procedure-level reviewers */}
+                  {!selectedTask.step_name.startsWith('Step Review:') && (
+                    <button
+                      onClick={async () => {
+                        if (!actionComment.trim()) {
+                          setActionError('A comment is required when delegating.')
+                          return
+                        }
+                        setShowDelegateModal(true)
+                        try {
+                          const res = await getUsers({ page_size: 200 })
+                          const users = Array.isArray(res.results) ? res.results : []
+                          setDelegateUsers(
+                            users
+                              .map((u: any) => ({
+                                id: Number(u.id),
+                                username: u.username,
+                                full_name:
+                                  u.full_name ||
+                                  `${u.first_name || ''} ${u.last_name || ''}`.trim() ||
+                                  u.username,
+                              }))
+                              .filter((u: any) => u.id !== selectedTask?.assigned_to)
+                          )
+                        } catch {
+                          setDelegateUsers([])
+                        }
+                      }}
+                      className="flex-1 flex items-center justify-center gap-2 px-3 py-3 sm:py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 active:bg-gray-100 dark:active:bg-gray-600 text-sm text-gray-700 dark:text-gray-300 touch-manipulation"
+                    >
+                      <Send className="w-5 h-5 sm:w-4 sm:h-4" />
+                      Delegate
+                    </button>
+                  )}
+                  {/* Review Procedure — for all procedure-related tasks */}
+                  {selectedTask?.target_type === 'procedure' && (
+                    <button
+                      onClick={() => navigate(`/procedures/${selectedTask.target_id}/review`)}
+                      className="flex-1 flex items-center justify-center gap-2 px-3 py-3 sm:py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 active:bg-purple-800 text-sm font-medium touch-manipulation"
+                    >
+                      <Eye className="w-5 h-5 sm:w-4 sm:h-4" />
+                      Review Procedure
+                    </button>
+                  )}
+                  {selectedTask?.target_type !== 'procedure' && (
+                    <button className="flex-1 flex items-center justify-center gap-2 px-3 py-3 sm:py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-sm text-gray-700 dark:text-gray-300 touch-manipulation">
+                      <Eye className="w-5 h-5 sm:w-4 sm:h-4" />
+                      View Document
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
           </>
+        )}
+
+        {/* Delegate Modal */}
+        {showDelegateModal && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 backdrop-blur-sm">
+            <div className="mx-4 w-full max-w-md rounded-lg bg-white shadow-xl dark:bg-gray-800">
+              <div className="flex items-center justify-between border-b px-5 py-4 dark:border-gray-700">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Delegate Task
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowDelegateModal(false)
+                    setDelegateToId(null)
+                    setDelegateSearch('')
+                  }}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  <XCircle className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="p-5 space-y-3">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Select a user to delegate this task to:
+                </p>
+                <input
+                  type="text"
+                  value={delegateSearch}
+                  onChange={(e) => setDelegateSearch(e.target.value)}
+                  placeholder="Search users..."
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                />
+                <div className="max-h-48 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-600">
+                  {delegateUsers
+                    .filter(
+                      (u) =>
+                        !delegateSearch ||
+                        u.full_name.toLowerCase().includes(delegateSearch.toLowerCase()) ||
+                        u.username.toLowerCase().includes(delegateSearch.toLowerCase())
+                    )
+                    .map((u) => (
+                      <label
+                        key={u.id}
+                        className={cn(
+                          'flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700',
+                          delegateToId === u.id && 'bg-blue-50 dark:bg-blue-900/20'
+                        )}
+                      >
+                        <input
+                          type="radio"
+                          name="delegate_to"
+                          checked={delegateToId === u.id}
+                          onChange={() => setDelegateToId(u.id)}
+                          className="border-gray-300"
+                        />
+                        <span className="text-gray-900 dark:text-gray-100">{u.full_name}</span>
+                        <span className="text-xs text-gray-400">@{u.username}</span>
+                      </label>
+                    ))}
+                  {delegateUsers.length === 0 && (
+                    <div className="p-3 text-center text-xs text-gray-400">No users found</div>
+                  )}
+                </div>
+                {actionError && (
+                  <p className="text-xs text-red-600 dark:text-red-400">{actionError}</p>
+                )}
+              </div>
+              <div className="flex justify-end gap-2 border-t px-5 py-4 dark:border-gray-700">
+                <button
+                  onClick={() => {
+                    setShowDelegateModal(false)
+                    setDelegateToId(null)
+                    setDelegateSearch('')
+                  }}
+                  className="rounded-lg px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDelegate}
+                  disabled={!delegateToId || isActionLoading}
+                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {isActionLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Delegate
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     )
@@ -961,7 +1149,7 @@ export function WorkflowCenterPage() {
 
   return (
     <ThreePanelLayout
-      header={<DashboardHeader user={user} notifications={notifications} onLogout={handleLogout} />}
+      header={<DashboardHeader user={user} notifications={[]} onLogout={handleLogout} />}
       leftPanel={<DashboardSidebar />}
       leftPanelWidth="auto"
       collapsibleLeft={false}

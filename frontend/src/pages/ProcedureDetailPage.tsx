@@ -31,6 +31,7 @@ import {
   CheckCircle,
   AlertOctagon,
   UserCheck,
+  Eye,
 } from 'lucide-react'
 import { ThreePanelLayout } from '@/components/Layout/ThreePanelLayout'
 import { DashboardHeader } from '@/components/Dashboard/DashboardHeader'
@@ -231,6 +232,15 @@ export function ProcedureDetailPage() {
                       Assign
                     </button>
                   )}
+                  {procedure?.state === 'in_review' && (
+                    <button
+                      onClick={() => navigate(`/procedures/${procedure.id}/review`)}
+                      className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700"
+                    >
+                      <Eye className="h-4 w-4" />
+                      Review
+                    </button>
+                  )}
                   {procedure?.state === 'approved' && (
                     <button
                       onClick={() => setShowPublishForm(true)}
@@ -240,24 +250,29 @@ export function ProcedureDetailPage() {
                       Publish
                     </button>
                   )}
-                  {procedure?.state === 'draft' && (
-                    <button
-                      onClick={() => navigate(`/procedures/${procedure.id}/edit`)}
-                      className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-                    >
-                      <Edit className="h-4 w-4" />
-                      Edit
-                    </button>
-                  )}
-                  {procedure && ['draft', 'in_review'].includes(procedure.state) && (
-                    <button
-                      onClick={() => setShowDeleteModal(true)}
-                      className="flex items-center gap-2 rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Delete
-                    </button>
-                  )}
+                  {procedure?.state === 'draft' &&
+                    (user.is_superuser ||
+                      String(userData?.id) === String(procedure.created_by)) && (
+                      <button
+                        onClick={() => navigate(`/procedures/${procedure.id}/edit`)}
+                        className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                      >
+                        <Edit className="h-4 w-4" />
+                        Edit
+                      </button>
+                    )}
+                  {procedure &&
+                    ['draft', 'in_review'].includes(procedure.state) &&
+                    (user.is_superuser ||
+                      String(userData?.id) === String(procedure.created_by)) && (
+                      <button
+                        onClick={() => setShowDeleteModal(true)}
+                        className="flex items-center gap-2 rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete
+                      </button>
+                    )}
                 </div>
               </div>
             </div>

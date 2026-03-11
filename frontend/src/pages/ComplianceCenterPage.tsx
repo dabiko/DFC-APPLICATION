@@ -410,31 +410,6 @@ export function ComplianceCenterPage() {
     is_superuser: userData?.is_superuser || false,
   }
 
-  // Mock notifications - replace with actual API data
-  const notifications = [
-    {
-      id: '1',
-      title: '2 compliance findings pending',
-      message: 'Review critical findings before deadline',
-      time: '1h ago',
-      read: false,
-    },
-    {
-      id: '2',
-      title: 'GDPR assessment due',
-      message: 'Quarterly GDPR assessment is due in 5 days',
-      time: '3h ago',
-      read: false,
-    },
-    {
-      id: '3',
-      title: 'Policy acknowledged',
-      message: 'Information Security Policy acknowledged by 95% of users',
-      time: '1d ago',
-      read: true,
-    },
-  ]
-
   // Handle logout
   const handleLogout = async () => {
     try {
@@ -1029,7 +1004,7 @@ export function ComplianceCenterPage() {
 
   return (
     <ThreePanelLayout
-      header={<DashboardHeader user={user} notifications={notifications} onLogout={handleLogout} />}
+      header={<DashboardHeader user={user} notifications={[]} onLogout={handleLogout} />}
       leftPanel={<DashboardSidebar />}
       leftPanelWidth="auto"
       collapsibleLeft={false}

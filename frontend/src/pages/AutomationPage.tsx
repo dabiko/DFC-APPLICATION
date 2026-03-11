@@ -107,17 +107,6 @@ export const AutomationPage: React.FC = () => {
     is_superuser: userData?.is_superuser || false,
   }
 
-  // Mock notifications
-  const notifications = [
-    {
-      id: '1',
-      title: 'Automation job completed',
-      message: 'Retention policy scan completed successfully',
-      time: '15m ago',
-      read: false,
-    },
-  ]
-
   // Handle logout
   const handleLogout = async () => {
     try {
@@ -490,7 +479,7 @@ export const AutomationPage: React.FC = () => {
 
   return (
     <ThreePanelLayout
-      header={<DashboardHeader user={user} notifications={notifications} onLogout={handleLogout} />}
+      header={<DashboardHeader user={user} notifications={[]} onLogout={handleLogout} />}
       leftPanel={<DashboardSidebar />}
       leftPanelWidth="auto"
       collapsibleLeft={false}

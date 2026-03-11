@@ -93,17 +93,6 @@ export function SettingsPage() {
     is_superuser: userData?.is_superuser || false,
   }
 
-  // Mock notifications for header
-  const notifications = [
-    {
-      id: '1',
-      title: 'Settings updated',
-      message: 'Your preferences have been saved',
-      time: 'Just now',
-      read: true,
-    },
-  ]
-
   // Handle logout
   const handleLogout = async () => {
     try {
@@ -355,7 +344,7 @@ export function SettingsPage() {
 
   return (
     <ThreePanelLayout
-      header={<DashboardHeader user={user} notifications={notifications} onLogout={handleLogout} />}
+      header={<DashboardHeader user={user} notifications={[]} onLogout={handleLogout} />}
       leftPanel={<DashboardSidebar />}
       leftPanelWidth="auto"
       collapsibleLeft={false}

@@ -326,11 +326,17 @@ export const getReviewProgress = async (procedureId: string): Promise<ReviewProg
 export const stepReviewAction = async (
   procedureId: string,
   stepId: string,
-  action: 'approve' | 'request_changes'
-): Promise<{ step_id: string; review_status: string; message: string }> => {
+  action: 'approve' | 'request_changes',
+  comment: string
+): Promise<{
+  step_id: string
+  review_status: string
+  procedure_state: string
+  message: string
+}> => {
   const response = await apiClient.post(
     `${BASE}/procedures/${procedureId}/step-review/${stepId}/`,
-    { action }
+    { action, comment }
   )
   return response.data
 }

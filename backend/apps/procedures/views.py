@@ -46,6 +46,23 @@ from apps.workflows.models import (
     WorkflowInstanceStatus, WorkflowTaskStatus, WorkflowStepType, WorkflowAuditLog,
 )
 from .utils import compute_version_diff, evaluate_branch_condition, can_advance_to_next_step, create_assignments, grade_quiz_attempt
+from apps.sharing.models import Notification
+
+
+def _notify(recipient, notification_type, title, message, actor=None, resource_type='', resource_id=None, action_url=''):
+    """Create an in-app notification."""
+    if recipient == actor:
+        return  # Don't notify yourself
+    Notification.objects.create(
+        recipient=recipient,
+        notification_type=notification_type,
+        title=title,
+        message=message,
+        actor=actor,
+        resource_type=resource_type,
+        resource_id=resource_id,
+        action_url=action_url,
+    )
 
 
 class ProcedureViewSet(viewsets.ModelViewSet):
@@ -187,36 +204,39 @@ class ProcedureViewSet(viewsets.ModelViewSet):
 
         from apps.users.models import CustomUser
 
-        # Create per-step reviewer tasks
+        task_count = 0
+
+        # Create per-step reviewer tasks — all at step_order=1 (parallel)
+        # These are for reviewing individual steps via the Review Procedure page.
         steps_with_reviewers = procedure.steps.filter(reviewer__isnull=False).select_related('reviewer')
-        step_order_counter = 1
         for proc_step in steps_with_reviewers:
             WorkflowTask.objects.create(
                 workflow=instance,
-                step_order=step_order_counter,
+                step_order=1,
                 step_name=f'Step Review: {proc_step.title}',
                 step_type=WorkflowStepType.APPROVAL,
                 assigned_to=proc_step.reviewer,
                 due_date=due_date,
             )
-            step_order_counter += 1
+            task_count += 1
 
-        # Create procedure-level reviewer tasks
+        # Create procedure-level reviewer tasks — all at step_order=2 (parallel)
+        # These are for final approval/rejection of the whole procedure.
         if reviewers:
             reviewer_users = CustomUser.objects.filter(id__in=reviewers)
             for reviewer in reviewer_users:
                 WorkflowTask.objects.create(
                     workflow=instance,
-                    step_order=step_order_counter,
+                    step_order=2,
                     step_name='Procedure Review',
                     step_type=WorkflowStepType.APPROVAL,
                     assigned_to=reviewer,
                     due_date=due_date,
                 )
-                step_order_counter += 1
+                task_count += 1
 
         # Validate at least one reviewer exists (step-level or procedure-level)
-        if step_order_counter == 1:
+        if task_count == 0:
             instance.delete()
             return Response(
                 {'error': 'At least one reviewer is required (assign step reviewers or procedure-level reviewers).'},
@@ -251,6 +271,37 @@ class ProcedureViewSet(viewsets.ModelViewSet):
             ip_address=request.META.get('REMOTE_ADDR'),
             detail={'workflow_instance_id': str(instance.id)},
         )
+
+        # Notify all assigned reviewers
+        notified_users = set()
+        for proc_step in steps_with_reviewers:
+            if proc_step.reviewer_id and proc_step.reviewer_id not in notified_users:
+                _notify(
+                    recipient=proc_step.reviewer,
+                    notification_type=Notification.NotificationType.REVIEW_ASSIGNED,
+                    title=f'Step review assigned: {procedure.title}',
+                    message=f'{request.user.get_full_name()} assigned you to review step "{proc_step.title}" in procedure "{procedure.title}".',
+                    actor=request.user,
+                    resource_type='PROCEDURE',
+                    resource_id=procedure.id,
+                    action_url=f'/procedures/{procedure.id}/review',
+                )
+                notified_users.add(proc_step.reviewer_id)
+
+        if reviewers:
+            for reviewer in reviewer_users:
+                if reviewer.id not in notified_users:
+                    _notify(
+                        recipient=reviewer,
+                        notification_type=Notification.NotificationType.REVIEW_ASSIGNED,
+                        title=f'Procedure review assigned: {procedure.title}',
+                        message=f'{request.user.get_full_name()} assigned you to review procedure "{procedure.title}".',
+                        actor=request.user,
+                        resource_type='PROCEDURE',
+                        resource_id=procedure.id,
+                        action_url=f'/procedures/{procedure.id}/review',
+                    )
+                    notified_users.add(reviewer.id)
 
         return Response({
             'workflow_instance_id': str(instance.id),
@@ -297,10 +348,17 @@ class ProcedureViewSet(viewsets.ModelViewSet):
     def step_review_action(self, request, pk=None, step_id=None):
         procedure = self.get_object()
         action_type = request.data.get('action')  # 'approve' or 'request_changes'
+        comment = (request.data.get('comment') or '').strip()
 
         if action_type not in ('approve', 'request_changes'):
             return Response(
                 {'error': 'action must be "approve" or "request_changes".'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not comment:
+            return Response(
+                {'error': 'A comment/reason is required when approving or requesting changes.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -319,6 +377,23 @@ class ProcedureViewSet(viewsets.ModelViewSet):
         step.review_status = 'approved' if action_type == 'approve' else 'changes_requested'
         step.save(update_fields=['review_status', 'updated_at'])
 
+        # Get the active workflow instance for this procedure
+        ct = ContentType.objects.get_for_model(Procedure)
+        active_workflow = WorkflowInstance.objects.filter(
+            target_content_type=ct,
+            target_object_id=procedure.id,
+            status__in=[WorkflowInstanceStatus.ACTIVE, WorkflowInstanceStatus.PENDING],
+        ).first()
+
+        # Save the review comment as a step comment
+        if active_workflow:
+            ProcedureStepComment.objects.create(
+                workflow_instance=active_workflow,
+                step=step,
+                author=request.user,
+                body=f"[{action_type.replace('_', ' ').title()}] {comment}",
+            )
+
         ProcedureAuditLog.objects.create(
             organization=procedure.organization,
             action=ProcedureAuditLog.Action.SUBMITTED_FOR_REVIEW,
@@ -326,12 +401,75 @@ class ProcedureViewSet(viewsets.ModelViewSet):
             procedure=procedure,
             step_id=str(step.id),
             ip_address=request.META.get('REMOTE_ADDR'),
-            detail={'step_review_action': action_type, 'step_title': step.title},
+            detail={
+                'step_review_action': action_type,
+                'step_title': step.title,
+                'comment': comment,
+            },
+        )
+
+        # Auto-complete the matching workflow task for this step reviewer
+        matching_task = WorkflowTask.objects.filter(
+            workflow__target_content_type=ct,
+            workflow__target_object_id=procedure.id,
+            workflow__status=WorkflowInstanceStatus.ACTIVE,
+            step_name=f'Step Review: {step.title}',
+            assigned_to=request.user,
+            status__in=[WorkflowTaskStatus.PENDING, WorkflowTaskStatus.IN_PROGRESS],
+        ).first()
+        if matching_task:
+            if action_type == 'approve':
+                matching_task.status = WorkflowTaskStatus.APPROVED
+                matching_task.action_taken = 'APPROVED'
+            else:
+                matching_task.status = WorkflowTaskStatus.REJECTED
+                matching_task.action_taken = 'REJECTED'
+            matching_task.comment = comment
+            matching_task.completed_at = timezone.now()
+            matching_task.save()
+
+        # Check overall step-review outcome:
+        # - If ALL steps with reviewers are approved → auto-advance to procedure review
+        # - If ANY step has 'changes_requested' → stays 'in_review' (author sees feedback)
+        reviewed_steps = procedure.steps.filter(reviewer__isnull=False)
+        all_steps_approved = False
+        if reviewed_steps.exists():
+            all_steps_approved = not reviewed_steps.exclude(review_status='approved').exists()
+
+        # Check if procedure-level reviewers exist
+        has_procedure_reviewers = WorkflowTask.objects.filter(
+            workflow__target_content_type=ct,
+            workflow__target_object_id=procedure.id,
+            workflow__status=WorkflowInstanceStatus.ACTIVE,
+            step_name='Procedure Review',
+        ).exists()
+
+        # Only auto-approve if all steps are approved AND there are no procedure reviewers
+        if all_steps_approved and not has_procedure_reviewers and procedure.state == Procedure.State.IN_REVIEW:
+            procedure.state = Procedure.State.APPROVED
+            procedure.save(update_fields=['state', 'updated_at'])
+
+        # Notify the procedure author about this step review
+        ntype = (Notification.NotificationType.STEP_APPROVED
+                 if action_type == 'approve'
+                 else Notification.NotificationType.STEP_CHANGES_REQUESTED)
+        action_label = 'approved' if action_type == 'approve' else 'requested changes on'
+        _notify(
+            recipient=procedure.created_by,
+            notification_type=ntype,
+            title=f'Step {action_label}: {step.title}',
+            message=f'{request.user.get_full_name()} {action_label} step "{step.title}" in "{procedure.title}". Comment: {comment}',
+            actor=request.user,
+            resource_type='PROCEDURE',
+            resource_id=procedure.id,
+            action_url=f'/procedures/{procedure.id}/review',
         )
 
         return Response({
             'step_id': str(step.id),
             'review_status': step.review_status,
+            'procedure_state': procedure.state,
+            'all_steps_approved': all_steps_approved,
             'message': f'Step "{step.title}" {step.review_status.replace("_", " ")}.',
         })
 

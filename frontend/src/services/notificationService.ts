@@ -22,6 +22,12 @@ export type NotificationType =
   | 'INVITATION_ACCEPTED'
   | 'INVITATION_DECLINED'
   | 'WEEKLY_DIGEST'
+  | 'STEP_APPROVED'
+  | 'STEP_CHANGES_REQ'
+  | 'PROCEDURE_APPROVED'
+  | 'PROCEDURE_REJECTED'
+  | 'REVIEW_ASSIGNED'
+  | 'TRAINING_ASSIGNED'
 
 export interface Notification {
   id: string
@@ -192,6 +198,12 @@ export function getNotificationIcon(type: NotificationType): string {
     INVITATION_ACCEPTED: 'user-check',
     INVITATION_DECLINED: 'user-x',
     WEEKLY_DIGEST: 'calendar',
+    STEP_APPROVED: 'check-circle',
+    STEP_CHANGES_REQ: 'alert-triangle',
+    PROCEDURE_APPROVED: 'check-circle-2',
+    PROCEDURE_REJECTED: 'x-octagon',
+    REVIEW_ASSIGNED: 'clipboard-list',
+    TRAINING_ASSIGNED: 'book-open',
   }
   return iconMap[type] || 'bell'
 }
@@ -211,6 +223,12 @@ export function getNotificationColor(type: NotificationType): string {
     INVITATION_ACCEPTED: 'text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30',
     INVITATION_DECLINED: 'text-gray-600 bg-gray-100 dark:text-gray-400 dark:bg-gray-800',
     WEEKLY_DIGEST: 'text-indigo-600 bg-indigo-100 dark:text-indigo-400 dark:bg-indigo-900/30',
+    STEP_APPROVED: 'text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30',
+    STEP_CHANGES_REQ: 'text-amber-600 bg-amber-100 dark:text-amber-400 dark:bg-amber-900/30',
+    PROCEDURE_APPROVED: 'text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30',
+    PROCEDURE_REJECTED: 'text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30',
+    REVIEW_ASSIGNED: 'text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30',
+    TRAINING_ASSIGNED: 'text-purple-600 bg-purple-100 dark:text-purple-400 dark:bg-purple-900/30',
   }
   return colorMap[type] || 'text-gray-600 bg-gray-100 dark:text-gray-400 dark:bg-gray-800'
 }
@@ -230,6 +248,12 @@ export function getNotificationTypeLabel(type: NotificationType): string {
     INVITATION_ACCEPTED: 'Accepted',
     INVITATION_DECLINED: 'Declined',
     WEEKLY_DIGEST: 'Digest',
+    STEP_APPROVED: 'Step Approved',
+    STEP_CHANGES_REQ: 'Changes Requested',
+    PROCEDURE_APPROVED: 'Procedure Approved',
+    PROCEDURE_REJECTED: 'Procedure Rejected',
+    REVIEW_ASSIGNED: 'Review Assigned',
+    TRAINING_ASSIGNED: 'Training Assigned',
   }
   return labelMap[type] || type
 }

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Bell,
@@ -21,6 +21,7 @@ import {
   Zap,
   KeyRound,
   Search,
+  Check,
 } from 'lucide-react'
 import { TopNavigationBar } from '@components/Navigation/TopNavigationBar'
 import { GlobalSearchCommand } from '@components/Search'
@@ -29,6 +30,11 @@ import { useNetworkStatus } from '@/contexts/NetworkStatusContext'
 import { useAuth } from '@hooks/useAuth'
 import { useGlobalSearch } from '@hooks/useGlobalSearch'
 import { cn } from '@utils/cn'
+import {
+  getNotifications,
+  markNotificationsRead,
+  type Notification as ApiNotification,
+} from '@/services/notificationService'
 
 interface DashboardHeaderProps {
   user?: {
@@ -49,6 +55,15 @@ interface DashboardHeaderProps {
     read: boolean
   }>
   onLogout?: () => void
+}
+
+interface DisplayNotification {
+  id: string
+  title: string
+  message: string
+  time: string
+  read: boolean
+  action_url?: string
 }
 
 const DEFAULT_USER = {
@@ -72,11 +87,54 @@ export function DashboardHeader({
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [showThemeMenu, setShowThemeMenu] = useState(false)
   const [showAdminMenu, setShowAdminMenu] = useState(false)
+  const [liveNotifications, setLiveNotifications] = useState<DisplayNotification[]>([])
+  const [loadingNotifs, setLoadingNotifs] = useState(false)
 
   const notificationRef = useRef<HTMLDivElement>(null)
   const profileRef = useRef<HTMLDivElement>(null)
   const themeRef = useRef<HTMLDivElement>(null)
   const adminRef = useRef<HTMLDivElement>(null)
+
+  // Fetch real notifications from API
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const data = await getNotifications()
+      const results = Array.isArray(data) ? data : ((data as any)?.results ?? [])
+      setLiveNotifications(
+        results.map((n: ApiNotification) => ({
+          id: n.id,
+          title: n.title,
+          message: n.message,
+          time: n.time_ago || n.created_at,
+          read: n.is_read,
+          action_url: n.action_url,
+        }))
+      )
+    } catch {
+      // Silently fail — keep showing whatever we have (or prop fallback)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchNotifications()
+    const interval = setInterval(fetchNotifications, 30_000) // poll every 30s
+    return () => clearInterval(interval)
+  }, [fetchNotifications])
+
+  const handleMarkAllRead = async () => {
+    setLoadingNotifs(true)
+    try {
+      await markNotificationsRead()
+      setLiveNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+    } catch {
+      // ignore
+    } finally {
+      setLoadingNotifs(false)
+    }
+  }
+
+  // Always use live notifications from API
+  const displayNotifications = liveNotifications
 
   // Check if user has admin privileges
   // authUser from useAuth() has 'role' field (admin, manager, editor, viewer)
@@ -89,7 +147,7 @@ export function DashboardHeader({
     user?.is_staff === true ||
     user?.is_superuser === true
 
-  const unreadCount = notifications.filter((n) => !n.read).length
+  const unreadCount = displayNotifications.filter((n) => !n.read).length
 
   // Get user initials
   const initials =
@@ -392,21 +450,39 @@ export function DashboardHeader({
 
           {showNotifications && (
             <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">
-              <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="font-semibold text-gray-900 dark:text-gray-100">Notifications</h3>
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-gray-900 dark:text-gray-100">Notifications</h3>
+                  {unreadCount > 0 && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{unreadCount} unread</p>
+                  )}
+                </div>
                 {unreadCount > 0 && (
-                  <p className="text-sm text-gray-500 dark:text-gray-400">{unreadCount} unread</p>
+                  <button
+                    onClick={handleMarkAllRead}
+                    disabled={loadingNotifs}
+                    className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 disabled:opacity-50"
+                  >
+                    <Check className="w-3 h-3" />
+                    Mark all read
+                  </button>
                 )}
               </div>
               <div className="max-h-96 overflow-y-auto">
-                {notifications.length === 0 ? (
+                {displayNotifications.length === 0 ? (
                   <div className="p-8 text-center text-gray-500 dark:text-gray-400">
                     No notifications
                   </div>
                 ) : (
-                  notifications.map((notification) => (
+                  displayNotifications.map((notification) => (
                     <div
                       key={notification.id}
+                      onClick={() => {
+                        if (notification.action_url) {
+                          setShowNotifications(false)
+                          navigate(notification.action_url)
+                        }
+                      }}
                       className={cn(
                         'p-4 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer',
                         !notification.read && 'bg-blue-50 dark:bg-blue-900/10'
@@ -416,11 +492,11 @@ export function DashboardHeader({
                         <h4 className="font-medium text-sm text-gray-900 dark:text-gray-100">
                           {notification.title}
                         </h4>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                        <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap ml-2">
                           {notification.time}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                      <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">
                         {notification.message}
                       </p>
                     </div>

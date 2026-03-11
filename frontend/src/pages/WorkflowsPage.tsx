@@ -122,17 +122,6 @@ export function WorkflowsPage() {
     is_superuser: userData?.is_superuser || false,
   }
 
-  // Mock notifications
-  const notifications = [
-    {
-      id: '1',
-      title: 'Workflow awaiting approval',
-      message: 'Contract Review workflow needs your action',
-      time: '30m ago',
-      read: false,
-    },
-  ]
-
   // Handle logout
   const handleLogout = async () => {
     try {
@@ -483,7 +472,7 @@ export function WorkflowsPage() {
 
   return (
     <ThreePanelLayout
-      header={<DashboardHeader user={user} notifications={notifications} onLogout={handleLogout} />}
+      header={<DashboardHeader user={user} notifications={[]} onLogout={handleLogout} />}
       leftPanel={<DashboardSidebar />}
       leftPanelWidth="auto"
       collapsibleLeft={false}

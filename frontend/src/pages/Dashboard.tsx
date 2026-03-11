@@ -40,31 +40,6 @@ export function Dashboard() {
     is_superuser: userData?.is_superuser || false,
   }
 
-  // Mock notifications - replace with actual API data
-  const notifications = [
-    {
-      id: '1',
-      title: '5 documents expiring soon',
-      message: 'Review retention policies for expiring documents',
-      time: '2h ago',
-      read: false,
-    },
-    {
-      id: '2',
-      title: 'New user registered',
-      message: 'John Doe joined your organization',
-      time: '4h ago',
-      read: false,
-    },
-    {
-      id: '3',
-      title: 'Audit log exported',
-      message: 'Your requested audit log is ready for download',
-      time: '1d ago',
-      read: true,
-    },
-  ]
-
   /**
    * Handle logout - clears tokens and redirects to login
    */
@@ -131,7 +106,7 @@ export function Dashboard() {
 
   return (
     <ThreePanelLayout
-      header={<DashboardHeader user={user} notifications={notifications} onLogout={handleLogout} />}
+      header={<DashboardHeader user={user} notifications={[]} onLogout={handleLogout} />}
       leftPanel={<DashboardSidebar />}
       leftPanelWidth="auto"
       collapsibleLeft={false}

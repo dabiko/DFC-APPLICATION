@@ -865,6 +865,13 @@ class Notification(models.Model):
         INVITATION_ACCEPTED = 'INVITATION_ACCEPTED', 'Share invitation accepted'
         INVITATION_DECLINED = 'INVITATION_DECLINED', 'Share invitation declined'
         WEEKLY_DIGEST = 'WEEKLY_DIGEST', 'Weekly sharing digest'
+        # Procedure review notifications
+        STEP_APPROVED = 'STEP_APPROVED', 'Procedure step approved'
+        STEP_CHANGES_REQUESTED = 'STEP_CHANGES_REQ', 'Changes requested on procedure step'
+        PROCEDURE_APPROVED = 'PROCEDURE_APPROVED', 'Procedure approved'
+        PROCEDURE_REJECTED = 'PROCEDURE_REJECTED', 'Procedure rejected'
+        REVIEW_ASSIGNED = 'REVIEW_ASSIGNED', 'Assigned as reviewer'
+        TRAINING_ASSIGNED = 'TRAINING_ASSIGNED', 'Training assigned'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 

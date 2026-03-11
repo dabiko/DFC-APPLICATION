@@ -59,7 +59,22 @@ from apps.workflows.engine import (
     TaskAssignmentError,
 )
 
+from apps.sharing.models import Notification
+from apps.procedures.models import Procedure
+from django.contrib.contenttypes.models import ContentType
+
 User = get_user_model()
+
+
+def _notify(recipient, notification_type, title, message, actor=None, resource_type='', resource_id=None, action_url=''):
+    """Create an in-app notification."""
+    if recipient == actor:
+        return
+    Notification.objects.create(
+        recipient=recipient, notification_type=notification_type,
+        title=title, message=message, actor=actor,
+        resource_type=resource_type, resource_id=resource_id, action_url=action_url,
+    )
 
 
 def get_client_ip(request):
@@ -454,6 +469,41 @@ class WorkflowTaskViewSet(viewsets.ReadOnlyModelViewSet):
 
             # Refresh task from database
             task.refresh_from_db()
+
+            # If the workflow targets a Procedure, update Procedure state and notify
+            workflow = task.workflow
+            procedure_ct = ContentType.objects.get_for_model(Procedure)
+            if workflow.target_content_type_id == procedure_ct.id:
+                try:
+                    procedure = Procedure.objects.get(id=workflow.target_object_id)
+                    if result.new_status == WorkflowInstanceStatus.APPROVED:
+                        procedure.state = Procedure.State.APPROVED
+                        procedure.save(update_fields=['state', 'updated_at'])
+                        _notify(
+                            recipient=procedure.created_by,
+                            notification_type=Notification.NotificationType.PROCEDURE_APPROVED,
+                            title=f'Procedure approved: {procedure.title}',
+                            message=f'{request.user.get_full_name()} approved procedure "{procedure.title}".{" Comment: " + comment if comment else ""}',
+                            actor=request.user,
+                            resource_type='PROCEDURE',
+                            resource_id=procedure.id,
+                            action_url=f'/procedures/{procedure.id}',
+                        )
+                    elif result.new_status == WorkflowInstanceStatus.REJECTED:
+                        procedure.state = Procedure.State.DRAFT
+                        procedure.save(update_fields=['state', 'updated_at'])
+                        _notify(
+                            recipient=procedure.created_by,
+                            notification_type=Notification.NotificationType.PROCEDURE_REJECTED,
+                            title=f'Procedure rejected: {procedure.title}',
+                            message=f'{request.user.get_full_name()} rejected procedure "{procedure.title}".{" Comment: " + comment if comment else ""}',
+                            actor=request.user,
+                            resource_type='PROCEDURE',
+                            resource_id=procedure.id,
+                            action_url=f'/procedures/{procedure.id}',
+                        )
+                except Procedure.DoesNotExist:
+                    pass
 
             return Response({
                 'task': WorkflowTaskDetailSerializer(task).data,
