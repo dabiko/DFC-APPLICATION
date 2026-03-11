@@ -42,7 +42,6 @@ export {
   AssignmentCard,
   AssignmentList,
   AssignmentDashboard,
-  AssignmentForm,
   DepartmentBreakdownChart,
   ProcedureBreakdownChart,
   OverdueAlertList,

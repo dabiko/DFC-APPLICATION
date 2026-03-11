@@ -298,6 +298,44 @@ export const resolveStepComment = async (procedureId: string, commentId: string)
 }
 
 // =============================================================================
+// Review Progress
+// =============================================================================
+
+export interface ReviewProgress {
+  total_steps: number
+  steps_with_reviewer: number
+  approved_steps: number
+  changes_requested: number
+  pending_steps: number
+  progress_percent: number
+  steps: Array<{
+    id: string
+    title: string
+    order: number
+    reviewer: number | null
+    reviewer_name: string | null
+    review_status: 'pending' | 'approved' | 'changes_requested'
+  }>
+}
+
+export const getReviewProgress = async (procedureId: string): Promise<ReviewProgress> => {
+  const response = await apiClient.get(`${BASE}/procedures/${procedureId}/review-progress/`)
+  return response.data
+}
+
+export const stepReviewAction = async (
+  procedureId: string,
+  stepId: string,
+  action: 'approve' | 'request_changes'
+): Promise<{ step_id: string; review_status: string; message: string }> => {
+  const response = await apiClient.post(
+    `${BASE}/procedures/${procedureId}/step-review/${stepId}/`,
+    { action }
+  )
+  return response.data
+}
+
+// =============================================================================
 // Publishing & Versioning
 // =============================================================================
 
@@ -374,6 +412,8 @@ export const procedureService = {
   listStepComments,
   createStepComment,
   resolveStepComment,
+  getReviewProgress,
+  stepReviewAction,
   publish: publishProcedure,
   retireVersion,
   listVersions,

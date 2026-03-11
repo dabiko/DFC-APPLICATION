@@ -46,10 +46,11 @@ export interface AssignmentDashboard {
 }
 
 export interface CreateAssignmentData {
-  procedure_id: string
-  version_id: string
-  user_ids: string[]
-  due_date?: string | null
+  procedure_version_id: string
+  assignees?: number[]
+  departments?: number[]
+  roles?: string[]
+  due_date: string
 }
 
 // =============================================================================

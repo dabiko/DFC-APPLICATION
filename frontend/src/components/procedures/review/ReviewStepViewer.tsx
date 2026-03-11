@@ -12,6 +12,9 @@ import {
   Paperclip,
   MessageSquare,
   Clock,
+  CheckCircle,
+  AlertOctagon,
+  UserCheck,
 } from 'lucide-react'
 import { StepCommentThread } from './StepCommentThread'
 import type { ProcedureStep, ProcedureStepComment } from '@/types/procedure'
@@ -21,6 +24,7 @@ interface ReviewStepViewerProps {
   comments: ProcedureStepComment[]
   onAddComment: (stepId: string, body: string, parentId?: string | null) => Promise<void>
   onResolve: (commentId: string) => Promise<void>
+  onStepReview?: (stepId: string, action: 'approve' | 'request_changes') => Promise<void>
 }
 
 export function ReviewStepViewer({
@@ -28,6 +32,7 @@ export function ReviewStepViewer({
   comments,
   onAddComment,
   onResolve,
+  onStepReview,
 }: ReviewStepViewerProps) {
   const [expanded, setExpanded] = useState(false)
   const [showComments, setShowComments] = useState(false)
@@ -63,8 +68,33 @@ export function ReviewStepViewer({
                 {step.attachments.length}
               </span>
             )}
+            {step.reviewer_name && (
+              <span className="flex items-center gap-1 text-xs text-gray-400">
+                <UserCheck className="h-3 w-3" />
+                {step.reviewer_name}
+              </span>
+            )}
           </div>
         </div>
+
+        {/* Review status badge */}
+        {step.reviewer && (
+          <span
+            className={`flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+              step.review_status === 'approved'
+                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                : step.review_status === 'changes_requested'
+                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                  : 'bg-gray-100 text-gray-500 dark:bg-gray-600 dark:text-gray-400'
+            }`}
+          >
+            {step.review_status === 'approved'
+              ? 'Approved'
+              : step.review_status === 'changes_requested'
+                ? 'Changes Requested'
+                : 'Pending'}
+          </span>
+        )}
 
         {/* Comment count */}
         <button
@@ -148,6 +178,26 @@ export function ReviewStepViewer({
                       </span>
                     )}
                   </div>
+                </div>
+              )}
+
+              {/* Step review actions */}
+              {onStepReview && step.reviewer && step.review_status !== 'approved' && (
+                <div className="flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-gray-700 mt-3">
+                  <button
+                    onClick={() => onStepReview(step.id, 'approve')}
+                    className="flex items-center gap-1 rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700"
+                  >
+                    <CheckCircle className="h-3 w-3" />
+                    Approve Step
+                  </button>
+                  <button
+                    onClick={() => onStepReview(step.id, 'request_changes')}
+                    className="flex items-center gap-1 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700"
+                  >
+                    <AlertOctagon className="h-3 w-3" />
+                    Request Changes
+                  </button>
                 </div>
               )}
             </div>

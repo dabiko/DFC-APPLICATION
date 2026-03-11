@@ -185,19 +185,46 @@ class ProcedureViewSet(viewsets.ModelViewSet):
             started_at=timezone.now(),
         )
 
-        # Create WorkflowTask per reviewer
         from apps.users.models import CustomUser
-        reviewer_users = CustomUser.objects.filter(id__in=reviewers)
 
-        for reviewer in reviewer_users:
+        # Create per-step reviewer tasks
+        steps_with_reviewers = procedure.steps.filter(reviewer__isnull=False).select_related('reviewer')
+        step_order_counter = 1
+        for proc_step in steps_with_reviewers:
             WorkflowTask.objects.create(
                 workflow=instance,
-                step_order=1,
-                step_name='Procedure Review',
+                step_order=step_order_counter,
+                step_name=f'Step Review: {proc_step.title}',
                 step_type=WorkflowStepType.APPROVAL,
-                assigned_to=reviewer,
+                assigned_to=proc_step.reviewer,
                 due_date=due_date,
             )
+            step_order_counter += 1
+
+        # Create procedure-level reviewer tasks
+        if reviewers:
+            reviewer_users = CustomUser.objects.filter(id__in=reviewers)
+            for reviewer in reviewer_users:
+                WorkflowTask.objects.create(
+                    workflow=instance,
+                    step_order=step_order_counter,
+                    step_name='Procedure Review',
+                    step_type=WorkflowStepType.APPROVAL,
+                    assigned_to=reviewer,
+                    due_date=due_date,
+                )
+                step_order_counter += 1
+
+        # Validate at least one reviewer exists (step-level or procedure-level)
+        if step_order_counter == 1:
+            instance.delete()
+            return Response(
+                {'error': 'At least one reviewer is required (assign step reviewers or procedure-level reviewers).'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Reset step review statuses
+        procedure.steps.update(review_status='pending')
 
         # Transition procedure state
         procedure.state = Procedure.State.IN_REVIEW
@@ -229,6 +256,84 @@ class ProcedureViewSet(viewsets.ModelViewSet):
             'workflow_instance_id': str(instance.id),
             'message': 'Procedure submitted for review.',
         }, status=status.HTTP_200_OK)
+
+    # --- Review Progress ---
+    @action(detail=True, methods=['get'], url_path='review-progress')
+    def review_progress(self, request, pk=None):
+        procedure = self.get_object()
+        steps = procedure.steps.select_related('reviewer').order_by('order')
+
+        total_steps = steps.count()
+        steps_with_reviewer = steps.filter(reviewer__isnull=False).count()
+        approved_steps = steps.filter(review_status='approved').count()
+        changes_requested = steps.filter(review_status='changes_requested').count()
+
+        step_details = []
+        for s in steps:
+            step_details.append({
+                'id': str(s.id),
+                'title': s.title,
+                'order': s.order,
+                'reviewer': s.reviewer_id,
+                'reviewer_name': s.reviewer.get_full_name() if s.reviewer else None,
+                'review_status': s.review_status,
+            })
+
+        progress_percent = 0
+        if steps_with_reviewer > 0:
+            progress_percent = round((approved_steps / steps_with_reviewer) * 100)
+
+        return Response({
+            'total_steps': total_steps,
+            'steps_with_reviewer': steps_with_reviewer,
+            'approved_steps': approved_steps,
+            'changes_requested': changes_requested,
+            'pending_steps': steps_with_reviewer - approved_steps - changes_requested,
+            'progress_percent': progress_percent,
+            'steps': step_details,
+        })
+
+    @action(detail=True, methods=['post'], url_path='step-review/(?P<step_id>[^/.]+)')
+    def step_review_action(self, request, pk=None, step_id=None):
+        procedure = self.get_object()
+        action_type = request.data.get('action')  # 'approve' or 'request_changes'
+
+        if action_type not in ('approve', 'request_changes'):
+            return Response(
+                {'error': 'action must be "approve" or "request_changes".'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            step = procedure.steps.get(id=step_id)
+        except ProcedureStep.DoesNotExist:
+            return Response({'error': 'Step not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Only the assigned reviewer or superuser can act
+        if not request.user.is_superuser and step.reviewer_id != request.user.id:
+            return Response(
+                {'error': 'Only the assigned step reviewer can perform this action.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        step.review_status = 'approved' if action_type == 'approve' else 'changes_requested'
+        step.save(update_fields=['review_status', 'updated_at'])
+
+        ProcedureAuditLog.objects.create(
+            organization=procedure.organization,
+            action=ProcedureAuditLog.Action.SUBMITTED_FOR_REVIEW,
+            actor=request.user,
+            procedure=procedure,
+            step_id=str(step.id),
+            ip_address=request.META.get('REMOTE_ADDR'),
+            detail={'step_review_action': action_type, 'step_title': step.title},
+        )
+
+        return Response({
+            'step_id': str(step.id),
+            'review_status': step.review_status,
+            'message': f'Step "{step.title}" {step.review_status.replace("_", " ")}.',
+        })
 
     # --- Phase D: Publish ---
     @action(detail=True, methods=['post'], url_path='publish')

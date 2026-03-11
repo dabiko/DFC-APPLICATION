@@ -19,8 +19,10 @@ import {
   HelpCircle,
   Link2,
   AlertTriangle,
+  UserCheck,
 } from 'lucide-react'
 import type { ProcedureStep, StepAttachment, BranchCondition } from '@/types/procedure'
+import type { UserBasic } from '@/services/userManagementService'
 import {
   uploadAttachment,
   deleteAttachment,
@@ -34,11 +36,19 @@ interface StepEditorProps {
   step: ProcedureStep
   procedureId: string
   index: number
+  users: UserBasic[]
   onUpdate: (stepId: string, data: Partial<ProcedureStep>) => void
   onDelete: (stepId: string) => void
 }
 
-export function StepEditor({ step, procedureId, index, onUpdate, onDelete }: StepEditorProps) {
+export function StepEditor({
+  step,
+  procedureId,
+  index,
+  users,
+  onUpdate,
+  onDelete,
+}: StepEditorProps) {
   const [expanded, setExpanded] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [linkModalOpen, setLinkModalOpen] = useState(false)
@@ -265,6 +275,35 @@ export function StepEditor({ step, procedureId, index, onUpdate, onDelete }: Ste
               value={step.branch_condition}
               onChange={(value) => onUpdate(step.id, { branch_condition: value })}
             />
+          </div>
+
+          {/* Step Reviewer */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+              <span className="flex items-center gap-1">
+                <UserCheck className="h-3.5 w-3.5" />
+                Step Reviewer
+              </span>
+            </label>
+            <select
+              value={step.reviewer ?? ''}
+              onChange={(e) =>
+                onUpdate(step.id, {
+                  reviewer: e.target.value ? Number(e.target.value) : null,
+                })
+              }
+              className="w-64 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+            >
+              <option value="">No reviewer assigned</option>
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.full_name || `${u.first_name} ${u.last_name}`.trim() || u.username}
+                </option>
+              ))}
+            </select>
+            {step.reviewer_name && (
+              <p className="mt-1 text-xs text-gray-400">Currently assigned: {step.reviewer_name}</p>
+            )}
           </div>
 
           {/* Attachments */}

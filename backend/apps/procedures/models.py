@@ -117,6 +117,24 @@ class ProcedureStep(models.Model):
     require_media_completion = models.BooleanField(default=False)
     require_quiz_pass = models.BooleanField(default=False)
 
+    # Per-step reviewer (nullable — assigned during authoring)
+    reviewer = models.ForeignKey(
+        'users.CustomUser',
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='assigned_step_reviews',
+        help_text='User assigned to review this specific step.',
+    )
+    review_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('pending', 'Pending'),
+            ('approved', 'Approved'),
+            ('changes_requested', 'Changes Requested'),
+        ],
+        default='pending',
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

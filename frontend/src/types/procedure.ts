@@ -108,6 +108,9 @@ export interface ProcedureStep {
   require_manual_open: boolean
   require_media_completion: boolean
   require_quiz_pass: boolean
+  reviewer: number | null
+  reviewer_name: string | null
+  review_status: 'pending' | 'approved' | 'changes_requested'
   attachments: StepAttachment[]
   created_at: string
   updated_at: string

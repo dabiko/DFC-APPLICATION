@@ -45,11 +45,12 @@ class StepAttachmentSerializer(serializers.ModelSerializer):
 
 class ProcedureStepSerializer(serializers.ModelSerializer):
     attachments = StepAttachmentSerializer(many=True, read_only=True)
+    reviewer_name = serializers.CharField(source='reviewer.get_full_name', read_only=True, default=None)
 
     class Meta:
         model = ProcedureStep
         fields = '__all__'
-        read_only_fields = ['id', 'procedure', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'procedure', 'created_at', 'updated_at', 'review_status']
 
 
 class ProcedureListSerializer(serializers.ModelSerializer):
@@ -98,8 +99,9 @@ class StepReorderSerializer(serializers.Serializer):
 class SubmitForReviewSerializer(serializers.Serializer):
     reviewers = serializers.ListField(
         child=serializers.IntegerField(),
-        min_length=1,
-        help_text='List of reviewer user IDs'
+        required=False,
+        default=[],
+        help_text='List of procedure-level reviewer user IDs (optional if steps have reviewers)'
     )
     priority = serializers.ChoiceField(
         choices=['LOW', 'MEDIUM', 'HIGH', 'URGENT'],
