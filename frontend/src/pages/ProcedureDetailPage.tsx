@@ -36,6 +36,8 @@ import {
   Mail,
   XCircle,
   Search,
+  RotateCcw,
+  X,
 } from 'lucide-react'
 import { ThreePanelLayout } from '@/components/Layout/ThreePanelLayout'
 import { DashboardHeader } from '@/components/Dashboard/DashboardHeader'
@@ -57,6 +59,7 @@ import {
   retireVersion,
   getReviewProgress,
   deleteProcedure,
+  revertToDraft,
 } from '@/services/procedureService'
 import type {
   ProcedureDetail,
@@ -84,6 +87,9 @@ export function ProcedureDetailPage() {
   const [publishing, setPublishing] = useState(false)
   const [waiveTarget, setWaiveTarget] = useState<ProcedureAssignmentInfo | null>(null)
   const [assigneeSearch, setAssigneeSearch] = useState('')
+  const [showRevertModal, setShowRevertModal] = useState(false)
+  const [revertReason, setRevertReason] = useState('')
+  const [reverting, setReverting] = useState(false)
   const [contentWarnings, setContentWarnings] = useState<
     Array<{
       step_order: number
@@ -282,6 +288,17 @@ export function ProcedureDetailPage() {
                       Review
                     </button>
                   )}
+                  {procedure?.state === 'in_review' &&
+                    (user.is_superuser ||
+                      String(userData?.id) === String(procedure.created_by)) && (
+                      <button
+                        onClick={() => setShowRevertModal(true)}
+                        className="flex items-center gap-2 rounded-lg border border-amber-300 px-4 py-2 text-sm font-medium text-amber-600 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-900/20"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        Revert to Draft
+                      </button>
+                    )}
                   {procedure?.state === 'approved' &&
                     (user.is_superuser ||
                       String(userData?.id) === String(procedure.created_by)) && (
@@ -302,6 +319,18 @@ export function ProcedureDetailPage() {
                       >
                         <Edit className="h-4 w-4" />
                         Edit
+                      </button>
+                    )}
+                  {procedure?.state === 'draft' &&
+                    !user.is_superuser &&
+                    String(userData?.id) !== String(procedure.created_by) &&
+                    procedure.steps?.some((s) => String(s.step_owner) === String(userData?.id)) && (
+                      <button
+                        onClick={() => navigate(`/procedures/${procedure.id}/edit`)}
+                        className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                      >
+                        <Edit className="h-4 w-4" />
+                        Contribute to My Steps
                       </button>
                     )}
                   {procedure &&
@@ -628,9 +657,17 @@ export function ProcedureDetailPage() {
                                   {step.title}
                                 </span>
                                 <div className="flex items-center gap-1.5">
+                                  {step.step_owner_name && (
+                                    <span className="flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400">
+                                      <User className="h-3 w-3" />
+                                      <span className="font-semibold">Owner:</span>{' '}
+                                      {step.step_owner_name}
+                                    </span>
+                                  )}
                                   {step.reviewer_name && (
                                     <span className="flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] text-blue-600 dark:bg-blue-900/20 dark:text-blue-400">
                                       <UserCheck className="h-3 w-3" />
+                                      <span className="font-semibold">Reviewer:</span>{' '}
                                       {step.reviewer_name}
                                     </span>
                                   )}
@@ -956,6 +993,94 @@ export function ProcedureDetailPage() {
           onClose={() => setWaiveTarget(null)}
           onConfirm={handleWaive}
         />
+      )}
+
+      {/* Revert to Draft Modal */}
+      {showRevertModal && procedure && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-4 w-full max-w-md rounded-lg bg-white shadow-xl dark:bg-gray-800">
+            <div className="flex items-center justify-between border-b px-5 py-4 dark:border-gray-700">
+              <div className="flex items-center gap-2">
+                <RotateCcw className="h-5 w-5 text-amber-600" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Revert to Draft
+                </h3>
+              </div>
+              <button
+                onClick={() => {
+                  setShowRevertModal(false)
+                  setRevertReason('')
+                }}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3">
+                <p className="text-sm text-amber-700 dark:text-amber-300">
+                  This will cancel all active reviews and revert{' '}
+                  <strong>"{procedure.title}"</strong> back to draft state. Reviewers will lose
+                  their review progress.
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Reason for reverting
+                </label>
+                <textarea
+                  value={revertReason}
+                  onChange={(e) => setRevertReason(e.target.value)}
+                  placeholder="e.g. Need to assign step owners and update content before review..."
+                  rows={3}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => {
+                    setShowRevertModal(false)
+                    setRevertReason('')
+                  }}
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    setReverting(true)
+                    try {
+                      await revertToDraft(procedure.id, { reason: revertReason.trim() })
+                      setShowRevertModal(false)
+                      setRevertReason('')
+                      // Reload procedure to reflect new state
+                      const updated = await getProcedure(procedure.id)
+                      setProcedure(updated)
+                      setReviewProgress(null)
+                    } catch (err: any) {
+                      setError(
+                        err?.response?.data?.error ||
+                          err?.response?.data?.detail ||
+                          'Failed to revert procedure'
+                      )
+                    } finally {
+                      setReverting(false)
+                    }
+                  }}
+                  disabled={reverting}
+                  className="flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+                >
+                  {reverting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RotateCcw className="h-4 w-4" />
+                  )}
+                  Revert to Draft
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </>
   )

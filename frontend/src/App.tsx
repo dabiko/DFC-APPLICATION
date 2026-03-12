@@ -292,7 +292,7 @@ function App() {
               <Route
                 path="/procedures/:id"
                 element={
-                  <ProtectedRoute requiredRole={['admin', 'manager']} pageName="Procedure Detail">
+                  <ProtectedRoute pageName="Procedure Detail">
                     <ProcedureDetailPage />
                   </ProtectedRoute>
                 }
@@ -300,7 +300,7 @@ function App() {
               <Route
                 path="/procedures/:id/edit"
                 element={
-                  <ProtectedRoute requiredRole={['admin', 'manager']} pageName="Edit Procedure">
+                  <ProtectedRoute pageName="Edit Procedure">
                     <ProcedureBuilderPage />
                   </ProtectedRoute>
                 }

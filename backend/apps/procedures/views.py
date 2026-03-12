@@ -311,6 +311,90 @@ class ProcedureViewSet(viewsets.ModelViewSet):
             'message': 'Procedure submitted for review.',
         }, status=status.HTTP_200_OK)
 
+    # --- Revert to Draft ---
+    @action(detail=True, methods=['post'], url_path='revert-to-draft')
+    def revert_to_draft(self, request, pk=None):
+        """Revert procedure from in_review back to draft.
+
+        Only allowed for: superusers, procedure creator, admin/manager roles.
+        Cancels any active review workflow.
+        """
+        procedure = self.get_object()
+
+        if procedure.state != Procedure.State.IN_REVIEW:
+            return Response(
+                {'error': 'Only procedures in review can be reverted to draft.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Permission check
+        user = request.user
+        allowed = False
+        if user.is_superuser:
+            allowed = True
+        elif procedure.created_by == user:
+            allowed = True
+        else:
+            from apps.permissions.models import UserRole
+            allowed = UserRole.objects.filter(
+                user=user,
+                role__name__iregex=r'^(admin|manager)$',
+                is_active=True,
+            ).exists()
+
+        if not allowed:
+            return Response(
+                {'error': 'You do not have permission to revert this procedure.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        reason = (request.data.get('reason') or '').strip()
+
+        # Cancel any active workflow instances
+        ct = ContentType.objects.get_for_model(Procedure)
+        active_workflows = WorkflowInstance.objects.filter(
+            target_content_type=ct,
+            target_object_id=procedure.id,
+            status__in=[WorkflowInstanceStatus.ACTIVE, WorkflowInstanceStatus.PENDING],
+        )
+        for wf in active_workflows:
+            wf.status = WorkflowInstanceStatus.CANCELLED
+            wf.completed_at = timezone.now()
+            wf.save(update_fields=['status', 'completed_at'])
+            # Cancel pending tasks
+            wf.tasks.filter(
+                status__in=[WorkflowTaskStatus.PENDING, WorkflowTaskStatus.IN_PROGRESS]
+            ).update(status=WorkflowTaskStatus.CANCELLED, completed_at=timezone.now())
+            WorkflowAuditLog.log(
+                workflow=wf,
+                action='CANCELLED',
+                actor=user,
+                details=f'Procedure "{procedure.title}" reverted to draft. Reason: {reason or "N/A"}',
+                ip_address=request.META.get('REMOTE_ADDR'),
+            )
+
+        # Reset step review statuses
+        procedure.steps.update(review_status='pending')
+
+        # Transition state
+        procedure.state = Procedure.State.DRAFT
+        procedure.save(update_fields=['state', 'updated_at'])
+
+        # Audit
+        ProcedureAuditLog.objects.create(
+            organization=procedure.organization,
+            action=ProcedureAuditLog.Action.REVERTED_TO_DRAFT,
+            actor=user,
+            procedure=procedure,
+            ip_address=request.META.get('REMOTE_ADDR'),
+            detail={'reason': reason},
+        )
+
+        return Response({
+            'message': 'Procedure reverted to draft.',
+            'state': 'draft',
+        }, status=status.HTTP_200_OK)
+
     # --- Review Progress ---
     @action(detail=True, methods=['get'], url_path='review-progress')
     def review_progress(self, request, pk=None):
@@ -664,6 +748,7 @@ class ProcedureViewSet(viewsets.ModelViewSet):
                 learning_objectives=step.learning_objectives,
                 key_concepts=step.key_concepts,
                 example_scenarios=step.example_scenarios,
+                video_url=step.video_url,
                 branch_condition=step.branch_condition,
                 require_manual_open=step.require_manual_open,
                 require_media_completion=step.require_media_completion,

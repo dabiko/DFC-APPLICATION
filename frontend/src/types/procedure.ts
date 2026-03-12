@@ -123,6 +123,7 @@ export interface ProcedureStep {
   learning_objectives: string[]
   key_concepts: string[]
   example_scenarios: string
+  video_url: string
   branch_condition: BranchCondition | null
   require_manual_open: boolean
   require_media_completion: boolean

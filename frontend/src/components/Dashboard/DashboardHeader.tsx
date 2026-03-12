@@ -600,6 +600,57 @@ export function DashboardHeader({
                 </button>
               </div>
 
+              {/* Theme Switcher */}
+              <div className="border-t border-gray-200 dark:border-gray-700 py-1">
+                <p className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                  Appearance
+                </p>
+                <div className="flex items-center gap-1 px-3">
+                  <button
+                    onClick={() => {
+                      setTheme('light')
+                    }}
+                    className={cn(
+                      'flex-1 flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs transition-colors',
+                      theme === 'light'
+                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400 font-medium'
+                        : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
+                    )}
+                  >
+                    <Sun className="w-3.5 h-3.5" />
+                    Light
+                  </button>
+                  <button
+                    onClick={() => {
+                      setTheme('dark')
+                    }}
+                    className={cn(
+                      'flex-1 flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs transition-colors',
+                      theme === 'dark'
+                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400 font-medium'
+                        : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
+                    )}
+                  >
+                    <Moon className="w-3.5 h-3.5" />
+                    Dark
+                  </button>
+                  <button
+                    onClick={() => {
+                      setTheme('system')
+                    }}
+                    className={cn(
+                      'flex-1 flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs transition-colors',
+                      theme === 'system'
+                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400 font-medium'
+                        : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
+                    )}
+                  >
+                    <Monitor className="w-3.5 h-3.5" />
+                    System
+                  </button>
+                </div>
+              </div>
+
               {/* Logout */}
               <div className="border-t border-gray-200 dark:border-gray-700 pt-1">
                 <button

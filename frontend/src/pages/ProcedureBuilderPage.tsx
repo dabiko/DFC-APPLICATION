@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useLogout } from '@/hooks/useLogout'
+import { useAuth } from '@/hooks/useAuth'
 import {
   ArrowLeft,
   Plus,
@@ -53,6 +54,7 @@ export function ProcedureBuilderPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const handleLogout = useLogout()
+  const { hasRole } = useAuth()
   const isNew = !id
 
   const [procedure, setProcedure] = useState<ProcedureDetail | null>(null)
@@ -74,6 +76,13 @@ export function ProcedureBuilderPage() {
     is_staff: userData?.is_staff || false,
     is_superuser: userData?.is_superuser || false,
   }
+
+  // Determine if current user is a step owner (not the creator/admin)
+  const isFullEditor =
+    user.is_superuser ||
+    (procedure && String(userData?.id) === String(procedure.created_by)) ||
+    hasRole(['admin', 'manager'])
+  const isStepOwnerMode = !isNew && procedure && !isFullEditor
 
   // Load existing procedure
   useEffect(() => {
@@ -253,7 +262,7 @@ export function ProcedureBuilderPage() {
                 </div>
 
                 {/* Actions */}
-                {procedure && (
+                {procedure && !isStepOwnerMode && (
                   <div className="flex items-center gap-2">
                     {procedure.state === 'draft' && (procedure.steps?.length || 0) > 0 && (
                       <button
@@ -270,7 +279,7 @@ export function ProcedureBuilderPage() {
             </div>
 
             {/* View Mode Tabs (only when editing existing procedure) */}
-            {procedure && (
+            {procedure && !isStepOwnerMode && (
               <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6">
                 <nav className="flex gap-1 -mb-px">
                   <button
@@ -300,6 +309,15 @@ export function ProcedureBuilderPage() {
                 </nav>
               </div>
             )}
+            {procedure && isStepOwnerMode && (
+              <div className="bg-indigo-50 dark:bg-indigo-900/30 border-b border-indigo-200 dark:border-indigo-700 px-6 py-2">
+                <p className="text-xs text-indigo-700 dark:text-indigo-300 flex items-center gap-1.5">
+                  <UserCheck className="h-3.5 w-3.5" />
+                  Step Owner Mode — You can edit the steps assigned to you. Other steps are
+                  read-only.
+                </p>
+              </div>
+            )}
 
             {/* Error Banner */}
             {error && (
@@ -311,7 +329,7 @@ export function ProcedureBuilderPage() {
 
             {/* Content */}
             <div className="flex-1 overflow-auto p-6">
-              {viewMode === 'metadata' || isNew ? (
+              {!isStepOwnerMode && (viewMode === 'metadata' || isNew) ? (
                 <div className="max-w-2xl mx-auto bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
                   <ProcedureMetadataForm
                     initialData={procedure || undefined}
@@ -368,17 +386,23 @@ export function ProcedureBuilderPage() {
                   {procedure?.steps && procedure.steps.length > 0 ? (
                     procedure.steps
                       .sort((a, b) => a.order - b.order)
-                      .map((step, idx) => (
-                        <StepEditor
-                          key={step.id}
-                          step={step}
-                          procedureId={procedure.id}
-                          index={idx}
-                          users={users}
-                          onUpdate={handleUpdateStep}
-                          onDelete={handleDeleteStep}
-                        />
-                      ))
+                      .map((step, idx) => {
+                        const isOwnedStep =
+                          isStepOwnerMode && String(step.step_owner) === String(userData?.id)
+                        const stepReadOnly = isStepOwnerMode && !isOwnedStep
+                        return (
+                          <StepEditor
+                            key={step.id}
+                            step={step}
+                            procedureId={procedure.id}
+                            index={idx}
+                            users={users}
+                            onUpdate={handleUpdateStep}
+                            onDelete={handleDeleteStep}
+                            readOnly={stepReadOnly}
+                          />
+                        )
+                      })
                   ) : (
                     <div className="text-center py-12 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600">
                       <ListOrdered className="h-8 w-8 text-gray-400 mx-auto mb-2" />
@@ -388,13 +412,15 @@ export function ProcedureBuilderPage() {
                     </div>
                   )}
 
-                  <button
-                    onClick={handleAddStep}
-                    className="w-full flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 py-3 text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors dark:border-gray-600 dark:text-gray-400 dark:hover:border-blue-500 dark:hover:text-blue-400"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Add Step
-                  </button>
+                  {!isStepOwnerMode && (
+                    <button
+                      onClick={handleAddStep}
+                      className="w-full flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 py-3 text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors dark:border-gray-600 dark:text-gray-400 dark:hover:border-blue-500 dark:hover:text-blue-400"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add Step
+                    </button>
+                  )}
                 </div>
               )}
             </div>

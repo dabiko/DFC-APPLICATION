@@ -280,6 +280,17 @@ export const submitForReview = async (
   return response.data
 }
 
+export const revertToDraft = async (
+  procedureId: string,
+  data?: { reason?: string }
+): Promise<{ message: string; state: string }> => {
+  const response = await apiClient.post(
+    `${BASE}/procedures/${procedureId}/revert-to-draft/`,
+    data || {}
+  )
+  return response.data
+}
+
 export const listStepComments = async (procedureId: string): Promise<ProcedureStepComment[]> => {
   const response = await apiClient.get(`${BASE}/procedures/${procedureId}/step-comments/`)
   return response.data
@@ -415,6 +426,7 @@ export const procedureService = {
   updateQuestion,
   deleteQuestion,
   submitForReview,
+  revertToDraft,
   listStepComments,
   createStepComment,
   resolveStepComment,

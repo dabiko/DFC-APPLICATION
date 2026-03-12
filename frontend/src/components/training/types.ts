@@ -13,6 +13,7 @@ export interface VersionStep {
   learning_objectives: string[]
   key_concepts: string[]
   example_scenarios: string
+  video_url: string
   require_manual_open: boolean
   require_media_completion: boolean
   require_quiz_pass: boolean

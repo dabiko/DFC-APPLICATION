@@ -4,7 +4,7 @@
  * and attachment uploads.
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   GripVertical,
   Trash2,
@@ -24,16 +24,22 @@ import {
   Lightbulb,
   FlaskConical,
   Plus,
+  ExternalLink,
 } from 'lucide-react'
-import type { ProcedureStep, StepAttachment, BranchCondition } from '@/types/procedure'
+import type { ProcedureStep, StepAttachment, BranchCondition, Quiz } from '@/types/procedure'
 import type { UserBasic } from '@/services/userManagementService'
 import {
   uploadAttachment,
   deleteAttachment,
   checkDuplicate,
   linkDocument,
+  listQuizzes,
+  createQuiz,
+  updateQuiz,
+  deleteQuiz,
 } from '@/services/procedureService'
 import { BranchConditionEditor } from '../branching/BranchConditionEditor'
+import { QuizBuilder } from '../quiz/QuizBuilder'
 import DocumentSearchModal from './DocumentSearchModal'
 
 interface StepEditorProps {
@@ -43,6 +49,7 @@ interface StepEditorProps {
   users: UserBasic[]
   onUpdate: (stepId: string, data: Partial<ProcedureStep>) => void
   onDelete: (stepId: string) => void
+  readOnly?: boolean
 }
 
 export function StepEditor({
@@ -52,9 +59,24 @@ export function StepEditor({
   users,
   onUpdate,
   onDelete,
+  readOnly = false,
 }: StepEditorProps) {
   const [expanded, setExpanded] = useState(true)
   const [uploading, setUploading] = useState(false)
+  const [stepQuizzes, setStepQuizzes] = useState<Quiz[]>([])
+  const [showQuizBuilder, setShowQuizBuilder] = useState(false)
+  const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null)
+
+  // Load quizzes for this step
+  useEffect(() => {
+    if (!readOnly) {
+      listQuizzes(procedureId)
+        .then((quizzes) => {
+          setStepQuizzes(quizzes.filter((q) => q.step === step.id))
+        })
+        .catch(() => {})
+    }
+  }, [procedureId, step.id, readOnly])
   const [linkModalOpen, setLinkModalOpen] = useState(false)
   const [duplicateWarning, setDuplicateWarning] = useState<{
     file: File
@@ -169,34 +191,44 @@ export function StepEditor({
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+    <div
+      className={`rounded-lg border bg-white dark:bg-gray-800 ${readOnly ? 'border-gray-100 dark:border-gray-700/50 opacity-75' : 'border-gray-200 dark:border-gray-700'}`}
+    >
       {/* Header */}
       <div className="flex items-center gap-2 p-3 border-b border-gray-100 dark:border-gray-700">
-        <GripVertical className="h-4 w-4 text-gray-400 cursor-grab" />
+        {!readOnly && <GripVertical className="h-4 w-4 text-gray-400 cursor-grab" />}
         <span className="text-xs font-bold text-gray-400 w-6">#{index + 1}</span>
         <input
           type="text"
           value={step.title}
           onChange={(e) => onUpdate(step.id, { title: e.target.value })}
           placeholder="Step title..."
-          className="flex-1 border-0 bg-transparent text-sm font-medium text-gray-900 focus:outline-none focus:ring-0 dark:text-gray-100"
+          readOnly={readOnly}
+          className={`flex-1 border-0 bg-transparent text-sm font-medium text-gray-900 focus:outline-none focus:ring-0 dark:text-gray-100 ${readOnly ? 'cursor-default' : ''}`}
         />
+        {readOnly && (
+          <span className="text-[10px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-full">
+            Read-only
+          </span>
+        )}
         <button
           onClick={() => setExpanded(!expanded)}
           className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
         >
           {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </button>
-        <button
-          onClick={() => onDelete(step.id)}
-          className="p-1 rounded text-gray-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
+        {!readOnly && (
+          <button
+            onClick={() => onDelete(step.id)}
+            className="p-1 rounded text-gray-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       {expanded && (
-        <div className="p-4 space-y-4">
+        <div className={`p-4 space-y-4 ${readOnly ? 'pointer-events-none select-none' : ''}`}>
           {/* Description */}
           <div>
             <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
@@ -331,6 +363,134 @@ export function StepEditor({
               placeholder="e.g. When a client submits incomplete KYC documents, the reviewer should..."
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
             />
+          </div>
+
+          {/* Video URL */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+              <span className="flex items-center gap-1">
+                <Video className="h-3.5 w-3.5 text-purple-500" />
+                Video URL
+              </span>
+            </label>
+            <p className="text-[11px] text-gray-400 mb-1">
+              Link to an external video (YouTube, Vimeo, etc.) for this step.
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                type="url"
+                value={step.video_url || ''}
+                onChange={(e) => onUpdate(step.id, { video_url: e.target.value })}
+                placeholder="https://www.youtube.com/watch?v=..."
+                className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+              />
+              {step.video_url && (
+                <a
+                  href={step.video_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-500 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  Open
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* Quiz Management */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+              <span className="flex items-center gap-1">
+                <HelpCircle className="h-3.5 w-3.5 text-green-500" />
+                Step Quiz
+              </span>
+            </label>
+            {stepQuizzes.length > 0 ? (
+              <div className="space-y-2">
+                {stepQuizzes.map((quiz) => (
+                  <div
+                    key={quiz.id}
+                    className="flex items-center justify-between rounded-lg border border-green-200 bg-green-50 px-3 py-2 dark:border-green-800 dark:bg-green-900/20"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-green-800 dark:text-green-300">
+                        {quiz.title}
+                      </p>
+                      <p className="text-[11px] text-green-600 dark:text-green-400">
+                        {quiz.questions?.length || 0} questions &middot; Pass:{' '}
+                        {quiz.passing_score_percent}%
+                        {quiz.max_attempts && ` · Max ${quiz.max_attempts} attempts`}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => {
+                          setEditingQuiz(quiz)
+                          setShowQuizBuilder(true)
+                        }}
+                        className="rounded px-2 py-1 text-xs text-green-700 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-800/40"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (confirm('Delete this quiz?')) {
+                            await deleteQuiz(procedureId, quiz.id)
+                            setStepQuizzes((prev) => prev.filter((q) => q.id !== quiz.id))
+                          }
+                        }}
+                        className="rounded px-2 py-1 text-xs text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400 mb-2">No quiz added yet for this step.</p>
+            )}
+            {!showQuizBuilder && (
+              <button
+                onClick={() => {
+                  setEditingQuiz(null)
+                  setShowQuizBuilder(true)
+                }}
+                className="mt-2 flex items-center gap-1 text-xs text-green-600 hover:text-green-700 dark:text-green-400"
+              >
+                <Plus className="h-3 w-3" />
+                {stepQuizzes.length > 0 ? 'Add Another Quiz' : 'Add Quiz'}
+              </button>
+            )}
+            {showQuizBuilder && (
+              <div className="mt-3">
+                <QuizBuilder
+                  quiz={editingQuiz}
+                  procedureId={procedureId}
+                  stepId={step.id}
+                  onSave={async (data) => {
+                    if (editingQuiz) {
+                      const updated = await updateQuiz(procedureId, editingQuiz.id, data)
+                      setStepQuizzes((prev) => prev.map((q) => (q.id === updated.id ? updated : q)))
+                    } else {
+                      const created = await createQuiz(procedureId, {
+                        ...data,
+                        step: step.id,
+                        quiz_type: 'step_level',
+                      })
+                      setStepQuizzes((prev) => [...prev, created])
+                    }
+                    setShowQuizBuilder(false)
+                    setEditingQuiz(null)
+                  }}
+                  onCancel={() => {
+                    setShowQuizBuilder(false)
+                    setEditingQuiz(null)
+                  }}
+                />
+              </div>
+            )}
           </div>
 
           {/* Duration */}

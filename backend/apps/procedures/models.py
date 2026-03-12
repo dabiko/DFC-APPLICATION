@@ -123,6 +123,12 @@ class ProcedureStep(models.Model):
         help_text='Practical examples or scenarios illustrating this step.',
     )
 
+    # Video / media URL (e.g. YouTube, Vimeo, or internal link)
+    video_url = models.URLField(
+        max_length=2000, blank=True, default='',
+        help_text='URL to an embedded video (YouTube, Vimeo, etc.)',
+    )
+
     # Conditional branching (null = always shown)
     branch_condition = models.JSONField(null=True, blank=True)
 
@@ -327,6 +333,9 @@ class ProcedureVersionStep(models.Model):
     learning_objectives = models.JSONField(default=list, blank=True)
     key_concepts = models.JSONField(default=list, blank=True)
     example_scenarios = models.TextField(blank=True)
+
+    # Video URL snapshot
+    video_url = models.URLField(max_length=2000, blank=True, default='')
 
     # Branching snapshot
     branch_condition = models.JSONField(null=True, blank=True)
@@ -951,6 +960,7 @@ class ProcedureAuditLog(models.Model):
         REVIEW_REJECTED = 'review_rejected', 'Review Rejected'
         PUBLISHED = 'published', 'Published'
         RETIRED = 'retired', 'Retired'
+        REVERTED_TO_DRAFT = 'reverted_to_draft', 'Reverted to Draft'
         DELETED = 'deleted', 'Deleted'
 
         # Steps

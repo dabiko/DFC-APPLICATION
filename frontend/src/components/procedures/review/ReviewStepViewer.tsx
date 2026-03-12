@@ -15,6 +15,7 @@ import {
   CheckCircle,
   AlertOctagon,
   UserCheck,
+  User,
   Loader2,
   Target,
   Lightbulb,
@@ -81,10 +82,19 @@ export function ReviewStepViewer({
                 {step.attachments.length}
               </span>
             )}
+            {(step.step_owner_name || step.reviewer_name) && (
+              <span className="h-3 w-px bg-gray-300 dark:bg-gray-600 mx-0.5" />
+            )}
+            {step.step_owner_name && (
+              <span className="flex items-center gap-1 rounded-full bg-indigo-50 dark:bg-indigo-900/20 px-2 py-0.5 text-[10px] text-indigo-600 dark:text-indigo-400">
+                <User className="h-3 w-3" />
+                <span className="font-semibold">Owner:</span> {step.step_owner_name}
+              </span>
+            )}
             {step.reviewer_name && (
-              <span className="flex items-center gap-1 text-xs text-gray-400">
+              <span className="flex items-center gap-1 rounded-full bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 text-[10px] text-blue-600 dark:text-blue-400">
                 <UserCheck className="h-3 w-3" />
-                {step.reviewer_name}
+                <span className="font-semibold">Reviewer:</span> {step.reviewer_name}
               </span>
             )}
           </div>

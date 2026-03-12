@@ -39,7 +39,10 @@
       "Bash(grep -A 20 \"class.*StatsSerializer\" /c/Users/dabik/PycharmProjects/DFC-APPLICATION/backend/apps/workflows/serializers.py 2>/dev/null | head -50)",
       "Bash(find /c/Users/dabik/PycharmProjects/DFC-APPLICATION/frontend/src/components -name \"*training*\" -o -name \"*training*\" | grep -E \"\\\\.tsx?$\")",
       "Bash(find /c/Users/dabik/PycharmProjects/DFC-APPLICATION/frontend/src/components/procedures -name \"*Step*\" -o -name \"*step*\" | grep -E \"\\\\.tsx?$\")",
-      "Bash(cd C:/Users/dabik/PycharmProjects/DFC-APPLICATION/backend && python -c \"\nimport django, os\nos.environ.setdefault\\('DJANGO_SETTINGS_MODULE', 'config.settings.development'\\)\ndjango.setup\\(\\)\nfrom apps.procedures.views import ProcedureStepViewSet\nfrom apps.procedures.permissions import IsStepOwner\nfrom apps.procedures.models import ProcedureStep\nassert hasattr\\(ProcedureStep, 'step_owner'\\), 'step_owner field missing'\nprint\\('Backend OK'\\)\n\" 2>&1 | tail -1)"
+      "Bash(cd C:/Users/dabik/PycharmProjects/DFC-APPLICATION/backend && python -c \"\nimport django, os\nos.environ.setdefault\\('DJANGO_SETTINGS_MODULE', 'config.settings.development'\\)\ndjango.setup\\(\\)\nfrom apps.procedures.views import ProcedureStepViewSet\nfrom apps.procedures.permissions import IsStepOwner\nfrom apps.procedures.models import ProcedureStep\nassert hasattr\\(ProcedureStep, 'step_owner'\\), 'step_owner field missing'\nprint\\('Backend OK'\\)\n\" 2>&1 | tail -1)",
+      "Bash(grep -l \"import.*Header\\\\|import.*Layout\" /c/Users/dabik/PycharmProjects/DFC-APPLICATION/frontend/src/pages/*.tsx | wc -l)",
+      "Bash(cd /c/Users/dabik/PycharmProjects/DFC-APPLICATION/frontend/src/pages && grep -L \"DashboardHeader\\\\|AuthHeader\\\\|LandingHeader\" *.tsx | head -10)",
+      "Bash(find \"C:\\\\Users\\\\dabik\\\\PycharmProjects\\\\DFC-APPLICATION\\\\frontend\\\\src\" -type f -name \"*.tsx\" | xargs grep -l \"require_media_completion\\\\|require_manual_open\" | head -5)"
     ],
     "deny": [],
     "ask": []
