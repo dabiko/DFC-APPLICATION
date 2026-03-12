@@ -16,11 +16,14 @@ import {
   PlayCircle,
   AlertCircle,
   RefreshCw,
+  UserCircle,
+  Eye,
 } from 'lucide-react'
 import { ThreePanelLayout } from '@/components/Layout/ThreePanelLayout'
 import { DashboardHeader } from '@/components/Dashboard/DashboardHeader'
 import { DashboardSidebar } from '@/components/Dashboard/DashboardSidebar'
 import { authService } from '@/services/auth.service'
+import { useLogout } from '@/hooks/useLogout'
 import { listAssignments, type ProcedureAssignment } from '@/services/assignmentService'
 import { startTraining } from '@/services/trainingService'
 import { cn } from '@/utils/cn'
@@ -63,6 +66,7 @@ const STATUS_CONFIG: Record<
 
 export function MyTrainingPage() {
   const navigate = useNavigate()
+  const handleLogout = useLogout()
   const [assignments, setAssignments] = useState<ProcedureAssignment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -82,7 +86,10 @@ export function MyTrainingPage() {
     setLoading(true)
     setError(null)
     try {
-      const data = await listAssignments()
+      // Always filter to current user's assignments only
+      const params: Record<string, string> = {}
+      if (userData?.id) params.assignee = String(userData.id)
+      const data = await listAssignments(params)
       const items = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : []
       setAssignments(items)
     } catch (err: any) {
@@ -90,7 +97,7 @@ export function MyTrainingPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [userData?.id])
 
   useEffect(() => {
     loadAssignments()
@@ -119,7 +126,7 @@ export function MyTrainingPage() {
 
   return (
     <ThreePanelLayout
-      header={<DashboardHeader user={user} notifications={[]} onLogout={() => {}} />}
+      header={<DashboardHeader user={user} notifications={[]} onLogout={handleLogout} />}
       leftPanel={<DashboardSidebar />}
       leftPanelWidth="auto"
       collapsibleLeft={false}
@@ -230,10 +237,16 @@ export function MyTrainingPage() {
                               {assignment.due_date && (
                                 <span className="flex items-center gap-1">
                                   <Clock className="h-3 w-3" />
-                                  Due: {new Date(assignment.due_date).toLocaleDateString()}
+                                  Due:{' '}
+                                  {new Date(assignment.due_date + 'T12:00:00').toLocaleDateString()}
                                 </span>
                               )}
-                              <span>Assigned by {assignment.assigned_by_name}</span>
+                              {assignment.assigned_by_name && (
+                                <span className="flex items-center gap-1">
+                                  <UserCircle className="h-3 w-3" />
+                                  Assigned by {assignment.assigned_by_name}
+                                </span>
+                              )}
                             </div>
                           </div>
 
@@ -253,11 +266,33 @@ export function MyTrainingPage() {
                             </button>
                           )}
 
-                          {assignment.status === 'completed' && (
-                            <span className="flex items-center gap-1 text-sm text-green-600 dark:text-green-400 ml-4">
-                              <CheckCircle className="h-4 w-4" />
-                              Done
-                            </span>
+                          {(assignment.status === 'completed' ||
+                            assignment.status === 'failed') && (
+                            <div className="flex items-center gap-2 ml-4">
+                              <span
+                                className={`flex items-center gap-1 text-sm ${
+                                  assignment.status === 'completed'
+                                    ? 'text-green-600 dark:text-green-400'
+                                    : 'text-red-600 dark:text-red-400'
+                                }`}
+                              >
+                                <CheckCircle className="h-4 w-4" />
+                                {assignment.status === 'completed' ? 'Done' : 'Failed'}
+                              </span>
+                              {assignment.latest_attempt_id && (
+                                <button
+                                  onClick={() =>
+                                    navigate(
+                                      `/training/${assignment.latest_attempt_id}?review=true`
+                                    )
+                                  }
+                                  title="Review training"
+                                  className="p-1.5 rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </button>
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>

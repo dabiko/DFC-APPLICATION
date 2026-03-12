@@ -304,7 +304,9 @@ class QuizCreateSerializer(serializers.ModelSerializer):
 
 class ProcedureAssignmentSerializer(serializers.ModelSerializer):
     assignee_name = serializers.CharField(source='assignee.get_full_name', read_only=True)
+    assigned_by_name = serializers.SerializerMethodField()
     procedure_title = serializers.CharField(source='procedure_version.title', read_only=True)
+    procedure_id = serializers.UUIDField(source='procedure_version.procedure_id', read_only=True)
     version_number = serializers.IntegerField(source='procedure_version.version_number', read_only=True)
 
     class Meta:
@@ -312,6 +314,17 @@ class ProcedureAssignmentSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ['id', 'assigned_at', 'completed_at', 'completion_score',
                             'last_reminder_sent', 'reminder_count']
+
+    def get_assigned_by_name(self, obj):
+        if obj.assigned_by:
+            return obj.assigned_by.get_full_name() or obj.assigned_by.username
+        return None
+
+    latest_attempt_id = serializers.SerializerMethodField()
+
+    def get_latest_attempt_id(self, obj):
+        attempt = obj.attempts.order_by('-attempt_number').first()
+        return str(attempt.id) if attempt else None
 
 
 class CreateAssignmentSerializer(serializers.Serializer):
@@ -362,6 +375,10 @@ class QuizAttemptSerializer(serializers.ModelSerializer):
 class TrainingAttemptSerializer(serializers.ModelSerializer):
     step_completions = StepCompletionSerializer(many=True, read_only=True)
     quiz_attempts = QuizAttemptSerializer(many=True, read_only=True)
+    version = serializers.UUIDField(source='assignment.procedure_version_id', read_only=True)
+    version_number = serializers.IntegerField(source='assignment.procedure_version.version_number', read_only=True)
+    procedure_id = serializers.UUIDField(source='assignment.procedure_version.procedure_id', read_only=True)
+    procedure_title = serializers.CharField(source='assignment.procedure_version.title', read_only=True)
 
     class Meta:
         model = TrainingAttempt

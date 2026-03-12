@@ -2,7 +2,7 @@
  * StepContent — Center panel displaying rich step content, attachments, and gates.
  */
 
-import { Clock } from 'lucide-react'
+import { Clock, CheckCircle, XCircle, Timer } from 'lucide-react'
 import type { VersionStep, StepCompletionResponse } from './types'
 import { AttachmentViewer } from './AttachmentViewer'
 import { StepGateBlocker } from './StepGateBlocker'
@@ -18,6 +18,7 @@ interface StepContentProps {
   actionLoading: boolean
   completing: boolean
   attemptId: string
+  reviewMode?: boolean
   onPrevious: () => void
   onNext: () => void
   onCompleteStep: () => void
@@ -37,6 +38,7 @@ export function StepContent({
   actionLoading,
   completing,
   attemptId,
+  reviewMode = false,
   onPrevious,
   onNext,
   onCompleteStep,
@@ -65,15 +67,76 @@ export function StepContent({
 
         <AttachmentViewer attachments={step.attachments} />
 
-        <StepGateBlocker
-          step={step}
-          completion={completion}
-          actionLoading={actionLoading}
-          attemptId={attemptId}
-          onMarkManualOpened={onMarkManualOpened}
-          onMarkMediaCompleted={onMarkMediaCompleted}
-          onTakeQuiz={onTakeQuiz}
-        />
+        {/* Review mode: step performance summary */}
+        {reviewMode && completion && (
+          <div className="mb-6 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 overflow-hidden">
+            <div className="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700">
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                Step Performance
+              </p>
+            </div>
+            <div className="px-4 py-3 flex flex-wrap items-center gap-4 text-sm">
+              <span
+                className={`flex items-center gap-1.5 font-medium ${
+                  completion.status === 'completed'
+                    ? 'text-green-600 dark:text-green-400'
+                    : completion.status === 'skipped'
+                      ? 'text-gray-400'
+                      : 'text-amber-600 dark:text-amber-400'
+                }`}
+              >
+                {completion.status === 'completed' ? (
+                  <CheckCircle className="h-4 w-4" />
+                ) : completion.status === 'skipped' ? (
+                  <XCircle className="h-4 w-4" />
+                ) : (
+                  <Clock className="h-4 w-4" />
+                )}
+                {completion.status === 'completed'
+                  ? 'Completed'
+                  : completion.status === 'skipped'
+                    ? 'Skipped'
+                    : 'Incomplete'}
+              </span>
+              {completion.started_at && (
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  Started: {new Date(completion.started_at).toLocaleString()}
+                </span>
+              )}
+              {completion.completed_at && (
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  Completed: {new Date(completion.completed_at).toLocaleString()}
+                </span>
+              )}
+              {completion.time_spent_seconds != null && completion.time_spent_seconds > 0 && (
+                <span className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                  <Timer className="h-3 w-3" />
+                  {completion.time_spent_seconds < 60
+                    ? `${completion.time_spent_seconds}s`
+                    : `${Math.floor(completion.time_spent_seconds / 60)}m ${completion.time_spent_seconds % 60}s`}
+                </span>
+              )}
+              {completion.manual_opened_at && (
+                <span className="text-xs text-blue-500">Manual opened</span>
+              )}
+              {completion.media_completed_at && (
+                <span className="text-xs text-purple-500">Media completed</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {!reviewMode && (
+          <StepGateBlocker
+            step={step}
+            completion={completion}
+            actionLoading={actionLoading}
+            attemptId={attemptId}
+            onMarkManualOpened={onMarkManualOpened}
+            onMarkMediaCompleted={onMarkMediaCompleted}
+            onTakeQuiz={onTakeQuiz}
+          />
+        )}
 
         <StepNavigationButtons
           currentStepIndex={currentStepIndex}
@@ -82,6 +145,7 @@ export function StepContent({
           allStepsCompleted={allStepsCompleted}
           actionLoading={actionLoading}
           completing={completing}
+          reviewMode={reviewMode}
           onPrevious={onPrevious}
           onNext={onNext}
           onCompleteStep={onCompleteStep}

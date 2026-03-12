@@ -6,6 +6,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useLogout } from '@/hooks/useLogout'
 import {
   ArrowLeft,
   Loader2,
@@ -31,6 +32,7 @@ import type { ProcedureVersion } from '@/types/procedure'
 export function ProcedureVersionPage() {
   const { id, versionNumber } = useParams<{ id: string; versionNumber: string }>()
   const navigate = useNavigate()
+  const handleLogout = useLogout()
 
   const [version, setVersion] = useState<ProcedureVersion | null>(null)
   const [loading, setLoading] = useState(true)
@@ -231,7 +233,7 @@ export function ProcedureVersionPage() {
 
   return (
     <ThreePanelLayout
-      header={<DashboardHeader user={user} notifications={[]} onLogout={() => {}} />}
+      header={<DashboardHeader user={user} notifications={[]} onLogout={handleLogout} />}
       leftPanel={<DashboardSidebar />}
       leftPanelWidth="auto"
       collapsibleLeft={false}

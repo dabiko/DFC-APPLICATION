@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Users, RefreshCw, Search, Loader2 } from 'lucide-react'
+import { useLogout } from '@/hooks/useLogout'
 import { ThreePanelLayout } from '@/components/Layout/ThreePanelLayout'
 import { DashboardHeader } from '@/components/Dashboard/DashboardHeader'
 import { DashboardSidebar } from '@/components/Dashboard/DashboardSidebar'
@@ -26,6 +27,7 @@ import {
 } from '@/services/assignmentService'
 
 export function TrainingAssignmentsPage() {
+  const handleLogout = useLogout()
   const [assignments, setAssignments] = useState<ProcedureAssignment[]>([])
   const [dashboard, setDashboard] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -88,7 +90,7 @@ export function TrainingAssignmentsPage() {
 
   return (
     <ThreePanelLayout
-      header={<DashboardHeader user={user} notifications={[]} onLogout={() => {}} />}
+      header={<DashboardHeader user={user} notifications={[]} onLogout={handleLogout} />}
       leftPanel={<DashboardSidebar />}
       leftPanelWidth="auto"
       collapsibleLeft={false}

@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Loader2, AlertTriangle, PlayCircle, ArrowLeft } from 'lucide-react'
+import { Loader2, AlertTriangle, PlayCircle, ArrowLeft, Eye } from 'lucide-react'
 import {
   startStep,
   viewStep,
@@ -25,9 +25,10 @@ import type { VersionStep } from './types'
 
 interface TrainingPlayerProps {
   attemptId: string
+  reviewMode?: boolean
 }
 
-export function TrainingPlayer({ attemptId }: TrainingPlayerProps) {
+export function TrainingPlayer({ attemptId, reviewMode = false }: TrainingPlayerProps) {
   const navigate = useNavigate()
 
   const [attempt, setAttempt] = useState<TrainingAttemptResponse | null>(null)
@@ -52,10 +53,17 @@ export function TrainingPlayer({ attemptId }: TrainingPlayerProps) {
       const attemptData: TrainingAttemptResponse = res.data
       setAttempt(attemptData)
 
-      const versionRes = await apiClient.get(`/procedures/versions/${attemptData.version}/`)
+      const versionRes = await apiClient.get(
+        `/procedures/${attemptData.procedure_id}/versions/${attemptData.version_number}/`
+      )
       setSteps(versionRes.data.steps || [])
 
-      if (attemptData.step_completions.length === 0 && versionRes.data.steps?.length > 0) {
+      if (reviewMode) {
+        // Review mode: start from first step, no API mutations
+        const completions = attemptData.step_completions
+        setCurrentStepIndex(0)
+        setCurrentCompletion(completions[0] || null)
+      } else if (attemptData.step_completions.length === 0 && versionRes.data.steps?.length > 0) {
         const firstStep = versionRes.data.steps[0]
         const completion = await startStep(attemptId, firstStep.id)
         setCurrentCompletion(completion)
@@ -101,6 +109,8 @@ export function TrainingPlayer({ attemptId }: TrainingPlayerProps) {
     const existing = getStepCompletion(step.id)
     if (existing) {
       setCurrentCompletion(existing)
+    } else if (reviewMode) {
+      setCurrentCompletion(null)
     } else {
       setActionLoading(true)
       try {
@@ -158,7 +168,7 @@ export function TrainingPlayer({ attemptId }: TrainingPlayerProps) {
           await handleNavigateStep(currentStepIndex + 1)
         }
       } else {
-        setError(`Cannot advance: ${result.reasons.join(', ')}`)
+        setError(`Cannot advance: ${(result.reasons || []).join(', ')}`)
       }
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Failed to complete step')
@@ -229,14 +239,21 @@ export function TrainingPlayer({ attemptId }: TrainingPlayerProps) {
             >
               <ArrowLeft className="h-5 w-5 text-gray-500" />
             </button>
-            <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-              <PlayCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+            <div
+              className={`p-2 rounded-lg ${reviewMode ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-green-100 dark:bg-green-900/30'}`}
+            >
+              {reviewMode ? (
+                <Eye className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              ) : (
+                <PlayCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+              )}
             </div>
             <div>
               <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Training Session
+                {reviewMode ? 'Training Review' : 'Training Session'}
               </h1>
               <p className="text-xs text-gray-500">
+                {reviewMode && attempt?.procedure_title ? `${attempt.procedure_title} · ` : ''}
                 Step {currentStepIndex + 1} of {steps.length}
               </p>
             </div>
@@ -266,6 +283,7 @@ export function TrainingPlayer({ attemptId }: TrainingPlayerProps) {
               actionLoading={actionLoading}
               completing={completing}
               attemptId={attemptId}
+              reviewMode={reviewMode}
               onPrevious={() => handleNavigateStep(currentStepIndex - 1)}
               onNext={() => handleNavigateStep(currentStepIndex + 1)}
               onCompleteStep={handleCompleteStep}

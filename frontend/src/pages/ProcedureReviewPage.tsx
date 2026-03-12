@@ -6,6 +6,7 @@
 
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
+import { useLogout } from '@/hooks/useLogout'
 import { ThreePanelLayout } from '@/components/Layout/ThreePanelLayout'
 import { DashboardHeader } from '@/components/Dashboard/DashboardHeader'
 import { DashboardSidebar } from '@/components/Dashboard/DashboardSidebar'
@@ -15,6 +16,7 @@ import { useAuth } from '@/hooks/useAuth'
 export function ProcedureReviewPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const handleLogout = useLogout()
   const { user: userData } = useAuth()
 
   const user = {
@@ -31,7 +33,7 @@ export function ProcedureReviewPage() {
 
   return (
     <ThreePanelLayout
-      header={<DashboardHeader user={user} notifications={[]} onLogout={() => {}} />}
+      header={<DashboardHeader user={user} notifications={[]} onLogout={handleLogout} />}
       leftPanel={<DashboardSidebar />}
       leftPanelWidth="auto"
       collapsibleLeft={false}

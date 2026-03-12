@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useLogout } from '@/hooks/useLogout'
 import {
   ArrowLeft,
   Plus,
@@ -51,6 +52,7 @@ type ViewMode = 'metadata' | 'steps'
 export function ProcedureBuilderPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const handleLogout = useLogout()
   const isNew = !id
 
   const [procedure, setProcedure] = useState<ProcedureDetail | null>(null)
@@ -203,7 +205,7 @@ export function ProcedureBuilderPage() {
   if (loading) {
     return (
       <ThreePanelLayout
-        header={<DashboardHeader user={user} notifications={[]} onLogout={() => {}} />}
+        header={<DashboardHeader user={user} notifications={[]} onLogout={handleLogout} />}
         leftPanel={<DashboardSidebar />}
         leftPanelWidth="auto"
         collapsibleLeft={false}
@@ -219,7 +221,7 @@ export function ProcedureBuilderPage() {
   return (
     <>
       <ThreePanelLayout
-        header={<DashboardHeader user={user} notifications={[]} onLogout={() => {}} />}
+        header={<DashboardHeader user={user} notifications={[]} onLogout={handleLogout} />}
         leftPanel={<DashboardSidebar />}
         leftPanelWidth="auto"
         collapsibleLeft={false}

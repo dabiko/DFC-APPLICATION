@@ -16,6 +16,7 @@ const BASE = '/procedures'
 export interface ProcedureAssignment {
   id: string
   procedure: string
+  procedure_id: string
   procedure_title: string
   version: string
   version_number: number
@@ -31,6 +32,7 @@ export interface ProcedureAssignment {
   waiver_reason: string
   source: string
   created_at: string
+  latest_attempt_id: string | null
 }
 
 export interface AssignmentDashboard {

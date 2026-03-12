@@ -5,7 +5,8 @@
  * Delegates to TrainingPlayer component for all training logic.
  */
 
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
+import { useLogout } from '@/hooks/useLogout'
 import { ThreePanelLayout } from '@/components/Layout/ThreePanelLayout'
 import { DashboardHeader } from '@/components/Dashboard/DashboardHeader'
 import { DashboardSidebar } from '@/components/Dashboard/DashboardSidebar'
@@ -14,6 +15,9 @@ import { authService } from '@/services/auth.service'
 
 export function TrainingPlayerPage() {
   const { attemptId } = useParams<{ attemptId: string }>()
+  const [searchParams] = useSearchParams()
+  const reviewMode = searchParams.get('review') === 'true'
+  const handleLogout = useLogout()
 
   const userData = authService.getUser()
   const user = {
@@ -26,11 +30,13 @@ export function TrainingPlayerPage() {
 
   return (
     <ThreePanelLayout
-      header={<DashboardHeader user={user} notifications={[]} onLogout={() => {}} />}
+      header={<DashboardHeader user={user} notifications={[]} onLogout={handleLogout} />}
       leftPanel={<DashboardSidebar />}
       leftPanelWidth="auto"
       collapsibleLeft={false}
-      centerPanel={attemptId ? <TrainingPlayer attemptId={attemptId} /> : null}
+      centerPanel={
+        attemptId ? <TrainingPlayer attemptId={attemptId} reviewMode={reviewMode} /> : null
+      }
     />
   )
 }

@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { FileCheck, RefreshCw, Search } from 'lucide-react'
+import { useLogout } from '@/hooks/useLogout'
 import { ThreePanelLayout } from '@/components/Layout/ThreePanelLayout'
 import { DashboardHeader } from '@/components/Dashboard/DashboardHeader'
 import { DashboardSidebar } from '@/components/Dashboard/DashboardSidebar'
@@ -20,6 +21,7 @@ import { authService } from '@/services/auth.service'
 import { listEvidence, type EvidenceRecord } from '@/services/evidenceService'
 
 export function TrainingEvidencePage() {
+  const handleLogout = useLogout()
   const [evidence, setEvidence] = useState<EvidenceRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -62,7 +64,7 @@ export function TrainingEvidencePage() {
 
   return (
     <ThreePanelLayout
-      header={<DashboardHeader user={user} notifications={[]} onLogout={() => {}} />}
+      header={<DashboardHeader user={user} notifications={[]} onLogout={handleLogout} />}
       leftPanel={<DashboardSidebar />}
       leftPanelWidth="auto"
       collapsibleLeft={false}

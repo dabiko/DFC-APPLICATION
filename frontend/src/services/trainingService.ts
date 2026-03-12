@@ -16,6 +16,9 @@ export interface TrainingAttemptResponse {
   id: string
   assignment: string
   version: string
+  version_number: number
+  procedure_id: string
+  procedure_title: string
   status: string
   started_at: string
   completed_at: string | null
@@ -29,6 +32,7 @@ export interface StepCompletionResponse {
   status: string
   started_at: string | null
   completed_at: string | null
+  time_spent_seconds: number | null
   manual_opened_at: string | null
   media_completed_at: string | null
 }

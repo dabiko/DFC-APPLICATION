@@ -1023,7 +1023,7 @@ class ProcedureAssignmentViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = ProcedureAssignment.objects.filter(
             organization=self.request.user.organization,
-        ).select_related('assignee', 'procedure_version', 'assigned_by')
+        ).select_related('assignee', 'procedure_version', 'assigned_by').prefetch_related('attempts')
 
         # Non-admins see only their own assignments
         from apps.permissions.models import UserRole
@@ -1251,6 +1251,18 @@ class ProcedureAssignmentViewSet(viewsets.ModelViewSet):
         })
 
 
+def _resolve_step_completion(attempt, data):
+    """Resolve a StepCompletion from request data.
+    Accepts step_completion_id (PK) or version_step_id (FK)."""
+    sc_id = data.get('step_completion_id')
+    vs_id = data.get('version_step_id')
+    if sc_id:
+        return StepCompletion.objects.get(id=sc_id, attempt=attempt)
+    if vs_id:
+        return StepCompletion.objects.get(attempt=attempt, version_step_id=vs_id)
+    raise StepCompletion.DoesNotExist('No step_completion_id or version_step_id provided.')
+
+
 class TrainingViewSet(viewsets.GenericViewSet):
     """Training delivery — start, progress, complete."""
     permission_classes = [permissions.IsAuthenticated]
@@ -1301,7 +1313,11 @@ class TrainingViewSet(viewsets.GenericViewSet):
             )
 
         # Check for existing in-progress attempt
-        existing = assignment.attempts.filter(status='in_progress').first()
+        existing = assignment.attempts.select_related(
+            'assignment__procedure_version',
+        ).prefetch_related(
+            'step_completions__version_step', 'quiz_attempts',
+        ).filter(status='in_progress').first()
         if existing:
             return Response(TrainingAttemptSerializer(existing).data)
 
@@ -1353,6 +1369,13 @@ class TrainingViewSet(viewsets.GenericViewSet):
             detail={'attempt_number': attempt_number},
         )
 
+        # Re-fetch with related data for serializer
+        attempt = TrainingAttempt.objects.select_related(
+            'assignment__procedure_version',
+        ).prefetch_related(
+            'step_completions__version_step', 'quiz_attempts',
+        ).get(pk=attempt.pk)
+
         return Response(TrainingAttemptSerializer(attempt).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post'], url_path='start_step')
@@ -1400,12 +1423,11 @@ class TrainingViewSet(viewsets.GenericViewSet):
     @action(detail=True, methods=['post'], url_path='manual_opened')
     def manual_opened(self, request, pk=None):
         """Record manual open event."""
-        step_id = request.data.get('step_completion_id') or request.data.get('version_step_id')
         _qs = TrainingAttempt.objects.filter(id=pk)
         if not request.user.is_superuser:
             _qs = _qs.filter(assignment__assignee=request.user)
         attempt = _qs.get()
-        step_completion = StepCompletion.objects.get(attempt=attempt, version_step_id=step_id)
+        step_completion = _resolve_step_completion(attempt, request.data)
 
         step_completion.manual_opened_at = timezone.now()
         if step_completion.status in ('not_started', 'started', 'viewed'):
@@ -1417,12 +1439,11 @@ class TrainingViewSet(viewsets.GenericViewSet):
     @action(detail=True, methods=['post'], url_path='media_completed')
     def media_completed(self, request, pk=None):
         """Record media completion event."""
-        step_id = request.data.get('step_completion_id') or request.data.get('version_step_id')
         _qs = TrainingAttempt.objects.filter(id=pk)
         if not request.user.is_superuser:
             _qs = _qs.filter(assignment__assignee=request.user)
         attempt = _qs.get()
-        step_completion = StepCompletion.objects.get(attempt=attempt, version_step_id=step_id)
+        step_completion = _resolve_step_completion(attempt, request.data)
 
         step_completion.media_completed_at = timezone.now()
         if step_completion.status in ('not_started', 'started', 'viewed', 'manual_opened'):
@@ -1434,17 +1455,16 @@ class TrainingViewSet(viewsets.GenericViewSet):
     @action(detail=True, methods=['post'], url_path='complete_step')
     def complete_step(self, request, pk=None):
         """Complete step (validates all gates)."""
-        step_id = request.data.get('step_completion_id') or request.data.get('version_step_id')
         _qs = TrainingAttempt.objects.filter(id=pk)
         if not request.user.is_superuser:
             _qs = _qs.filter(assignment__assignee=request.user)
         attempt = _qs.get()
-        step_completion = StepCompletion.objects.get(attempt=attempt, version_step_id=step_id)
+        step_completion = _resolve_step_completion(attempt, request.data)
 
         # Validate gates
         can_advance, reasons = can_advance_to_next_step(step_completion)
         if not can_advance:
-            return Response({'errors': reasons}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'can_advance': False, 'reasons': reasons}, status=status.HTTP_400_BAD_REQUEST)
 
         step_completion.status = 'completed'
         step_completion.completed_at = timezone.now()
@@ -1460,7 +1480,7 @@ class TrainingViewSet(viewsets.GenericViewSet):
 
         # Update trainee context with step result
         attempt.trainee_context.setdefault('step_results', {})
-        attempt.trainee_context['step_results'][str(step_id)] = 'passed'
+        attempt.trainee_context['step_results'][str(step_completion.version_step_id)] = 'passed'
         attempt.save(update_fields=['trainee_context'])
 
         # Audit
@@ -1471,13 +1491,14 @@ class TrainingViewSet(viewsets.GenericViewSet):
             procedure=attempt.assignment.procedure_version.procedure,
             version=attempt.assignment.procedure_version,
             assignment=attempt.assignment,
-            step_id=step_id,
+            step_id=step_completion.version_step_id,
             ip_address=request.META.get('REMOTE_ADDR'),
             detail={'steps_completed': attempt.steps_completed, 'total_steps': attempt.total_steps},
         )
 
         return Response({
             'message': 'Step completed.',
+            'can_advance': True,
             'steps_completed': attempt.steps_completed,
             'total_steps': attempt.total_steps,
         })

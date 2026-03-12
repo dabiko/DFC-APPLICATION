@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useLogout } from '@/hooks/useLogout'
 import { ClipboardList, Plus, Loader2, AlertTriangle, RefreshCw } from 'lucide-react'
 import { ThreePanelLayout } from '@/components/Layout/ThreePanelLayout'
 import { DashboardHeader } from '@/components/Dashboard/DashboardHeader'
@@ -19,6 +20,7 @@ import type { Procedure, ProcedureFilters as Filters } from '@/types/procedure'
 
 export function ProceduresListPage() {
   const navigate = useNavigate()
+  const handleLogout = useLogout()
   const [procedures, setProcedures] = useState<Procedure[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -61,7 +63,7 @@ export function ProceduresListPage() {
 
   return (
     <ThreePanelLayout
-      header={<DashboardHeader user={user} notifications={[]} onLogout={() => {}} />}
+      header={<DashboardHeader user={user} notifications={[]} onLogout={handleLogout} />}
       leftPanel={<DashboardSidebar />}
       leftPanelWidth="auto"
       collapsibleLeft={false}

@@ -6,6 +6,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { useLogout } from '@/hooks/useLogout'
 import { ArrowLeft, Loader2, AlertTriangle, GitCompare } from 'lucide-react'
 import { ThreePanelLayout } from '@/components/Layout/ThreePanelLayout'
 import { DashboardHeader } from '@/components/Dashboard/DashboardHeader'
@@ -18,6 +19,7 @@ import type { ProcedureVersionListItem } from '@/types/procedure'
 export function ProcedureVersionDiffPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const handleLogout = useLogout()
   const [versions, setVersions] = useState<ProcedureVersionListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -94,7 +96,7 @@ export function ProcedureVersionDiffPage() {
 
   return (
     <ThreePanelLayout
-      header={<DashboardHeader user={user} notifications={[]} onLogout={() => {}} />}
+      header={<DashboardHeader user={user} notifications={[]} onLogout={handleLogout} />}
       leftPanel={<DashboardSidebar />}
       leftPanelWidth="auto"
       collapsibleLeft={false}

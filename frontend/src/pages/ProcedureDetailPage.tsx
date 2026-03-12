@@ -7,6 +7,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useLogout } from '@/hooks/useLogout'
 import {
   ArrowLeft,
   Edit,
@@ -67,6 +68,7 @@ import type { ReviewProgress } from '@/services/procedureService'
 export function ProcedureDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const handleLogout = useLogout()
 
   const [procedure, setProcedure] = useState<ProcedureDetail | null>(null)
   const [versions, setVersions] = useState<ProcedureVersionListItem[]>([])
@@ -172,7 +174,7 @@ export function ProcedureDetailPage() {
   if (loading) {
     return (
       <ThreePanelLayout
-        header={<DashboardHeader user={user} notifications={[]} onLogout={() => {}} />}
+        header={<DashboardHeader user={user} notifications={[]} onLogout={handleLogout} />}
         leftPanel={<DashboardSidebar />}
         leftPanelWidth="auto"
         collapsibleLeft={false}
@@ -188,7 +190,7 @@ export function ProcedureDetailPage() {
   if (error && !procedure) {
     return (
       <ThreePanelLayout
-        header={<DashboardHeader user={user} notifications={[]} onLogout={() => {}} />}
+        header={<DashboardHeader user={user} notifications={[]} onLogout={handleLogout} />}
         leftPanel={<DashboardSidebar />}
         leftPanelWidth="auto"
         collapsibleLeft={false}
@@ -211,7 +213,7 @@ export function ProcedureDetailPage() {
   return (
     <>
       <ThreePanelLayout
-        header={<DashboardHeader user={user} notifications={[]} onLogout={() => {}} />}
+        header={<DashboardHeader user={user} notifications={[]} onLogout={handleLogout} />}
         leftPanel={<DashboardSidebar />}
         leftPanelWidth="auto"
         collapsibleLeft={false}
