@@ -32,14 +32,22 @@ import {
   AlertOctagon,
   UserCheck,
   Eye,
+  Mail,
+  XCircle,
+  Search,
 } from 'lucide-react'
 import { ThreePanelLayout } from '@/components/Layout/ThreePanelLayout'
 import { DashboardHeader } from '@/components/Dashboard/DashboardHeader'
 import { DashboardSidebar } from '@/components/Dashboard/DashboardSidebar'
 import { ProcedureStatusBadge } from '@/components/procedures/ProcedureStatusBadge'
 import { DeleteProcedureModal } from '@/components/procedures/DeleteProcedureModal'
+import { PublishConfirmModal } from '@/components/procedures/PublishConfirmModal'
 import { AssignProcedureModal } from '@/components/procedures/AssignProcedureModal'
+import { RetireVersionModal } from '@/components/procedures/RetireVersionModal'
+import { WaiveAssignmentModal } from '@/components/procedures/WaiveAssignmentModal'
+import { waiveAssignment } from '@/services/assignmentService'
 import { cn } from '@/utils/cn'
+import { DatePicker } from '@/components/DatePicker'
 import { authService } from '@/services/auth.service'
 import {
   getProcedure,
@@ -49,7 +57,11 @@ import {
   getReviewProgress,
   deleteProcedure,
 } from '@/services/procedureService'
-import type { ProcedureDetail, ProcedureVersionListItem } from '@/types/procedure'
+import type {
+  ProcedureDetail,
+  ProcedureVersionListItem,
+  ProcedureAssignmentInfo,
+} from '@/types/procedure'
 import type { ReviewProgress } from '@/services/procedureService'
 
 export function ProcedureDetailPage() {
@@ -65,7 +77,11 @@ export function ProcedureDetailPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showAssignModal, setShowAssignModal] = useState(false)
   const [showPublishForm, setShowPublishForm] = useState(false)
+  const [retireTarget, setRetireTarget] = useState<number | null>(null)
+  const [showPublishConfirm, setShowPublishConfirm] = useState(false)
   const [publishing, setPublishing] = useState(false)
+  const [waiveTarget, setWaiveTarget] = useState<ProcedureAssignmentInfo | null>(null)
+  const [assigneeSearch, setAssigneeSearch] = useState('')
   const [publishData, setPublishData] = useState({
     effective_from: new Date().toISOString().split('T')[0],
     expires_on: '',
@@ -127,17 +143,24 @@ export function ProcedureDetailPage() {
     }
   }
 
-  const handleRetire = async (versionNumber: number) => {
-    if (!procedure) return
-    const reason = prompt('Reason for retiring this version:')
-    if (!reason) return
-    try {
-      await retireVersion(procedure.id, versionNumber, { reason })
-      const versionData = await listVersions(procedure.id)
-      setVersions(Array.isArray(versionData) ? versionData : ((versionData as any)?.results ?? []))
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to retire version')
-    }
+  const handleRetire = async (reason: string) => {
+    if (!procedure || retireTarget === null) return
+    await retireVersion(procedure.id, retireTarget, { reason })
+    const [procData, versionData] = await Promise.all([
+      getProcedure(procedure.id),
+      listVersions(procedure.id),
+    ])
+    setProcedure(procData)
+    setVersions(Array.isArray(versionData) ? versionData : ((versionData as any)?.results ?? []))
+    setRetireTarget(null)
+  }
+
+  const handleWaive = async (reason: string) => {
+    if (!procedure || !waiveTarget) return
+    await waiveAssignment(waiveTarget.id, reason)
+    const procData = await getProcedure(procedure.id)
+    setProcedure(procData)
+    setWaiveTarget(null)
   }
 
   const handleDelete = async () => {
@@ -223,15 +246,17 @@ export function ProcedureDetailPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {versions.some((v) => v.is_active) && (
-                    <button
-                      onClick={() => setShowAssignModal(true)}
-                      className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-                    >
-                      <Users className="h-4 w-4" />
-                      Assign
-                    </button>
-                  )}
+                  {versions.some((v) => v.is_active) &&
+                    (user.is_superuser ||
+                      String(userData?.id) === String(procedure?.created_by)) && (
+                      <button
+                        onClick={() => setShowAssignModal(true)}
+                        className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                      >
+                        <Users className="h-4 w-4" />
+                        Assign
+                      </button>
+                    )}
                   {procedure?.state === 'in_review' && (
                     <button
                       onClick={() => navigate(`/procedures/${procedure.id}/review`)}
@@ -241,15 +266,17 @@ export function ProcedureDetailPage() {
                       Review
                     </button>
                   )}
-                  {procedure?.state === 'approved' && (
-                    <button
-                      onClick={() => setShowPublishForm(true)}
-                      className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
-                    >
-                      <Rocket className="h-4 w-4" />
-                      Publish
-                    </button>
-                  )}
+                  {procedure?.state === 'approved' &&
+                    (user.is_superuser ||
+                      String(userData?.id) === String(procedure.created_by)) && (
+                      <button
+                        onClick={() => setShowPublishForm(true)}
+                        className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+                      >
+                        <Rocket className="h-4 w-4" />
+                        Publish
+                      </button>
+                    )}
                   {procedure?.state === 'draft' &&
                     (user.is_superuser ||
                       String(userData?.id) === String(procedure.created_by)) && (
@@ -294,37 +321,50 @@ export function ProcedureDetailPage() {
                     <h3 className="text-sm font-semibold text-green-800 dark:text-green-300 mb-3">
                       Publish Procedure
                     </h3>
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-                            Effective From
-                          </label>
-                          <input
-                            type="date"
-                            value={publishData.effective_from}
-                            onChange={(e) =>
-                              setPublishData({ ...publishData, effective_from: e.target.value })
-                            }
-                            className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-                            Expires On
-                          </label>
-                          <input
-                            type="date"
-                            value={publishData.expires_on}
-                            onChange={(e) =>
-                              setPublishData({ ...publishData, expires_on: e.target.value })
-                            }
-                            className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-                          />
-                        </div>
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <DatePicker
+                          label="Effective From"
+                          required
+                          value={
+                            publishData.effective_from
+                              ? new Date(publishData.effective_from + 'T12:00:00')
+                              : undefined
+                          }
+                          onChange={(date) => {
+                            const formatted = date
+                              ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+                              : ''
+                            setPublishData({ ...publishData, effective_from: formatted })
+                          }}
+                          minDate={new Date()}
+                          placeholder="Select effective date"
+                          dateFormat="PP"
+                        />
+                        <DatePicker
+                          label="Expires On"
+                          value={
+                            publishData.expires_on
+                              ? new Date(publishData.expires_on + 'T12:00:00')
+                              : undefined
+                          }
+                          onChange={(date) => {
+                            const formatted = date
+                              ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+                              : ''
+                            setPublishData({ ...publishData, expires_on: formatted })
+                          }}
+                          minDate={
+                            publishData.effective_from
+                              ? new Date(publishData.effective_from + 'T12:00:00')
+                              : new Date()
+                          }
+                          placeholder="Optional expiry date"
+                          dateFormat="PP"
+                        />
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                        <label className="block text-xs font-medium text-green-800 dark:text-green-300 mb-1.5">
                           Changelog
                         </label>
                         <textarea
@@ -333,22 +373,22 @@ export function ProcedureDetailPage() {
                             setPublishData({ ...publishData, changelog: e.target.value })
                           }
                           rows={2}
-                          className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                          className="w-full rounded-lg border border-green-300 bg-white px-3 py-2 text-sm shadow-sm transition-colors focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 dark:border-green-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-green-400 dark:focus:ring-green-400/20"
                           placeholder="What changed in this version..."
                         />
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex items-center gap-3 pt-1">
                         <button
-                          onClick={handlePublish}
-                          disabled={publishing}
-                          className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                          onClick={() => setShowPublishConfirm(true)}
+                          disabled={!publishData.effective_from}
+                          className="flex items-center gap-2 rounded-lg bg-green-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-green-700 disabled:opacity-50"
                         >
-                          {publishing && <Loader2 className="h-4 w-4 animate-spin" />}
+                          <Rocket className="h-4 w-4" />
                           Publish Now
                         </button>
                         <button
                           onClick={() => setShowPublishForm(false)}
-                          className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300"
+                          className="rounded-lg border border-green-300 bg-white px-5 py-2.5 text-sm font-medium text-green-800 shadow-sm transition-colors hover:bg-green-100 dark:border-green-700 dark:bg-gray-800 dark:text-green-300 dark:hover:bg-green-900/30"
                         >
                           Cancel
                         </button>
@@ -402,6 +442,18 @@ export function ProcedureDetailPage() {
                           : ''}
                       </span>
                     </div>
+                    {procedure?.state === 'published' && procedure.assignment_count != null && (
+                      <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                        <Users className="h-4 w-4" />
+                        <span>
+                          <span className="text-gray-400">Assigned:</span>{' '}
+                          <span className="font-medium text-gray-900 dark:text-gray-100">
+                            {procedure.assignment_count}
+                          </span>{' '}
+                          user(s)
+                        </span>
+                      </div>
+                    )}
                   </div>
                   {procedure?.tags && procedure.tags.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-1.5">
@@ -632,17 +684,147 @@ export function ProcedureDetailPage() {
                               {v.changelog && ` — ${v.changelog}`}
                             </p>
                           </div>
-                          {v.is_active && (
-                            <button
-                              onClick={() => handleRetire(v.version_number)}
-                              className="flex items-center gap-1 text-xs text-gray-500 hover:text-red-500"
-                            >
-                              <Archive className="h-3 w-3" />
-                              Retire
-                            </button>
-                          )}
+                          {v.is_active &&
+                            (user.is_superuser ||
+                              String(userData?.id) === String(procedure?.created_by)) && (
+                              <button
+                                onClick={() => setRetireTarget(v.version_number)}
+                                className="flex items-center gap-1 text-xs text-gray-500 hover:text-red-500"
+                              >
+                                <Archive className="h-3 w-3" />
+                                Retire
+                              </button>
+                            )}
                         </div>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Assignees */}
+                {procedure?.assignments && procedure.assignments.length > 0 && (
+                  <div className="rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+                    <div className="p-5 border-b border-gray-100 dark:border-gray-700">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Users className="h-4 w-4 text-gray-500" />
+                          <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                            Assignees (
+                            {
+                              procedure.assignments.filter((a) =>
+                                ['assigned', 'in_progress'].includes(a.status)
+                              ).length
+                            }{' '}
+                            active)
+                          </h2>
+                        </div>
+                        {procedure.assignments.length > 5 && (
+                          <div className="relative">
+                            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+                            <input
+                              type="text"
+                              value={assigneeSearch}
+                              onChange={(e) => setAssigneeSearch(e.target.value)}
+                              placeholder="Search assignees..."
+                              className="rounded-lg border border-gray-200 bg-gray-50 pl-8 pr-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="divide-y divide-gray-100 dark:divide-gray-700 max-h-64 overflow-y-auto">
+                      {procedure.assignments
+                        .filter((a) => {
+                          if (!assigneeSearch) return true
+                          const q = assigneeSearch.toLowerCase()
+                          return (
+                            a.assignee_name.toLowerCase().includes(q) ||
+                            a.assignee_email.toLowerCase().includes(q)
+                          )
+                        })
+                        .map((a) => {
+                          const isActive = ['assigned', 'in_progress'].includes(a.status)
+                          const canWaive =
+                            isActive &&
+                            (user.is_superuser ||
+                              String(userData?.id) === String(procedure.created_by))
+                          return (
+                            <div
+                              key={a.id}
+                              className={cn(
+                                'flex items-center justify-between px-5 py-3',
+                                !isActive && 'opacity-50'
+                              )}
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div
+                                  className={cn(
+                                    'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-medium',
+                                    isActive
+                                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                      : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+                                  )}
+                                >
+                                  {a.assignee_name
+                                    .split(' ')
+                                    .map((n) => n[0])
+                                    .join('')
+                                    .slice(0, 2)
+                                    .toUpperCase()}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                                    {a.assignee_name}
+                                  </p>
+                                  <div className="flex items-center gap-2 text-xs text-gray-400">
+                                    <span className="flex items-center gap-1 truncate">
+                                      <Mail className="h-3 w-3 flex-shrink-0" />
+                                      {a.assignee_email}
+                                    </span>
+                                    {a.due_date && (
+                                      <span className="flex items-center gap-1 flex-shrink-0">
+                                        <Clock className="h-3 w-3" />
+                                        Due{' '}
+                                        {new Date(a.due_date + 'T12:00:00').toLocaleDateString()}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                                <span
+                                  className={cn(
+                                    'rounded-full px-2 py-0.5 text-[10px] font-medium',
+                                    a.status === 'assigned' &&
+                                      'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+                                    a.status === 'in_progress' &&
+                                      'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+                                    a.status === 'completed' &&
+                                      'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+                                    a.status === 'waived' &&
+                                      'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400',
+                                    a.status === 'failed' &&
+                                      'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                  )}
+                                >
+                                  {a.status === 'in_progress'
+                                    ? 'In Progress'
+                                    : a.status.charAt(0).toUpperCase() + a.status.slice(1)}
+                                </span>
+                                {canWaive && (
+                                  <button
+                                    onClick={() => setWaiveTarget(a)}
+                                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400 transition-colors"
+                                    title="Waive assignment"
+                                  >
+                                    <XCircle className="h-3.5 w-3.5" />
+                                    Waive
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
                     </div>
                   </div>
                 )}
@@ -669,8 +851,58 @@ export function ProcedureDetailPage() {
           isOpen={showAssignModal}
           procedureTitle={procedure.title}
           versions={versions}
+          existingAssignments={procedure.assignments ?? []}
           onClose={() => setShowAssignModal(false)}
-          onAssigned={() => {}}
+          onAssigned={() => {
+            if (id)
+              getProcedure(id)
+                .then(setProcedure)
+                .catch(() => {})
+          }}
+        />
+      )}
+
+      {/* Publish Confirmation Modal */}
+      {procedure && (
+        <PublishConfirmModal
+          isOpen={showPublishConfirm}
+          procedureTitle={procedure.title}
+          versionNumber={(procedure.current_version ?? 0) + 1}
+          effectiveFrom={publishData.effective_from}
+          expiresOn={publishData.expires_on || undefined}
+          changelog={publishData.changelog || undefined}
+          isLoading={publishing}
+          onClose={() => setShowPublishConfirm(false)}
+          onConfirm={async () => {
+            await handlePublish()
+            setShowPublishConfirm(false)
+          }}
+        />
+      )}
+
+      {/* Retire Version Modal */}
+      {procedure && retireTarget !== null && (
+        <RetireVersionModal
+          isOpen={true}
+          procedureTitle={procedure.title}
+          versionNumber={retireTarget}
+          isLastActiveVersion={versions.filter((v) => v.is_active).length === 1}
+          onClose={() => setRetireTarget(null)}
+          onConfirm={handleRetire}
+        />
+      )}
+
+      {/* Waive Assignment Modal */}
+      {procedure && waiveTarget && (
+        <WaiveAssignmentModal
+          isOpen={true}
+          assigneeName={waiveTarget.assignee_name}
+          assigneeEmail={waiveTarget.assignee_email}
+          procedureTitle={procedure.title}
+          versionNumber={waiveTarget.version_number}
+          dueDate={waiveTarget.due_date}
+          onClose={() => setWaiveTarget(null)}
+          onConfirm={handleWaive}
         />
       )}
     </>

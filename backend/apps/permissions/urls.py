@@ -22,7 +22,7 @@ urlpatterns = [
 
     # Custom endpoints - Folder permissions
     path('check/', views.PermissionCheckView.as_view(), name='permission-check'),
-    path('users/<uuid:user_id>/summary/', views.UserPermissionSummaryView.as_view(), name='user-permission-summary'),
+    path('users/<int:user_id>/summary/', views.UserPermissionSummaryView.as_view(), name='user-permission-summary'),
     path('cache/clear/', views.ClearPermissionCacheView.as_view(), name='clear-permission-cache'),
 
     # Document permission checking

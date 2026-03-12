@@ -73,6 +73,7 @@ class ProcedureDetailSerializer(serializers.ModelSerializer):
     steps = ProcedureStepSerializer(many=True, read_only=True)
     created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
     department_name = serializers.CharField(source='department.name', read_only=True)
+    assignment_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Procedure
@@ -80,6 +81,37 @@ class ProcedureDetailSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'state', 'current_version', 'created_by',
                             'created_at', 'updated_at', 'is_deleted',
                             'deleted_at', 'deleted_by']
+
+    def get_assignment_count(self, obj):
+        from .models import ProcedureAssignment
+        return ProcedureAssignment.objects.filter(
+            procedure_version__procedure=obj,
+            status__in=['assigned', 'in_progress'],
+        ).count()
+
+    assignments = serializers.SerializerMethodField()
+
+    def get_assignments(self, obj):
+        from .models import ProcedureAssignment
+        qs = ProcedureAssignment.objects.filter(
+            procedure_version__procedure=obj,
+        ).select_related('assignee', 'assigned_by', 'waived_by', 'procedure_version').order_by('-assigned_at')
+        return [
+            {
+                'id': str(a.id),
+                'assignee_id': a.assignee_id,
+                'assignee_name': a.assignee.get_full_name() or a.assignee.username,
+                'assignee_email': a.assignee.email,
+                'status': a.status,
+                'due_date': str(a.due_date) if a.due_date else None,
+                'assigned_at': a.assigned_at.isoformat() if a.assigned_at else None,
+                'assigned_by_name': a.assigned_by.get_full_name() if a.assigned_by else None,
+                'version_number': a.procedure_version.version_number,
+                'assignment_source': a.assignment_source,
+                'waiver_reason': a.waiver_reason or '',
+            }
+            for a in qs
+        ]
 
 
 class ProcedureCreateSerializer(serializers.ModelSerializer):

@@ -89,12 +89,28 @@ export interface Procedure {
   updated_at: string
 }
 
+export interface ProcedureAssignmentInfo {
+  id: string
+  assignee_id: number
+  assignee_name: string
+  assignee_email: string
+  status: string
+  due_date: string | null
+  assigned_at: string | null
+  assigned_by_name: string | null
+  version_number: number
+  assignment_source: string
+  waiver_reason: string
+}
+
 export interface ProcedureDetail extends Procedure {
   steps: ProcedureStep[]
   organization: string
   is_deleted: boolean
   deleted_at: string | null
   deleted_by: string | null
+  assignment_count?: number
+  assignments?: ProcedureAssignmentInfo[]
 }
 
 export interface ProcedureStep {

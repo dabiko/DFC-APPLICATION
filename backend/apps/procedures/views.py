@@ -110,6 +110,8 @@ class ProcedureViewSet(viewsets.ModelViewSet):
             return [permissions.IsAuthenticated(), (IsProcedureCreator | IsProcedureAdmin)()]
         if self.action in ['destroy']:
             return [permissions.IsAuthenticated(), (IsProcedureCreator | IsProcedureAdmin)()]
+        if self.action in ['publish', 'retire_version']:
+            return [permissions.IsAuthenticated(), (IsProcedureCreator | IsProcedureAdmin | IsProcedureManager)()]
         return [permissions.IsAuthenticated()]
 
     def perform_create(self, serializer):
@@ -1068,7 +1070,7 @@ class ProcedureAssignmentViewSet(viewsets.ModelViewSet):
             org=request.user.organization,
         )
 
-        # Audit log for each assignment
+        # Audit log and notification for each assignment
         for assignment in assignments:
             ProcedureAuditLog.objects.create(
                 organization=request.user.organization,
@@ -1084,6 +1086,24 @@ class ProcedureAssignmentViewSet(viewsets.ModelViewSet):
                     'source': assignment.assignment_source,
                 },
             )
+            try:
+                _notify(
+                    recipient=assignment.assignee,
+                    notification_type=Notification.NotificationType.TRAINING_ASSIGNED,
+                    title='Training Assigned',
+                    message=(
+                        f'You have been assigned "{assignment.procedure_version.title}" '
+                        f'(v{assignment.procedure_version.version_number}). '
+                        f'Due by {assignment.due_date.strftime("%b %d, %Y")}.'
+                    ),
+                    actor=request.user,
+                    resource_type='procedure',
+                    resource_id=assignment.procedure_version.procedure_id,
+                    action_url=f'/procedures/{assignment.procedure_version.procedure_id}',
+                )
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(f'Failed to notify assignee {assignment.assignee_id}: {e}')
 
         return Response({
             'created': len(assignments),
@@ -1119,6 +1139,24 @@ class ProcedureAssignmentViewSet(viewsets.ModelViewSet):
             ip_address=request.META.get('REMOTE_ADDR'),
             detail={'reason': serializer.validated_data['reason']},
         )
+
+        try:
+            _notify(
+                recipient=assignment.assignee,
+                notification_type=Notification.NotificationType.TRAINING_ASSIGNED,
+                title='Training Assignment Waived',
+                message=(
+                    f'Your assignment for "{assignment.procedure_version.title}" '
+                    f'(v{assignment.procedure_version.version_number}) has been waived. '
+                    f'Reason: {serializer.validated_data["reason"]}'
+                ),
+                actor=request.user,
+                resource_type='procedure',
+                resource_id=assignment.procedure_version.procedure_id,
+                action_url=f'/procedures/{assignment.procedure_version.procedure_id}',
+            )
+        except Exception:
+            pass
 
         return Response({'message': 'Assignment waived.'})
 
