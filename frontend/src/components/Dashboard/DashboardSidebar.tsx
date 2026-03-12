@@ -18,6 +18,7 @@ import {
   Cloud,
   BookOpen,
   GraduationCap,
+  BarChart3,
 } from 'lucide-react'
 import { SmartFolderItem } from '@components/Folder'
 import {
@@ -337,6 +338,20 @@ export function DashboardSidebar({
                   >
                     <ClipboardList className="w-5 h-5 flex-shrink-0" />
                     <span className="flex-1">Browse Procedures</span>
+                  </NavLink>
+                  <NavLink
+                    to="/procedures/assignments"
+                    className={({ isActive }) =>
+                      cn(
+                        'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                        isActive
+                          ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400'
+                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                      )
+                    }
+                  >
+                    <BarChart3 className="w-5 h-5 flex-shrink-0" />
+                    <span className="flex-1">Assignments & Analytics</span>
                   </NavLink>
                 </div>
               )}

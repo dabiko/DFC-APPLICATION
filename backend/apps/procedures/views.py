@@ -40,6 +40,7 @@ from .serializers import (
 from .permissions import (
     IsProcedureCreator, IsProcedureAdmin, IsProcedureManager,
     CanCreateProcedure, IsAssignedReviewer, IsComplianceAuditor,
+    IsStepOwner,
 )
 from apps.workflows.models import (
     WorkflowInstance, WorkflowTask, WorkflowTemplate,
@@ -535,7 +536,26 @@ class ProcedureViewSet(viewsets.ModelViewSet):
             ip_address=request.META.get('REMOTE_ADDR'),
         )
 
-        return Response(ProcedureVersionSerializer(version).data, status=status.HTTP_201_CREATED)
+        # Content structure warnings (non-blocking)
+        content_warnings = []
+        for step in procedure.steps.order_by('order'):
+            missing = []
+            if not step.learning_objectives:
+                missing.append('learning objectives')
+            if not step.key_concepts:
+                missing.append('key concepts')
+            if missing:
+                content_warnings.append({
+                    'step_order': step.order,
+                    'step_title': step.title,
+                    'missing': missing,
+                })
+
+        response_data = ProcedureVersionSerializer(version).data
+        if content_warnings:
+            response_data['content_warnings'] = content_warnings
+
+        return Response(response_data, status=status.HTTP_201_CREATED)
 
     # --- Phase D: Retire a version ---
     @action(detail=True, methods=['post'], url_path=r'versions/(?P<version_number>\d+)/retire')
@@ -641,6 +661,9 @@ class ProcedureViewSet(viewsets.ModelViewSet):
                 description=step.description,
                 order=step.order,
                 estimated_duration_minutes=step.estimated_duration_minutes,
+                learning_objectives=step.learning_objectives,
+                key_concepts=step.key_concepts,
+                example_scenarios=step.example_scenarios,
                 branch_condition=step.branch_condition,
                 require_manual_open=step.require_manual_open,
                 require_media_completion=step.require_media_completion,
@@ -744,6 +767,36 @@ class ProcedureStepViewSet(viewsets.ModelViewSet):
             procedure_id=self.kwargs['procedure_pk'],
             procedure__organization=self.request.user.organization,
         ).prefetch_related('attachments')
+
+    def get_permissions(self):
+        if self.action in ['update', 'partial_update']:
+            # Step owners can edit their assigned steps (draft only),
+            # plus procedure creator and admins
+            return [permissions.IsAuthenticated()]
+        return [permissions.IsAuthenticated()]
+
+    def check_step_edit_permission(self, step):
+        """Check if the current user can edit this step."""
+        user = self.request.user
+        procedure = step.procedure
+        if user.is_superuser:
+            return
+        if procedure.created_by == user:
+            return
+        if step.step_owner_id == user.id and procedure.state == 'draft':
+            return
+        from apps.permissions.models import UserRole
+        is_admin = UserRole.objects.filter(
+            user=user, role__name__iregex=r'^(admin|manager)$', is_active=True
+        ).exists()
+        if is_admin:
+            return
+        from rest_framework.exceptions import PermissionDenied
+        raise PermissionDenied('You do not have permission to edit this step.')
+
+    def perform_update(self, serializer):
+        self.check_step_edit_permission(serializer.instance)
+        serializer.save()
 
     def perform_create(self, serializer):
         procedure = Procedure.objects.get(
@@ -1056,7 +1109,7 @@ class ProcedureAssignmentViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ['create']:
             return [permissions.IsAuthenticated(), (IsProcedureAdmin | IsProcedureManager)()]
-        if self.action in ['waive', 'dashboard']:
+        if self.action in ['waive', 'dashboard', 'analytics']:
             return [permissions.IsAuthenticated(), (IsProcedureAdmin | IsProcedureManager)()]
         return [permissions.IsAuthenticated()]
 
@@ -1248,6 +1301,234 @@ class ProcedureAssignmentViewSet(viewsets.ModelViewSet):
         return Response({
             'summary': summary,
             'overdue_assignments': overdue_list,
+        })
+
+    @action(detail=False, methods=['get'], url_path='analytics')
+    def analytics(self, request):
+        """
+        Content effectiveness analytics for procedure authors and managers.
+        Provides question difficulty, step bottlenecks, quiz attempt distribution,
+        per-procedure trends, and comparative metrics.
+        """
+        org = request.user.organization
+
+        # ── Base querysets ────────────────────────────────────────────
+        assignments_qs = ProcedureAssignment.objects.filter(organization=org)
+        attempts_qs = TrainingAttempt.objects.filter(
+            assignment__organization=org,
+        )
+
+        # Optional procedure filter
+        procedure_id = request.query_params.get('procedure')
+        if procedure_id:
+            assignments_qs = assignments_qs.filter(
+                procedure_version__procedure_id=procedure_id,
+            )
+            attempts_qs = attempts_qs.filter(
+                assignment__procedure_version__procedure_id=procedure_id,
+            )
+
+        # Optional department filter
+        department_id = request.query_params.get('department')
+        if department_id:
+            assignments_qs = assignments_qs.filter(
+                procedure_version__procedure__department_id=department_id,
+            )
+            attempts_qs = attempts_qs.filter(
+                assignment__procedure_version__procedure__department_id=department_id,
+            )
+
+        # ── 1. Question difficulty ────────────────────────────────────
+        # Aggregate pass/fail per question across all responses
+        question_stats_raw = (
+            QuestionResponse.objects.filter(
+                quiz_attempt__training_attempt__in=attempts_qs,
+                is_correct__isnull=False,
+            )
+            .values(
+                'version_question__id',
+                'version_question__text',
+                'version_question__order',
+                'version_question__version_quiz__title',
+                'version_question__version_quiz__version_step__title',
+            )
+            .annotate(
+                total_responses=Count('id'),
+                correct_count=Count('id', filter=Q(is_correct=True)),
+                incorrect_count=Count('id', filter=Q(is_correct=False)),
+                avg_points=Avg('points_earned'),
+            )
+            .order_by('correct_count')  # hardest first
+        )
+
+        question_difficulty = []
+        for q in question_stats_raw[:20]:
+            total = q['total_responses']
+            correct = q['correct_count']
+            question_difficulty.append({
+                'question_id': str(q['version_question__id']),
+                'question_text': q['version_question__text'][:120],
+                'question_order': q['version_question__order'],
+                'quiz_title': q['version_question__version_quiz__title'],
+                'step_title': q['version_question__version_quiz__version_step__title'] or 'End of Procedure',
+                'total_responses': total,
+                'correct_count': correct,
+                'incorrect_count': q['incorrect_count'],
+                'pass_rate': round(correct / total * 100, 1) if total > 0 else 0,
+            })
+
+        # ── 2. Step bottlenecks (avg time + failure rates) ────────────
+        step_stats_raw = (
+            StepCompletion.objects.filter(
+                attempt__in=attempts_qs,
+                status__in=['completed', 'quiz_passed', 'quiz_failed', 'skipped'],
+            )
+            .values(
+                'version_step__id',
+                'version_step__title',
+                'version_step__order',
+            )
+            .annotate(
+                total_trainees=Count('id'),
+                avg_time_seconds=Avg('time_spent_seconds'),
+                completed_count=Count('id', filter=Q(status='completed') | Q(status='quiz_passed')),
+                failed_count=Count('id', filter=Q(status='quiz_failed')),
+                skipped_count=Count('id', filter=Q(status='skipped')),
+            )
+            .order_by('-avg_time_seconds')
+        )
+
+        step_bottlenecks = []
+        for s in step_stats_raw[:20]:
+            total = s['total_trainees']
+            step_bottlenecks.append({
+                'step_id': str(s['version_step__id']),
+                'step_title': s['version_step__title'],
+                'step_order': s['version_step__order'],
+                'total_trainees': total,
+                'avg_time_seconds': round(s['avg_time_seconds'] or 0),
+                'completion_rate': round(
+                    s['completed_count'] / total * 100, 1
+                ) if total > 0 else 0,
+                'failure_rate': round(
+                    s['failed_count'] / total * 100, 1
+                ) if total > 0 else 0,
+                'skip_rate': round(
+                    s['skipped_count'] / total * 100, 1
+                ) if total > 0 else 0,
+            })
+
+        # ── 3. Quiz attempt distribution ──────────────────────────────
+        quiz_stats_raw = (
+            QuizAttempt.objects.filter(
+                training_attempt__in=attempts_qs,
+                completed_at__isnull=False,
+            )
+            .values(
+                'version_quiz__id',
+                'version_quiz__title',
+                'version_quiz__version_step__title',
+            )
+            .annotate(
+                total_attempts=Count('id'),
+                passed_count=Count('id', filter=Q(passed=True)),
+                failed_count=Count('id', filter=Q(passed=False)),
+                avg_score=Avg('score_percent'),
+                avg_attempts_to_pass=Avg(
+                    'attempt_number',
+                    filter=Q(passed=True),
+                ),
+            )
+            .order_by('-total_attempts')
+        )
+
+        quiz_performance = []
+        for q in quiz_stats_raw[:20]:
+            total = q['total_attempts']
+            quiz_performance.append({
+                'quiz_id': str(q['version_quiz__id']),
+                'quiz_title': q['version_quiz__title'],
+                'step_title': q['version_quiz__version_step__title'] or 'End of Procedure',
+                'total_attempts': total,
+                'pass_rate': round(
+                    q['passed_count'] / total * 100, 1
+                ) if total > 0 else 0,
+                'avg_score': round(float(q['avg_score'] or 0), 1),
+                'avg_attempts_to_pass': round(float(q['avg_attempts_to_pass'] or 0), 1),
+            })
+
+        # ── 4. Per-procedure comparison ───────────────────────────────
+        procedure_comparison_raw = (
+            assignments_qs
+            .values(
+                'procedure_version__procedure_id',
+                'procedure_version__title',
+            )
+            .annotate(
+                total_assigned=Count('id'),
+                completed_count=Count('id', filter=Q(status='completed')),
+                failed_count=Count('id', filter=Q(status='failed')),
+                overdue_count=Count('id', filter=Q(status='overdue')),
+                avg_score=Avg('completion_score', filter=Q(status='completed')),
+            )
+            .order_by('-total_assigned')
+        )
+
+        procedure_comparison = []
+        for p in procedure_comparison_raw[:15]:
+            total = p['total_assigned']
+            procedure_comparison.append({
+                'procedure_id': str(p['procedure_version__procedure_id']),
+                'procedure_title': p['procedure_version__title'],
+                'total_assigned': total,
+                'completion_rate': round(
+                    p['completed_count'] / total * 100, 1
+                ) if total > 0 else 0,
+                'failure_rate': round(
+                    p['failed_count'] / total * 100, 1
+                ) if total > 0 else 0,
+                'overdue_rate': round(
+                    p['overdue_count'] / total * 100, 1
+                ) if total > 0 else 0,
+                'avg_score': round(float(p['avg_score'] or 0), 1),
+            })
+
+        # ── 5. Overall training metrics ───────────────────────────────
+        completed_attempts = attempts_qs.filter(
+            status__in=['passed', 'completed'],
+            completed_at__isnull=False,
+        )
+        avg_training_time = completed_attempts.aggregate(
+            avg=Avg('total_time_seconds'),
+        )['avg']
+
+        overall = {
+            'total_training_attempts': attempts_qs.count(),
+            'avg_training_time_seconds': round(avg_training_time or 0),
+            'total_questions_answered': QuestionResponse.objects.filter(
+                quiz_attempt__training_attempt__in=attempts_qs,
+            ).count(),
+            'overall_question_accuracy': 0,
+        }
+        # overall accuracy
+        q_totals = QuestionResponse.objects.filter(
+            quiz_attempt__training_attempt__in=attempts_qs,
+            is_correct__isnull=False,
+        ).aggregate(
+            total=Count('id'),
+            correct=Count('id', filter=Q(is_correct=True)),
+        )
+        if q_totals['total'] and q_totals['total'] > 0:
+            overall['overall_question_accuracy'] = round(
+                q_totals['correct'] / q_totals['total'] * 100, 1
+            )
+
+        return Response({
+            'overall': overall,
+            'question_difficulty': question_difficulty,
+            'step_bottlenecks': step_bottlenecks,
+            'quiz_performance': quiz_performance,
+            'procedure_comparison': procedure_comparison,
         })
 
 

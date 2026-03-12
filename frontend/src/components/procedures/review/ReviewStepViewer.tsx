@@ -16,6 +16,9 @@ import {
   AlertOctagon,
   UserCheck,
   Loader2,
+  Target,
+  Lightbulb,
+  FlaskConical,
 } from 'lucide-react'
 import { StepCommentThread } from './StepCommentThread'
 import type { ProcedureStep, ProcedureStepComment } from '@/types/procedure'
@@ -146,6 +149,61 @@ export function ReviewStepViewer({
               {step.description && (
                 <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
                   {step.description}
+                </div>
+              )}
+
+              {/* Learning Objectives */}
+              {step.learning_objectives?.length > 0 && (
+                <div className="rounded-md border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 p-3">
+                  <p className="flex items-center gap-1.5 text-xs font-semibold text-green-800 dark:text-green-300 mb-1.5">
+                    <Target className="h-3.5 w-3.5" />
+                    Learning Objectives
+                  </p>
+                  <ul className="space-y-1">
+                    {step.learning_objectives.map((obj, i) => (
+                      <li
+                        key={i}
+                        className="flex items-start gap-1.5 text-xs text-green-700 dark:text-green-300"
+                      >
+                        <span className="mt-1 h-1 w-1 rounded-full bg-green-500 flex-shrink-0" />
+                        {obj}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Key Concepts */}
+              {step.key_concepts?.length > 0 && (
+                <div className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-3">
+                  <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300 mb-1.5">
+                    <Lightbulb className="h-3.5 w-3.5" />
+                    Key Concepts
+                  </p>
+                  <ul className="space-y-1">
+                    {step.key_concepts.map((concept, i) => (
+                      <li
+                        key={i}
+                        className="flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-300"
+                      >
+                        <span className="mt-1 h-1 w-1 rounded-full bg-amber-500 flex-shrink-0" />
+                        {concept}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Example Scenarios */}
+              {step.example_scenarios && (
+                <div className="rounded-md border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/20 p-3">
+                  <p className="flex items-center gap-1.5 text-xs font-semibold text-purple-800 dark:text-purple-300 mb-1.5">
+                    <FlaskConical className="h-3.5 w-3.5" />
+                    Example Scenarios
+                  </p>
+                  <p className="text-xs text-purple-700 dark:text-purple-300 whitespace-pre-wrap">
+                    {step.example_scenarios}
+                  </p>
                 </div>
               )}
 

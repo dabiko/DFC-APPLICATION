@@ -55,6 +55,15 @@ class CanCreateProcedure(BasePermission):
         ).exists()
 
 
+class IsStepOwner(BasePermission):
+    """Allows step owners to edit their assigned steps (draft procedures only)."""
+    def has_object_permission(self, request, view, obj):
+        # obj is a ProcedureStep
+        if not hasattr(obj, 'step_owner_id'):
+            return False
+        return obj.step_owner_id == request.user.id and obj.procedure.state == 'draft'
+
+
 class IsComplianceAuditor(BasePermission):
     def has_permission(self, request, view):
         if request.method not in SAFE_METHODS:

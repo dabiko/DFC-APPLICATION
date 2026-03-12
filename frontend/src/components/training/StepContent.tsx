@@ -2,7 +2,7 @@
  * StepContent — Center panel displaying rich step content, attachments, and gates.
  */
 
-import { Clock, CheckCircle, XCircle, Timer } from 'lucide-react'
+import { Clock, CheckCircle, XCircle, Timer, Target, Lightbulb, FlaskConical } from 'lucide-react'
 import type { VersionStep, StepCompletionResponse } from './types'
 import { AttachmentViewer } from './AttachmentViewer'
 import { StepGateBlocker } from './StepGateBlocker'
@@ -61,6 +61,61 @@ export function StepContent({
           <div className="prose prose-sm dark:prose-invert max-w-none mb-6">
             <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
               {step.description}
+            </p>
+          </div>
+        )}
+
+        {/* Learning Objectives */}
+        {step.learning_objectives?.length > 0 && (
+          <div className="mb-5 rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 p-4">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-green-800 dark:text-green-300 mb-2">
+              <Target className="h-4 w-4" />
+              Learning Objectives
+            </h3>
+            <ul className="space-y-1.5">
+              {step.learning_objectives.map((obj, i) => (
+                <li
+                  key={i}
+                  className="flex items-start gap-2 text-sm text-green-700 dark:text-green-300"
+                >
+                  <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-green-500 flex-shrink-0" />
+                  {obj}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Key Concepts */}
+        {step.key_concepts?.length > 0 && (
+          <div className="mb-5 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-300 mb-2">
+              <Lightbulb className="h-4 w-4" />
+              Key Concepts
+            </h3>
+            <ul className="space-y-1.5">
+              {step.key_concepts.map((concept, i) => (
+                <li
+                  key={i}
+                  className="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-300"
+                >
+                  <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-amber-500 flex-shrink-0" />
+                  {concept}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Example Scenarios */}
+        {step.example_scenarios && (
+          <div className="mb-5 rounded-lg border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/20 p-4">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-purple-800 dark:text-purple-300 mb-2">
+              <FlaskConical className="h-4 w-4" />
+              Example Scenarios
+            </h3>
+            <p className="text-sm text-purple-700 dark:text-purple-300 whitespace-pre-wrap">
+              {step.example_scenarios}
             </p>
           </div>
         )}

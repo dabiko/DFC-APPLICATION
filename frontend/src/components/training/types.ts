@@ -10,6 +10,9 @@ export interface VersionStep {
   description: string
   order: number
   estimated_duration_minutes: number | null
+  learning_objectives: string[]
+  key_concepts: string[]
+  example_scenarios: string
   require_manual_open: boolean
   require_media_completion: boolean
   require_quiz_pass: boolean

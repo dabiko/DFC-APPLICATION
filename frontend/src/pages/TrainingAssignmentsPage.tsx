@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import { Users, RefreshCw, Search, Loader2 } from 'lucide-react'
+import { Users, RefreshCw, Search, Loader2, BarChart3 } from 'lucide-react'
 import { useLogout } from '@/hooks/useLogout'
 import { ThreePanelLayout } from '@/components/Layout/ThreePanelLayout'
 import { DashboardHeader } from '@/components/Dashboard/DashboardHeader'
@@ -16,20 +16,28 @@ import {
   AssignmentList,
   OverdueAlertList,
   ExpirationWarningList,
+  AnalyticsOverviewCards,
+  QuestionDifficultyTable,
+  StepBottlenecksChart,
+  QuizPerformanceChart,
+  ProcedureComparisonChart,
 } from '@/components/procedures/assignments'
 import { authService } from '@/services/auth.service'
 import {
   listAssignments,
   getAssignmentDashboard,
+  getContentAnalytics,
   waiveAssignment,
   type ProcedureAssignment,
   type AssignmentDashboard as DashboardData,
+  type ContentAnalytics,
 } from '@/services/assignmentService'
 
 export function TrainingAssignmentsPage() {
   const handleLogout = useLogout()
   const [assignments, setAssignments] = useState<ProcedureAssignment[]>([])
   const [dashboard, setDashboard] = useState<DashboardData | null>(null)
+  const [analytics, setAnalytics] = useState<ContentAnalytics | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<string>('all')
@@ -37,6 +45,7 @@ export function TrainingAssignmentsPage() {
   const [waivingId, setWaivingId] = useState<string | null>(null)
   const [showWaiveModal, setShowWaiveModal] = useState<string | null>(null)
   const [waiveReason, setWaiveReason] = useState('')
+  const [activeTab, setActiveTab] = useState<'assignments' | 'analytics'>('assignments')
 
   const userData = authService.getUser()
   const user = {
@@ -55,12 +64,14 @@ export function TrainingAssignmentsPage() {
       if (filter !== 'all') params.status = filter
       if (search) params.search = search
 
-      const [assignmentsData, dashboardData] = await Promise.all([
+      const [assignmentsData, dashboardData, analyticsData] = await Promise.all([
         listAssignments(params),
         getAssignmentDashboard(),
+        getContentAnalytics(),
       ])
       setAssignments(assignmentsData.results)
       setDashboard(dashboardData)
+      setAnalytics(analyticsData)
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Failed to load assignments')
     } finally {
@@ -121,55 +132,118 @@ export function TrainingAssignmentsPage() {
                 </button>
               </div>
             </div>
+
+            {/* Tabs */}
+            <div className="flex gap-1 mt-4">
+              <button
+                onClick={() => setActiveTab('assignments')}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  activeTab === 'assignments'
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                    : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Assignments
+                </span>
+              </button>
+              <button
+                onClick={() => setActiveTab('analytics')}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  activeTab === 'analytics'
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                    : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  Content Analytics
+                </span>
+              </button>
+            </div>
           </div>
 
           {/* Content */}
           <div className="flex-1 overflow-auto p-6">
             <div className="max-w-5xl mx-auto space-y-6">
-              {/* Dashboard Metrics */}
+              {/* Dashboard Metrics (always visible) */}
               {dashboard && <AssignmentDashboard dashboard={dashboard} />}
 
-              {/* Alert Lists */}
-              <OverdueAlertList assignments={assignments} />
-              <ExpirationWarningList assignments={assignments} />
+              {activeTab === 'assignments' && (
+                <>
+                  {/* Alert Lists */}
+                  <OverdueAlertList assignments={assignments} />
+                  <ExpirationWarningList assignments={assignments} />
 
-              {/* Search + Filter */}
-              <div className="flex gap-3">
-                <div className="flex-1 relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search by trainee name or procedure..."
-                    className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                  {/* Search + Filter */}
+                  <div className="flex gap-3">
+                    <div className="flex-1 relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <input
+                        type="text"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Search by trainee name or procedure..."
+                        className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                      />
+                    </div>
+                    <select
+                      value={filter}
+                      onChange={(e) => setFilter(e.target.value)}
+                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                    >
+                      <option value="all">All Status</option>
+                      <option value="assigned">Assigned</option>
+                      <option value="in_progress">In Progress</option>
+                      <option value="completed">Completed</option>
+                      <option value="failed">Failed</option>
+                      <option value="overdue">Overdue</option>
+                      <option value="waived">Waived</option>
+                    </select>
+                  </div>
+
+                  {/* Assignments Table */}
+                  <AssignmentList
+                    assignments={assignments}
+                    loading={loading}
+                    error={error}
+                    onWaive={(id) => {
+                      setShowWaiveModal(id)
+                      setWaiveReason('')
+                    }}
                   />
-                </div>
-                <select
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
-                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-                >
-                  <option value="all">All Status</option>
-                  <option value="assigned">Assigned</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="completed">Completed</option>
-                  <option value="failed">Failed</option>
-                  <option value="overdue">Overdue</option>
-                  <option value="waived">Waived</option>
-                </select>
-              </div>
+                </>
+              )}
 
-              {/* Assignments Table */}
-              <AssignmentList
-                assignments={assignments}
-                loading={loading}
-                error={error}
-                onWaive={(id) => {
-                  setShowWaiveModal(id)
-                  setWaiveReason('')
-                }}
-              />
+              {activeTab === 'analytics' && analytics && (
+                <>
+                  {/* Overall KPIs */}
+                  <AnalyticsOverviewCards data={analytics.overall} />
+
+                  {/* Step Bottlenecks + Quiz Performance side by side on wide screens */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <StepBottlenecksChart data={analytics.step_bottlenecks} />
+                    <QuizPerformanceChart data={analytics.quiz_performance} />
+                  </div>
+
+                  {/* Question Difficulty (full width) */}
+                  <QuestionDifficultyTable data={analytics.question_difficulty} />
+
+                  {/* Procedure Comparison (full width) */}
+                  <ProcedureComparisonChart data={analytics.procedure_comparison} />
+                </>
+              )}
+
+              {activeTab === 'analytics' && !analytics && !loading && (
+                <div className="rounded-lg border border-gray-200 bg-white p-8 text-center dark:border-gray-700 dark:bg-gray-800">
+                  <BarChart3 className="h-10 w-10 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-500">No analytics data available yet.</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Analytics will appear once trainees start completing procedures.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

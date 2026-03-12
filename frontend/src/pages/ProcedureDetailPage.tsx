@@ -84,6 +84,14 @@ export function ProcedureDetailPage() {
   const [publishing, setPublishing] = useState(false)
   const [waiveTarget, setWaiveTarget] = useState<ProcedureAssignmentInfo | null>(null)
   const [assigneeSearch, setAssigneeSearch] = useState('')
+  const [contentWarnings, setContentWarnings] = useState<
+    Array<{
+      step_order: number
+      step_title: string
+      missing: string[]
+    }>
+  >([])
+
   const [publishData, setPublishData] = useState({
     effective_from: new Date().toISOString().split('T')[0],
     expires_on: '',
@@ -129,7 +137,13 @@ export function ProcedureDetailPage() {
     if (!procedure || !publishData.effective_from) return
     setPublishing(true)
     try {
-      await publishProcedure(procedure.id, publishData)
+      const publishResult = await publishProcedure(procedure.id, publishData)
+      // Show content warnings if any
+      if (publishResult.content_warnings?.length) {
+        setContentWarnings(publishResult.content_warnings)
+      } else {
+        setContentWarnings([])
+      }
       // Reload
       const [procData, versionData] = await Promise.all([
         getProcedure(procedure.id),
@@ -395,6 +409,42 @@ export function ProcedureDetailPage() {
                           Cancel
                         </button>
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Content Structure Warnings */}
+                {contentWarnings.length > 0 && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertTriangle className="h-4 w-4 text-amber-600" />
+                        <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                          Content Structure Suggestions
+                        </h3>
+                      </div>
+                      <button
+                        onClick={() => setContentWarnings([])}
+                        className="text-amber-400 hover:text-amber-600 text-xs"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                    <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">
+                      The following steps were published without structured learning content.
+                      Consider adding these to improve training effectiveness.
+                    </p>
+                    <div className="space-y-1">
+                      {contentWarnings.map((w) => (
+                        <div
+                          key={w.step_order}
+                          className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300"
+                        >
+                          <span className="font-medium">Step {w.step_order}:</span>
+                          <span className="truncate">{w.step_title}</span>
+                          <span className="text-amber-500">— missing {w.missing.join(', ')}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}

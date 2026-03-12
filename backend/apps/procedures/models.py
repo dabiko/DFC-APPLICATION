@@ -109,6 +109,20 @@ class ProcedureStep(models.Model):
     order = models.PositiveIntegerField()
     estimated_duration_minutes = models.PositiveIntegerField(null=True, blank=True)
 
+    # Structured learning content
+    learning_objectives = models.JSONField(
+        default=list, blank=True,
+        help_text='List of strings — what the trainee should learn from this step.',
+    )
+    key_concepts = models.JSONField(
+        default=list, blank=True,
+        help_text='List of strings — core ideas the trainee must understand.',
+    )
+    example_scenarios = models.TextField(
+        blank=True,
+        help_text='Practical examples or scenarios illustrating this step.',
+    )
+
     # Conditional branching (null = always shown)
     branch_condition = models.JSONField(null=True, blank=True)
 
@@ -116,6 +130,15 @@ class ProcedureStep(models.Model):
     require_manual_open = models.BooleanField(default=False)
     require_media_completion = models.BooleanField(default=False)
     require_quiz_pass = models.BooleanField(default=False)
+
+    # Per-step owner (subject-matter expert who can edit this step)
+    step_owner = models.ForeignKey(
+        'users.CustomUser',
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='owned_procedure_steps',
+        help_text='Subject-matter expert assigned to author/edit this step.',
+    )
 
     # Per-step reviewer (nullable — assigned during authoring)
     reviewer = models.ForeignKey(
@@ -299,6 +322,11 @@ class ProcedureVersionStep(models.Model):
     description = models.TextField(blank=True)
     order = models.PositiveIntegerField()
     estimated_duration_minutes = models.PositiveIntegerField(null=True, blank=True)
+
+    # Structured learning content snapshot
+    learning_objectives = models.JSONField(default=list, blank=True)
+    key_concepts = models.JSONField(default=list, blank=True)
+    example_scenarios = models.TextField(blank=True)
 
     # Branching snapshot
     branch_condition = models.JSONField(null=True, blank=True)

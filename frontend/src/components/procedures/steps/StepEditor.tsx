@@ -20,6 +20,10 @@ import {
   Link2,
   AlertTriangle,
   UserCheck,
+  Target,
+  Lightbulb,
+  FlaskConical,
+  Plus,
 } from 'lucide-react'
 import type { ProcedureStep, StepAttachment, BranchCondition } from '@/types/procedure'
 import type { UserBasic } from '@/services/userManagementService'
@@ -207,6 +211,128 @@ export function StepEditor({
             />
           </div>
 
+          {/* Learning Objectives */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+              <span className="flex items-center gap-1">
+                <Target className="h-3.5 w-3.5 text-green-500" />
+                Learning Objectives
+              </span>
+            </label>
+            <p className="text-[11px] text-gray-400 mb-2">
+              What should the trainee learn from this step?
+            </p>
+            <div className="space-y-1.5">
+              {(step.learning_objectives || []).map((obj, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400 w-4">{i + 1}.</span>
+                  <input
+                    type="text"
+                    value={obj}
+                    onChange={(e) => {
+                      const updated = [...(step.learning_objectives || [])]
+                      updated[i] = e.target.value
+                      onUpdate(step.id, { learning_objectives: updated })
+                    }}
+                    placeholder="e.g. Understand the approval workflow..."
+                    className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                  />
+                  <button
+                    onClick={() => {
+                      const updated = (step.learning_objectives || []).filter((_, j) => j !== i)
+                      onUpdate(step.id, { learning_objectives: updated })
+                    }}
+                    className="text-gray-400 hover:text-red-500"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+              <button
+                onClick={() =>
+                  onUpdate(step.id, {
+                    learning_objectives: [...(step.learning_objectives || []), ''],
+                  })
+                }
+                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400"
+              >
+                <Plus className="h-3 w-3" />
+                Add objective
+              </button>
+            </div>
+          </div>
+
+          {/* Key Concepts */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+              <span className="flex items-center gap-1">
+                <Lightbulb className="h-3.5 w-3.5 text-amber-500" />
+                Key Concepts
+              </span>
+            </label>
+            <p className="text-[11px] text-gray-400 mb-2">
+              Core ideas the trainee must understand.
+            </p>
+            <div className="space-y-1.5">
+              {(step.key_concepts || []).map((concept, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400 w-4">{i + 1}.</span>
+                  <input
+                    type="text"
+                    value={concept}
+                    onChange={(e) => {
+                      const updated = [...(step.key_concepts || [])]
+                      updated[i] = e.target.value
+                      onUpdate(step.id, { key_concepts: updated })
+                    }}
+                    placeholder="e.g. Data integrity requirements..."
+                    className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                  />
+                  <button
+                    onClick={() => {
+                      const updated = (step.key_concepts || []).filter((_, j) => j !== i)
+                      onUpdate(step.id, { key_concepts: updated })
+                    }}
+                    className="text-gray-400 hover:text-red-500"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+              <button
+                onClick={() =>
+                  onUpdate(step.id, {
+                    key_concepts: [...(step.key_concepts || []), ''],
+                  })
+                }
+                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400"
+              >
+                <Plus className="h-3 w-3" />
+                Add concept
+              </button>
+            </div>
+          </div>
+
+          {/* Example Scenarios */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+              <span className="flex items-center gap-1">
+                <FlaskConical className="h-3.5 w-3.5 text-purple-500" />
+                Example Scenarios
+              </span>
+            </label>
+            <p className="text-[11px] text-gray-400 mb-1">
+              Practical examples that illustrate this step.
+            </p>
+            <textarea
+              value={step.example_scenarios || ''}
+              onChange={(e) => onUpdate(step.id, { example_scenarios: e.target.value })}
+              rows={3}
+              placeholder="e.g. When a client submits incomplete KYC documents, the reviewer should..."
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+            />
+          </div>
+
           {/* Duration */}
           <div>
             <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
@@ -277,33 +403,71 @@ export function StepEditor({
             />
           </div>
 
-          {/* Step Reviewer */}
-          <div>
-            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-              <span className="flex items-center gap-1">
-                <UserCheck className="h-3.5 w-3.5" />
-                Step Reviewer
-              </span>
-            </label>
-            <select
-              value={step.reviewer ?? ''}
-              onChange={(e) =>
-                onUpdate(step.id, {
-                  reviewer: e.target.value ? Number(e.target.value) : null,
-                })
-              }
-              className="w-64 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-            >
-              <option value="">No reviewer assigned</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.full_name || `${u.first_name} ${u.last_name}`.trim() || u.username}
-                </option>
-              ))}
-            </select>
-            {step.reviewer_name && (
-              <p className="mt-1 text-xs text-gray-400">Currently assigned: {step.reviewer_name}</p>
-            )}
+          {/* Step Owner & Reviewer */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Step Owner */}
+            <div>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                <span className="flex items-center gap-1">
+                  <UserCheck className="h-3.5 w-3.5 text-indigo-500" />
+                  Step Owner
+                </span>
+              </label>
+              <p className="text-[11px] text-gray-400 mb-1">
+                Subject-matter expert who can edit this step.
+              </p>
+              <select
+                value={step.step_owner ?? ''}
+                onChange={(e) =>
+                  onUpdate(step.id, {
+                    step_owner: e.target.value ? Number(e.target.value) : null,
+                  })
+                }
+                className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+              >
+                <option value="">No owner assigned</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.full_name || `${u.first_name} ${u.last_name}`.trim() || u.username}
+                  </option>
+                ))}
+              </select>
+              {step.step_owner_name && (
+                <p className="mt-1 text-xs text-gray-400">Currently: {step.step_owner_name}</p>
+              )}
+            </div>
+
+            {/* Step Reviewer */}
+            <div>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                <span className="flex items-center gap-1">
+                  <UserCheck className="h-3.5 w-3.5" />
+                  Step Reviewer
+                </span>
+              </label>
+              <p className="text-[11px] text-gray-400 mb-1">
+                Reviewer who approves this step during review.
+              </p>
+              <select
+                value={step.reviewer ?? ''}
+                onChange={(e) =>
+                  onUpdate(step.id, {
+                    reviewer: e.target.value ? Number(e.target.value) : null,
+                  })
+                }
+                className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+              >
+                <option value="">No reviewer assigned</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.full_name || `${u.first_name} ${u.last_name}`.trim() || u.username}
+                  </option>
+                ))}
+              </select>
+              {step.reviewer_name && (
+                <p className="mt-1 text-xs text-gray-400">Currently: {step.reviewer_name}</p>
+              )}
+            </div>
           </div>
 
           {/* Attachments */}

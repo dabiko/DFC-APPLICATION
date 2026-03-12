@@ -120,10 +120,15 @@ export interface ProcedureStep {
   description: string
   order: number
   estimated_duration_minutes: number | null
+  learning_objectives: string[]
+  key_concepts: string[]
+  example_scenarios: string
   branch_condition: BranchCondition | null
   require_manual_open: boolean
   require_media_completion: boolean
   require_quiz_pass: boolean
+  step_owner: number | null
+  step_owner_name: string | null
   reviewer: number | null
   reviewer_name: string | null
   review_status: 'pending' | 'approved' | 'changes_requested'
@@ -182,6 +187,11 @@ export interface ProcedureVersion {
   retired_by: string | null
   retirement_reason: string
   steps: ProcedureVersionStep[]
+  content_warnings?: Array<{
+    step_order: number
+    step_title: string
+    missing: string[]
+  }>
 }
 
 export interface ProcedureVersionListItem {
@@ -205,6 +215,9 @@ export interface ProcedureVersionStep {
   description: string
   order: number
   estimated_duration_minutes: number | null
+  learning_objectives: string[]
+  key_concepts: string[]
+  example_scenarios: string
   branch_condition: BranchCondition | null
   require_manual_open: boolean
   require_media_completion: boolean

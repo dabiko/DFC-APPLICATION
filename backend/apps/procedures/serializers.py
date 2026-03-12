@@ -46,6 +46,7 @@ class StepAttachmentSerializer(serializers.ModelSerializer):
 class ProcedureStepSerializer(serializers.ModelSerializer):
     attachments = StepAttachmentSerializer(many=True, read_only=True)
     reviewer_name = serializers.CharField(source='reviewer.get_full_name', read_only=True, default=None)
+    step_owner_name = serializers.CharField(source='step_owner.get_full_name', read_only=True, default=None)
 
     class Meta:
         model = ProcedureStep
