@@ -24,6 +24,7 @@ export interface VersionStep {
   require_manual_open: boolean
   require_media_completion: boolean
   require_quiz_pass: boolean
+  require_read_content: boolean
   attachments: StepAttachmentItem[]
   quizzes?: VersionStepQuizSummary[]
 }

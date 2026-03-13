@@ -128,6 +128,7 @@ export interface ProcedureStep {
   require_manual_open: boolean
   require_media_completion: boolean
   require_quiz_pass: boolean
+  require_read_content: boolean
   step_owner: number | null
   step_owner_name: string | null
   reviewer: number | null
@@ -223,6 +224,7 @@ export interface ProcedureVersionStep {
   require_manual_open: boolean
   require_media_completion: boolean
   require_quiz_pass: boolean
+  require_read_content: boolean
   attachments: VersionStepAttachment[]
 }
 

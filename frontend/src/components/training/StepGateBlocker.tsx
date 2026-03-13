@@ -2,7 +2,7 @@
  * StepGateBlocker — Gate requirements overlay showing completion gates for a step.
  */
 
-import { BookOpen, Video, HelpCircle, CheckCircle, XCircle, AlertTriangle } from 'lucide-react'
+import { BookOpen, Video, HelpCircle, CheckCircle, XCircle, AlertTriangle, Eye } from 'lucide-react'
 import type { VersionStep, StepCompletionResponse } from './types'
 import type { QuizAttemptResponse } from '@/services/trainingService'
 
@@ -20,6 +20,7 @@ interface StepGateBlockerProps {
   actionLoading: boolean
   attemptId: string
   quizAttemptInfo?: QuizAttemptInfo | null
+  onMarkContentRead: () => void
   onMarkManualOpened: () => void
   onMarkMediaCompleted: () => void
   onTakeQuiz: () => void
@@ -30,17 +31,29 @@ export function StepGateBlocker({
   completion,
   actionLoading,
   quizAttemptInfo,
+  onMarkContentRead,
   onMarkManualOpened,
   onMarkMediaCompleted,
   onTakeQuiz,
 }: StepGateBlockerProps) {
   const hasGates =
-    step.require_manual_open || step.require_media_completion || step.require_quiz_pass
+    step.require_read_content ||
+    step.require_manual_open ||
+    step.require_media_completion ||
+    step.require_quiz_pass
 
   if (!hasGates) return null
 
   return (
     <div className="space-y-3 mb-6">
+      {step.require_read_content && (
+        <ReadContentGateRow
+          completion={completion}
+          actionLoading={actionLoading}
+          onMarkContentRead={onMarkContentRead}
+        />
+      )}
+
       {step.require_manual_open && (
         <ManualGateRow
           step={step}
@@ -61,6 +74,38 @@ export function StepGateBlocker({
 
       {step.require_quiz_pass && (
         <QuizGateRow quizAttemptInfo={quizAttemptInfo} onTakeQuiz={onTakeQuiz} />
+      )}
+    </div>
+  )
+}
+
+function ReadContentGateRow({
+  completion,
+  actionLoading,
+  onMarkContentRead,
+}: {
+  completion: StepCompletionResponse | null
+  actionLoading: boolean
+  onMarkContentRead: () => void
+}) {
+  return (
+    <div className="flex items-center justify-between rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+      <div className="flex items-center gap-2 text-sm">
+        <Eye className="h-4 w-4 text-teal-500" />
+        <span className="text-gray-700 dark:text-gray-300">I have read the step content</span>
+      </div>
+      {completion?.content_read_at ? (
+        <span className="flex items-center gap-1 text-xs text-green-600">
+          <CheckCircle className="h-3 w-3" /> Done
+        </span>
+      ) : (
+        <button
+          onClick={onMarkContentRead}
+          disabled={actionLoading}
+          className="text-xs text-teal-600 hover:underline disabled:opacity-50"
+        >
+          Confirm
+        </button>
       )}
     </div>
   )

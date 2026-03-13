@@ -21,6 +21,7 @@ import {
   Paperclip,
   ChevronDown,
   ChevronUp,
+  Eye,
 } from 'lucide-react'
 import { ThreePanelLayout } from '@/components/Layout/ThreePanelLayout'
 import { DashboardHeader } from '@/components/Dashboard/DashboardHeader'
@@ -179,6 +180,9 @@ export function ProcedureVersionPage() {
                           {step.title}
                         </span>
                         <div className="flex items-center gap-1.5">
+                          {step.require_read_content && (
+                            <Eye className="h-3.5 w-3.5 text-teal-500" />
+                          )}
                           {step.require_manual_open && (
                             <BookOpen className="h-3.5 w-3.5 text-blue-500" />
                           )}

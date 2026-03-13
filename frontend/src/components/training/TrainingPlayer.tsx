@@ -9,6 +9,7 @@ import { Loader2, AlertTriangle, PlayCircle, ArrowLeft, Eye } from 'lucide-react
 import {
   startStep,
   viewStep,
+  markContentRead,
   markManualOpened,
   markMediaCompleted,
   completeStep,
@@ -144,6 +145,20 @@ export function TrainingPlayer({ attemptId, reviewMode = false }: TrainingPlayer
       } finally {
         setActionLoading(false)
       }
+    }
+  }
+
+  const handleMarkContentRead = async () => {
+    if (!currentCompletion) return
+    setActionLoading(true)
+    try {
+      const updated = await markContentRead(attemptId, currentCompletion.id)
+      setCurrentCompletion(updated)
+      updateCompletionInAttempt(updated)
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || 'Failed to mark content as read')
+    } finally {
+      setActionLoading(false)
     }
   }
 
@@ -362,6 +377,7 @@ export function TrainingPlayer({ attemptId, reviewMode = false }: TrainingPlayer
                   onNext={() => handleNavigateStep(currentStepIndex + 1)}
                   onCompleteStep={handleCompleteStep}
                   onFinishTraining={handleCompleteTraining}
+                  onMarkContentRead={handleMarkContentRead}
                   onMarkManualOpened={handleMarkManualOpened}
                   onMarkMediaCompleted={handleMarkMediaCompleted}
                   onTakeQuiz={() => {

@@ -136,6 +136,7 @@ class ProcedureStep(models.Model):
     require_manual_open = models.BooleanField(default=False)
     require_media_completion = models.BooleanField(default=False)
     require_quiz_pass = models.BooleanField(default=False)
+    require_read_content = models.BooleanField(default=False)
 
     # Per-step owner (subject-matter expert who can edit this step)
     step_owner = models.ForeignKey(
@@ -344,6 +345,7 @@ class ProcedureVersionStep(models.Model):
     require_manual_open = models.BooleanField(default=False)
     require_media_completion = models.BooleanField(default=False)
     require_quiz_pass = models.BooleanField(default=False)
+    require_read_content = models.BooleanField(default=False)
 
     class Meta:
         db_table = 'procedure_version_steps'
@@ -849,6 +851,7 @@ class StepCompletion(models.Model):
     # Manual interaction tracking
     manual_opened_at = models.DateTimeField(null=True, blank=True)
     media_completed_at = models.DateTimeField(null=True, blank=True)
+    content_read_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = 'step_completions'

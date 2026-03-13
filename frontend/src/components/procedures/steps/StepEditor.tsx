@@ -25,6 +25,7 @@ import {
   FlaskConical,
   Plus,
   ExternalLink,
+  Eye,
 } from 'lucide-react'
 import type { ProcedureStep, StepAttachment, BranchCondition, Quiz } from '@/types/procedure'
 import type { UserBasic } from '@/services/userManagementService'
@@ -239,7 +240,7 @@ export function StepEditor({
               onChange={(e) => onUpdate(step.id, { description: e.target.value })}
               rows={3}
               placeholder="Describe what the trainee should do in this step..."
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+              className="w-full rounded-lg border-2 border-gray-200 bg-gray-50/50 px-3 py-2 text-sm transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700/50 dark:text-gray-100 dark:focus:border-blue-400 dark:focus:bg-gray-700"
             />
           </div>
 
@@ -267,7 +268,7 @@ export function StepEditor({
                       onUpdate(step.id, { learning_objectives: updated })
                     }}
                     placeholder="e.g. Understand the approval workflow..."
-                    className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                    className="flex-1 rounded-lg border-2 border-gray-200 bg-gray-50/50 px-3 py-1.5 text-sm transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700/50 dark:text-gray-100 dark:focus:border-blue-400 dark:focus:bg-gray-700"
                   />
                   <button
                     onClick={() => {
@@ -318,7 +319,7 @@ export function StepEditor({
                       onUpdate(step.id, { key_concepts: updated })
                     }}
                     placeholder="e.g. Data integrity requirements..."
-                    className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                    className="flex-1 rounded-lg border-2 border-gray-200 bg-gray-50/50 px-3 py-1.5 text-sm transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700/50 dark:text-gray-100 dark:focus:border-blue-400 dark:focus:bg-gray-700"
                   />
                   <button
                     onClick={() => {
@@ -361,7 +362,7 @@ export function StepEditor({
               onChange={(e) => onUpdate(step.id, { example_scenarios: e.target.value })}
               rows={3}
               placeholder="e.g. When a client submits incomplete KYC documents, the reviewer should..."
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+              className="w-full rounded-lg border-2 border-gray-200 bg-gray-50/50 px-3 py-2 text-sm transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700/50 dark:text-gray-100 dark:focus:border-blue-400 dark:focus:bg-gray-700"
             />
           </div>
 
@@ -382,7 +383,7 @@ export function StepEditor({
                 value={step.video_url || ''}
                 onChange={(e) => onUpdate(step.id, { video_url: e.target.value })}
                 placeholder="https://www.youtube.com/watch?v=..."
-                className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                className="flex-1 rounded-lg border-2 border-gray-200 bg-gray-50/50 px-3 py-1.5 text-sm transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700/50 dark:text-gray-100 dark:focus:border-blue-400 dark:focus:bg-gray-700"
               />
               {step.video_url && (
                 <a
@@ -507,7 +508,7 @@ export function StepEditor({
                   estimated_duration_minutes: e.target.value ? Number(e.target.value) : null,
                 })
               }
-              className="w-32 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+              className="w-32 rounded-lg border-2 border-gray-200 bg-gray-50/50 px-3 py-1.5 text-sm transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700/50 dark:text-gray-100 dark:focus:border-blue-400 dark:focus:bg-gray-700"
             />
           </div>
 
@@ -516,38 +517,52 @@ export function StepEditor({
             <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
               Completion Requirements
             </label>
-            <div className="flex flex-wrap gap-3">
-              <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <label className="flex items-center gap-3 rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors has-[:checked]:border-blue-400 has-[:checked]:bg-blue-50 dark:has-[:checked]:border-blue-500 dark:has-[:checked]:bg-blue-900/20">
+                <input
+                  type="checkbox"
+                  checked={step.require_read_content}
+                  onChange={(e) => onUpdate(step.id, { require_read_content: e.target.checked })}
+                  className="h-4 w-4 rounded border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 dark:border-gray-500 dark:bg-gray-700 transition-colors"
+                />
+                <Eye className="h-4 w-4 text-teal-500 flex-shrink-0" />
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  I have read the step content
+                </span>
+              </label>
+              <label className="flex items-center gap-3 rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors has-[:checked]:border-blue-400 has-[:checked]:bg-blue-50 dark:has-[:checked]:border-blue-500 dark:has-[:checked]:bg-blue-900/20">
                 <input
                   type="checkbox"
                   checked={step.require_manual_open}
                   onChange={(e) => onUpdate(step.id, { require_manual_open: e.target.checked })}
-                  className="rounded border-gray-300"
+                  className="h-4 w-4 rounded border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 dark:border-gray-500 dark:bg-gray-700 transition-colors"
                 />
-                <BookOpen className="h-3.5 w-3.5 text-blue-500" />
-                Must open manual
+                <BookOpen className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                <span className="text-sm text-gray-700 dark:text-gray-300">Must open manual</span>
               </label>
-              <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <label className="flex items-center gap-3 rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors has-[:checked]:border-purple-400 has-[:checked]:bg-purple-50 dark:has-[:checked]:border-purple-500 dark:has-[:checked]:bg-purple-900/20">
                 <input
                   type="checkbox"
                   checked={step.require_media_completion}
                   onChange={(e) =>
                     onUpdate(step.id, { require_media_completion: e.target.checked })
                   }
-                  className="rounded border-gray-300"
+                  className="h-4 w-4 rounded border-2 border-gray-300 text-purple-600 focus:ring-2 focus:ring-purple-500 focus:ring-offset-0 dark:border-gray-500 dark:bg-gray-700 transition-colors"
                 />
-                <Video className="h-3.5 w-3.5 text-purple-500" />
-                Must complete media
+                <Video className="h-4 w-4 text-purple-500 flex-shrink-0" />
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  Must complete media
+                </span>
               </label>
-              <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <label className="flex items-center gap-3 rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors has-[:checked]:border-green-400 has-[:checked]:bg-green-50 dark:has-[:checked]:border-green-500 dark:has-[:checked]:bg-green-900/20">
                 <input
                   type="checkbox"
                   checked={step.require_quiz_pass}
                   onChange={(e) => onUpdate(step.id, { require_quiz_pass: e.target.checked })}
-                  className="rounded border-gray-300"
+                  className="h-4 w-4 rounded border-2 border-gray-300 text-green-600 focus:ring-2 focus:ring-green-500 focus:ring-offset-0 dark:border-gray-500 dark:bg-gray-700 transition-colors"
                 />
-                <HelpCircle className="h-3.5 w-3.5 text-green-500" />
-                Must pass quiz
+                <HelpCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
+                <span className="text-sm text-gray-700 dark:text-gray-300">Must pass quiz</span>
               </label>
             </div>
           </div>
@@ -583,7 +598,7 @@ export function StepEditor({
                     step_owner: e.target.value ? Number(e.target.value) : null,
                   })
                 }
-                className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                className="w-full appearance-none rounded-lg border-2 border-gray-200 bg-gray-50/50 px-3 py-2 text-sm transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700/50 dark:text-gray-100 dark:focus:border-blue-400 dark:focus:bg-gray-700 bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22%236b7280%22%3E%3Cpath%20fill-rule%3D%22evenodd%22%20d%3D%22M5.23%207.21a.75.75%200%20011.06.02L10%2011.168l3.71-3.938a.75.75%200%20111.08%201.04l-4.25%204.5a.75.75%200%2001-1.08%200l-4.25-4.5a.75.75%200%2001.02-1.06z%22%20clip-rule%3D%22evenodd%22%2F%3E%3C%2Fsvg%3E')] bg-[length:20px_20px] bg-[position:right_8px_center] bg-no-repeat pr-9"
               >
                 <option value="">No owner assigned</option>
                 {users.map((u) => (
@@ -615,7 +630,7 @@ export function StepEditor({
                     reviewer: e.target.value ? Number(e.target.value) : null,
                   })
                 }
-                className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                className="w-full appearance-none rounded-lg border-2 border-gray-200 bg-gray-50/50 px-3 py-2 text-sm transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700/50 dark:text-gray-100 dark:focus:border-blue-400 dark:focus:bg-gray-700 bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22%236b7280%22%3E%3Cpath%20fill-rule%3D%22evenodd%22%20d%3D%22M5.23%207.21a.75.75%200%20011.06.02L10%2011.168l3.71-3.938a.75.75%200%20111.08%201.04l-4.25%204.5a.75.75%200%2001-1.08%200l-4.25-4.5a.75.75%200%2001.02-1.06z%22%20clip-rule%3D%22evenodd%22%2F%3E%3C%2Fsvg%3E')] bg-[length:20px_20px] bg-[position:right_8px_center] bg-no-repeat pr-9"
               >
                 <option value="">No reviewer assigned</option>
                 {users.map((u) => (

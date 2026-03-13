@@ -38,6 +38,7 @@ export interface StepCompletionResponse {
   time_spent_seconds: number | null
   manual_opened_at: string | null
   media_completed_at: string | null
+  content_read_at: string | null
 }
 
 export interface QuizAttemptResponse {
@@ -106,6 +107,16 @@ export const markMediaCompleted = async (
   stepCompletionId: string
 ): Promise<StepCompletionResponse> => {
   const response = await apiClient.post(`${BASE}/training/${attemptId}/media_completed/`, {
+    step_completion_id: stepCompletionId,
+  })
+  return response.data
+}
+
+export const markContentRead = async (
+  attemptId: string,
+  stepCompletionId: string
+): Promise<StepCompletionResponse> => {
+  const response = await apiClient.post(`${BASE}/training/${attemptId}/content_read/`, {
     step_completion_id: stepCompletionId,
   })
   return response.data

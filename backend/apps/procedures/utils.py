@@ -147,7 +147,8 @@ def compute_version_diff(from_version, to_version):
         else:
             changes = {}
             for field in ['title', 'description', 'order', 'branch_condition',
-                          'require_manual_open', 'require_media_completion', 'require_quiz_pass']:
+                          'require_manual_open', 'require_media_completion', 'require_quiz_pass',
+                          'require_read_content']:
                 from_val = getattr(from_step, field)
                 to_val = getattr(to_step, field)
                 if from_val != to_val:
@@ -325,6 +326,9 @@ def can_advance_to_next_step(step_completion):
             reasons.append(f"You must read the document(s): {doc_names}.")
         else:
             reasons.append("You must read the step content and confirm before continuing.")
+
+    if version_step.require_read_content and not step_completion.content_read_at:
+        reasons.append("You must read the step content and confirm before continuing.")
 
     if version_step.require_media_completion and not step_completion.media_completed_at:
         videos = version_step.attachments.filter(attachment_type='video')

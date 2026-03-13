@@ -689,6 +689,9 @@ export function ProcedureDetailPage() {
                                           : 'Pending'}
                                     </span>
                                   )}
+                                  {step.require_read_content && (
+                                    <Eye className="h-3.5 w-3.5 text-teal-500" />
+                                  )}
                                   {step.require_manual_open && (
                                     <BookOpen className="h-3.5 w-3.5 text-blue-500" />
                                   )}

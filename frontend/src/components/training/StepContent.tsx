@@ -36,6 +36,7 @@ interface StepContentProps {
   quizAttemptInfo?: QuizAttemptInfo | null
   stepError?: string | null
   onDismissStepError?: () => void
+  onMarkContentRead: () => void
   onMarkManualOpened: () => void
   onMarkMediaCompleted: () => void
   onTakeQuiz: () => void
@@ -59,6 +60,7 @@ export function StepContent({
   onNext,
   onCompleteStep,
   onFinishTraining,
+  onMarkContentRead,
   onMarkManualOpened,
   onMarkMediaCompleted,
   onTakeQuiz,
@@ -209,6 +211,7 @@ export function StepContent({
             actionLoading={actionLoading}
             attemptId={attemptId}
             quizAttemptInfo={quizAttemptInfo}
+            onMarkContentRead={onMarkContentRead}
             onMarkManualOpened={onMarkManualOpened}
             onMarkMediaCompleted={onMarkMediaCompleted}
             onTakeQuiz={onTakeQuiz}

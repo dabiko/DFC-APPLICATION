@@ -31,8 +31,8 @@ from apps.procedures.models import (
 class ProcedureStepInline(admin.TabularInline):
     model = ProcedureStep
     extra = 1
-    fields = ['order', 'title', 'estimated_duration_minutes', 'require_manual_open',
-              'require_media_completion', 'require_quiz_pass']
+    fields = ['order', 'title', 'estimated_duration_minutes', 'require_read_content',
+              'require_manual_open', 'require_media_completion', 'require_quiz_pass']
     ordering = ['order']
 
 
@@ -105,8 +105,8 @@ class ProcedureAdmin(admin.ModelAdmin):
 @admin.register(ProcedureStep)
 class ProcedureStepAdmin(admin.ModelAdmin):
     list_display = ['procedure', 'order', 'title', 'estimated_duration_minutes',
-                    'require_manual_open', 'require_media_completion', 'require_quiz_pass']
-    list_filter = ['require_manual_open', 'require_media_completion', 'require_quiz_pass']
+                    'require_read_content', 'require_manual_open', 'require_media_completion', 'require_quiz_pass']
+    list_filter = ['require_read_content', 'require_manual_open', 'require_media_completion', 'require_quiz_pass']
     search_fields = ['title', 'procedure__title']
     readonly_fields = ['id', 'created_at', 'updated_at']
     inlines = [StepAttachmentInline]

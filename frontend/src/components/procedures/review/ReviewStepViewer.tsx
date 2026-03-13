@@ -20,6 +20,7 @@ import {
   Target,
   Lightbulb,
   FlaskConical,
+  Eye,
 } from 'lucide-react'
 import { StepCommentThread } from './StepCommentThread'
 import type { ProcedureStep, ProcedureStepComment } from '@/types/procedure'
@@ -73,6 +74,7 @@ export function ReviewStepViewer({
                 {step.estimated_duration_minutes} min
               </span>
             )}
+            {step.require_read_content && <Eye className="h-3 w-3 text-teal-500" />}
             {step.require_manual_open && <BookOpen className="h-3 w-3 text-blue-500" />}
             {step.require_media_completion && <Video className="h-3 w-3 text-purple-500" />}
             {step.require_quiz_pass && <HelpCircle className="h-3 w-3 text-green-500" />}
@@ -237,7 +239,8 @@ export function ReviewStepViewer({
               )}
 
               {/* Gates summary */}
-              {(step.require_manual_open ||
+              {(step.require_read_content ||
+                step.require_manual_open ||
                 step.require_media_completion ||
                 step.require_quiz_pass) && (
                 <div className="space-y-1">
@@ -245,6 +248,12 @@ export function ReviewStepViewer({
                     Completion Requirements
                   </p>
                   <div className="flex flex-wrap gap-2 text-xs">
+                    {step.require_read_content && (
+                      <span className="flex items-center gap-1 rounded-full bg-teal-50 px-2 py-0.5 text-teal-700 dark:bg-teal-900/20 dark:text-teal-400">
+                        <Eye className="h-3 w-3" />
+                        Read content
+                      </span>
+                    )}
                     {step.require_manual_open && (
                       <span className="flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
                         <BookOpen className="h-3 w-3" />

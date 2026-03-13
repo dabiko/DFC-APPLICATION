@@ -365,7 +365,8 @@ class StepCompletionSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ['id', 'attempt', 'version_step', 'started_at',
                             'completed_at', 'time_spent_seconds',
-                            'manual_opened_at', 'media_completed_at']
+                            'manual_opened_at', 'media_completed_at',
+                            'content_read_at']
 
 
 class QuestionResponseSerializer(serializers.ModelSerializer):

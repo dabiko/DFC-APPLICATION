@@ -755,6 +755,7 @@ class ProcedureViewSet(viewsets.ModelViewSet):
                 require_manual_open=step.require_manual_open,
                 require_media_completion=step.require_media_completion,
                 require_quiz_pass=step.require_quiz_pass,
+                require_read_content=step.require_read_content,
             )
 
             # Snapshot attachments
@@ -1997,6 +1998,20 @@ class TrainingViewSet(viewsets.GenericViewSet):
 
         return Response(StepCompletionSerializer(step_completion).data)
 
+    @action(detail=True, methods=['post'], url_path='content_read')
+    def content_read(self, request, pk=None):
+        """Record content read confirmation event."""
+        _qs = TrainingAttempt.objects.filter(id=pk)
+        if not request.user.is_superuser:
+            _qs = _qs.filter(assignment__assignee=request.user)
+        attempt = _qs.get()
+        step_completion = _resolve_step_completion(attempt, request.data)
+
+        step_completion.content_read_at = timezone.now()
+        step_completion.save(update_fields=['content_read_at'])
+
+        return Response(StepCompletionSerializer(step_completion).data)
+
     @action(detail=True, methods=['post'], url_path='complete_step')
     def complete_step(self, request, pk=None):
         """Complete step (validates all gates)."""
@@ -2513,6 +2528,8 @@ class EvidenceViewSet(viewsets.ReadOnlyModelViewSet):
                     'manual_opened_at': sc.manual_opened_at.isoformat() if sc.manual_opened_at else None,
                     'media_completed': sc.media_completed_at is not None,
                     'media_completed_at': sc.media_completed_at.isoformat() if sc.media_completed_at else None,
+                    'content_read': sc.content_read_at is not None,
+                    'content_read_at': sc.content_read_at.isoformat() if sc.content_read_at else None,
                 }
                 attempt_data['step_completions'].append(step_data)
 
