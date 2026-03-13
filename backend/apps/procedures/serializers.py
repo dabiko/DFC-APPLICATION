@@ -11,7 +11,7 @@ from .models import (
     Quiz, Question, AnswerOption,
     ProcedureAssignment, TrainingAttempt, StepCompletion,
     QuizAttempt, QuestionResponse,
-    VersionQuiz,
+    VersionQuiz, VersionQuestion, VersionAnswerOption,
 )
 
 
@@ -184,8 +184,17 @@ class VersionStepAttachmentSerializer(serializers.ModelSerializer):
         }
 
 
+class VersionStepQuizSummarySerializer(serializers.ModelSerializer):
+    """Lightweight quiz info nested on version steps (just id and title)."""
+
+    class Meta:
+        model = VersionQuiz
+        fields = ['id', 'title', 'quiz_type']
+
+
 class ProcedureVersionStepSerializer(serializers.ModelSerializer):
     attachments = VersionStepAttachmentSerializer(many=True, read_only=True)
+    quizzes = VersionStepQuizSummarySerializer(many=True, read_only=True)
 
     class Meta:
         model = ProcedureVersionStep
@@ -405,3 +414,33 @@ class VersionQuizSerializer(serializers.ModelSerializer):
         fields = ['id', 'quiz_type', 'title', 'description',
                   'passing_score_percent', 'max_attempts', 'time_limit_minutes',
                   'shuffle_questions', 'shuffle_answers', 'show_correct_answers_after']
+
+
+class VersionAnswerOptionSerializer(serializers.ModelSerializer):
+    """Serializer for version answer options — hides is_correct from trainees."""
+
+    class Meta:
+        model = VersionAnswerOption
+        fields = ['id', 'text', 'order', 'correct_order']
+
+
+class VersionQuestionSerializer(serializers.ModelSerializer):
+    """Serializer for version questions with nested options."""
+    options = VersionAnswerOptionSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = VersionQuestion
+        fields = ['id', 'question_type', 'text', 'explanation', 'order',
+                  'points', 'is_mandatory', 'options']
+
+
+class VersionQuizDetailSerializer(serializers.ModelSerializer):
+    """Detail serializer for versioned quizzes — includes questions and options."""
+    questions = VersionQuestionSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = VersionQuiz
+        fields = ['id', 'quiz_type', 'title', 'description',
+                  'passing_score_percent', 'max_attempts', 'time_limit_minutes',
+                  'shuffle_questions', 'shuffle_answers', 'show_correct_answers_after',
+                  'questions']

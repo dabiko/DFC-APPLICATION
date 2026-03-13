@@ -36,6 +36,7 @@ assignment_router.register(r'assignments', views.ProcedureAssignmentViewSet, bas
 assignment_router.register(r'training', views.TrainingViewSet, basename='training')
 
 # Phase G: Evidence & Export + Audit Log
+assignment_router.register(r'version-quizzes', views.VersionQuizViewSet, basename='version-quiz')
 assignment_router.register(r'evidence', views.EvidenceViewSet, basename='evidence')
 assignment_router.register(r'audit-log', views.ProcedureAuditLogViewSet, basename='audit-log')
 

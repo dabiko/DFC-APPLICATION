@@ -5,7 +5,7 @@ Covers Phases B-G.
 
 import csv
 import hashlib
-from rest_framework import viewsets, status, permissions
+from rest_framework import viewsets, mixins, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.contrib.contenttypes.models import ContentType
@@ -36,6 +36,7 @@ from .serializers import (
     WaiveAssignmentSerializer, TrainingAttemptSerializer,
     StepCompletionSerializer, QuizAttemptSerializer, QuizSubmitSerializer,
     ProcedureAuditLogSerializer,
+    VersionQuizDetailSerializer,
 )
 from .permissions import (
     IsProcedureCreator, IsProcedureAdmin, IsProcedureManager,
@@ -1905,17 +1906,28 @@ class TrainingViewSet(viewsets.GenericViewSet):
     @action(detail=True, methods=['post'], url_path='submit_quiz')
     def submit_quiz(self, request, pk=None):
         """Submit quiz answers and grade."""
-        quiz_id = request.data.get('quiz_attempt_id') or request.data.get('version_quiz_id')
         _qs = TrainingAttempt.objects.filter(id=pk)
         if not request.user.is_superuser:
             _qs = _qs.filter(assignment__assignee=request.user)
         attempt = _qs.get()
-        version_quiz = VersionQuiz.objects.get(id=quiz_id)
 
-        # Find in-progress quiz attempt
-        quiz_attempt = attempt.quiz_attempts.filter(
-            version_quiz=version_quiz, completed_at__isnull=True
-        ).first()
+        # Resolve quiz attempt — accept quiz_attempt_id (PK) or version_quiz_id (FK)
+        quiz_attempt_id = request.data.get('quiz_attempt_id')
+        version_quiz_id = request.data.get('version_quiz_id')
+
+        if quiz_attempt_id:
+            quiz_attempt = attempt.quiz_attempts.filter(
+                id=quiz_attempt_id, completed_at__isnull=True
+            ).first()
+        elif version_quiz_id:
+            quiz_attempt = attempt.quiz_attempts.filter(
+                version_quiz_id=version_quiz_id, completed_at__isnull=True
+            ).first()
+        else:
+            return Response(
+                {'error': 'Provide quiz_attempt_id or version_quiz_id.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         if not quiz_attempt:
             return Response(
@@ -1923,25 +1935,44 @@ class TrainingViewSet(viewsets.GenericViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        version_quiz = quiz_attempt.version_quiz
+
         serializer = QuizSubmitSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         # Create QuestionResponse records
+        # Accept both frontend field names and backend field names
         for resp_data in serializer.validated_data['responses']:
-            question_id = resp_data.get('question_id')
+            question_id = (
+                resp_data.get('question_id')
+                or resp_data.get('version_question_id')
+            )
             version_question = VersionQuestion.objects.get(
                 id=question_id, version_quiz=version_quiz
+            )
+
+            text_response = (
+                resp_data.get('text_response', '')
+                or resp_data.get('text_answer', '')
+            )
+            submitted_order = (
+                resp_data.get('submitted_order')
+                or resp_data.get('ordering_answer')
             )
 
             response = QuestionResponse.objects.create(
                 quiz_attempt=quiz_attempt,
                 version_question=version_question,
-                text_response=resp_data.get('text_response', ''),
-                submitted_order=resp_data.get('submitted_order'),
+                text_response=text_response,
+                submitted_order=submitted_order,
             )
 
-            # Set selected_options (M2M)
-            selected_option_ids = resp_data.get('selected_options', [])
+            # Set selected_options (M2M) — accept both field names
+            selected_option_ids = (
+                resp_data.get('selected_options')
+                or resp_data.get('selected_option_ids')
+                or []
+            )
             if selected_option_ids:
                 response.selected_options.set(
                     VersionAnswerOption.objects.filter(id__in=selected_option_ids)
@@ -1964,7 +1995,7 @@ class TrainingViewSet(viewsets.GenericViewSet):
 
         # Update trainee context with quiz score
         attempt.trainee_context.setdefault('quiz_scores', {})
-        attempt.trainee_context['quiz_scores'][str(quiz_id)] = float(result['score_percent'])
+        attempt.trainee_context['quiz_scores'][str(version_quiz.id)] = float(result['score_percent'])
         attempt.save(update_fields=['trainee_context'])
 
         # Update step completion status if quiz is step-level
@@ -2095,6 +2126,19 @@ class TrainingViewSet(viewsets.GenericViewSet):
         )
 
         return Response(TrainingAttemptSerializer(attempt).data)
+
+
+# ---------------------------------------------------------------------------
+# Version Quiz Retrieve (for training quiz player)
+# ---------------------------------------------------------------------------
+
+class VersionQuizViewSet(viewsets.GenericViewSet, mixins.RetrieveModelMixin):
+    """GET /version-quizzes/{id}/ — Retrieve a single VersionQuiz with questions & options."""
+    serializer_class = VersionQuizDetailSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    queryset = VersionQuiz.objects.prefetch_related(
+        'questions__options',
+    )
 
 
 # ---------------------------------------------------------------------------

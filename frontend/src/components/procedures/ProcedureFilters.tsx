@@ -28,7 +28,7 @@ export function ProcedureFilters({ filters, onChange }: ProcedureFiltersProps) {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         {/* Search */}
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -44,7 +44,7 @@ export function ProcedureFilters({ filters, onChange }: ProcedureFiltersProps) {
         {/* Filter toggle */}
         <button
           onClick={() => setShowFilters(!showFilters)}
-          className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
+          className={`flex shrink-0 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
             hasActiveFilters
               ? 'border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-600 dark:bg-blue-900/30 dark:text-blue-300'
               : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300'

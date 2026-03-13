@@ -100,7 +100,8 @@ export function StepNavigationButtons({
 
       <button
         onClick={onNext}
-        disabled={currentStepIndex >= totalSteps - 1}
+        disabled={currentStepIndex >= totalSteps - 1 || (!reviewMode && !isStepCompleted)}
+        title={!reviewMode && !isStepCompleted ? 'Complete this step first' : undefined}
         className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 disabled:opacity-30 dark:text-gray-400"
       >
         Next

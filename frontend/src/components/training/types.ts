@@ -4,6 +4,12 @@
 
 import type { StepCompletionResponse } from '@/services/trainingService'
 
+export interface VersionStepQuizSummary {
+  id: string
+  title: string
+  quiz_type: string
+}
+
 export interface VersionStep {
   id: string
   title: string
@@ -18,6 +24,7 @@ export interface VersionStep {
   require_media_completion: boolean
   require_quiz_pass: boolean
   attachments: StepAttachmentItem[]
+  quizzes?: VersionStepQuizSummary[]
 }
 
 export interface StepAttachmentItem {

@@ -102,8 +102,25 @@ export function TrainingPlayer({ attemptId, reviewMode = false }: TrainingPlayer
     })
   }
 
+  /** Check whether all steps before `index` are completed. */
+  const isStepAccessible = useCallback(
+    (index: number): boolean => {
+      if (reviewMode) return true
+      if (index === 0) return true
+      // Every prior step must be completed
+      for (let i = 0; i < index; i++) {
+        const c = attempt?.step_completions.find((sc) => sc.version_step === steps[i]?.id)
+        if (c?.status !== 'completed') return false
+      }
+      return true
+    },
+    [attempt, steps, reviewMode]
+  )
+
   const handleNavigateStep = async (index: number) => {
     if (!steps[index]) return
+    // Block navigation to steps whose predecessors are not completed
+    if (!isStepAccessible(index)) return
     setCurrentStepIndex(index)
     const step = steps[index]
     const existing = getStepCompletion(step.id)
@@ -171,7 +188,13 @@ export function TrainingPlayer({ attemptId, reviewMode = false }: TrainingPlayer
         setError(`Cannot advance: ${(result.reasons || []).join(', ')}`)
       }
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to complete step')
+      // Backend returns 400 with {can_advance, reasons} when gates block completion
+      const data = err?.response?.data
+      if (data?.can_advance === false && Array.isArray(data?.reasons)) {
+        setError(data.reasons.join(' '))
+      } else {
+        setError(data?.detail || 'Failed to complete step')
+      }
     } finally {
       setActionLoading(false)
     }
@@ -264,35 +287,60 @@ export function TrainingPlayer({ attemptId, reviewMode = false }: TrainingPlayer
 
       {/* Content */}
       <div className="flex-1 overflow-auto">
-        <div className="max-w-3xl mx-auto p-6">
-          <StepSidebar
-            steps={steps}
-            currentStepIndex={currentStepIndex}
-            getStepCompletion={getStepCompletion}
-            onNavigate={handleNavigateStep}
-          />
-
-          {currentStep && (
-            <StepContent
-              step={currentStep}
-              completion={currentCompletion}
+        <div className="mx-auto max-w-6xl p-4 lg:p-6">
+          {/* Mobile: step dropdown above content */}
+          <div className="lg:hidden">
+            <StepSidebar
+              steps={steps}
               currentStepIndex={currentStepIndex}
-              totalSteps={steps.length}
-              isStepCompleted={isStepCompleted}
-              allStepsCompleted={allStepsCompleted}
-              actionLoading={actionLoading}
-              completing={completing}
-              attemptId={attemptId}
-              reviewMode={reviewMode}
-              onPrevious={() => handleNavigateStep(currentStepIndex - 1)}
-              onNext={() => handleNavigateStep(currentStepIndex + 1)}
-              onCompleteStep={handleCompleteStep}
-              onFinishTraining={handleCompleteTraining}
-              onMarkManualOpened={handleMarkManualOpened}
-              onMarkMediaCompleted={handleMarkMediaCompleted}
-              onTakeQuiz={() => navigate(`/training/${attemptId}/quiz/${currentStep.id}`)}
+              getStepCompletion={getStepCompletion}
+              onNavigate={handleNavigateStep}
+              isStepAccessible={isStepAccessible}
             />
-          )}
+          </div>
+
+          {/* Desktop: two-column layout */}
+          <div className="flex gap-6">
+            {/* Left sidebar — desktop only */}
+            <aside className="hidden w-72 shrink-0 lg:block">
+              <StepSidebar
+                steps={steps}
+                currentStepIndex={currentStepIndex}
+                getStepCompletion={getStepCompletion}
+                onNavigate={handleNavigateStep}
+              />
+            </aside>
+
+            {/* Main content */}
+            <div className="min-w-0 flex-1">
+              {currentStep && (
+                <StepContent
+                  step={currentStep}
+                  completion={currentCompletion}
+                  currentStepIndex={currentStepIndex}
+                  totalSteps={steps.length}
+                  isStepCompleted={isStepCompleted}
+                  allStepsCompleted={allStepsCompleted}
+                  actionLoading={actionLoading}
+                  completing={completing}
+                  attemptId={attemptId}
+                  reviewMode={reviewMode}
+                  onPrevious={() => handleNavigateStep(currentStepIndex - 1)}
+                  onNext={() => handleNavigateStep(currentStepIndex + 1)}
+                  onCompleteStep={handleCompleteStep}
+                  onFinishTraining={handleCompleteTraining}
+                  onMarkManualOpened={handleMarkManualOpened}
+                  onMarkMediaCompleted={handleMarkMediaCompleted}
+                  onTakeQuiz={() => {
+                    const quizId = currentStep.quizzes?.[0]?.id
+                    if (quizId) {
+                      navigate(`/training/${attemptId}/quiz/${quizId}`)
+                    }
+                  }}
+                />
+              )}
+            </div>
+          </div>
         </div>
       </div>
 

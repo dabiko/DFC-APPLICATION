@@ -3,7 +3,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Loader2, AlertTriangle } from 'lucide-react'
+import { Plus, Loader2, AlertTriangle, FileText } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { ProcedureCard } from './ProcedureCard'
 import { ProcedureFilters } from './ProcedureFilters'
@@ -45,7 +45,7 @@ export function ProceduresTab() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Procedures</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -54,7 +54,7 @@ export function ProceduresTab() {
         </div>
         <button
           onClick={() => navigate('/procedures/new')}
-          className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 sm:w-auto"
         >
           <Plus className="h-4 w-4" />
           New Procedure
@@ -82,8 +82,9 @@ export function ProceduresTab() {
           </button>
         </div>
       ) : procedures.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 py-12 dark:border-gray-600">
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+        <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 px-4 py-16 dark:border-gray-600">
+          <FileText className="mb-3 h-10 w-10 text-gray-300 dark:text-gray-600" />
+          <p className="text-center text-sm text-gray-500 dark:text-gray-400">
             {filters.search || filters.state
               ? 'No procedures match your filters.'
               : 'No procedures yet. Create your first one!'}
@@ -99,7 +100,7 @@ export function ProceduresTab() {
           )}
         </div>
       ) : (
-        <div className="grid gap-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {procedures.map((proc) => (
             <ProcedureCard
               key={proc.id}
