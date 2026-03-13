@@ -5,8 +5,9 @@
  * Allows admins/managers to view, create, and manage training assignments.
  */
 
-import { useState, useEffect, useCallback } from 'react'
-import { Users, RefreshCw, Search, Loader2, BarChart3 } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { Users, RefreshCw, Search, Loader2, BarChart3, ChevronDown, Check } from 'lucide-react'
+import { cn } from '@/utils/cn'
 import { useLogout } from '@/hooks/useLogout'
 import { ThreePanelLayout } from '@/components/Layout/ThreePanelLayout'
 import { DashboardHeader } from '@/components/Dashboard/DashboardHeader'
@@ -188,19 +189,7 @@ export function TrainingAssignmentsPage() {
                         className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                       />
                     </div>
-                    <select
-                      value={filter}
-                      onChange={(e) => setFilter(e.target.value)}
-                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-                    >
-                      <option value="all">All Status</option>
-                      <option value="assigned">Assigned</option>
-                      <option value="in_progress">In Progress</option>
-                      <option value="completed">Completed</option>
-                      <option value="failed">Failed</option>
-                      <option value="overdue">Overdue</option>
-                      <option value="waived">Waived</option>
-                    </select>
+                    <StatusFilterDropdown value={filter} onChange={setFilter} />
                   </div>
 
                   {/* Assignments Table */}
@@ -286,6 +275,85 @@ export function TrainingAssignmentsPage() {
         </div>
       }
     />
+  )
+}
+
+/* ─── Status Filter Dropdown ─── */
+
+const STATUS_OPTIONS = [
+  { value: 'all', label: 'All Status', dot: 'bg-gray-400' },
+  { value: 'assigned', label: 'Assigned', dot: 'bg-gray-400' },
+  { value: 'in_progress', label: 'In Progress', dot: 'bg-blue-500' },
+  { value: 'completed', label: 'Completed', dot: 'bg-green-500' },
+  { value: 'failed', label: 'Failed', dot: 'bg-red-500' },
+  { value: 'overdue', label: 'Overdue', dot: 'bg-orange-500' },
+  { value: 'waived', label: 'Waived', dot: 'bg-purple-500' },
+]
+
+function StatusFilterDropdown({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (value: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const selected = STATUS_OPTIONS.find((o) => o.value === value) || STATUS_OPTIONS[0]
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className={cn(
+          'flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors',
+          'border-gray-300 bg-white hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:hover:bg-gray-700',
+          'focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
+        )}
+      >
+        <span className={cn('h-2 w-2 rounded-full', selected.dot)} />
+        <span className="text-gray-700 dark:text-gray-200">{selected.label}</span>
+        <ChevronDown
+          className={cn('h-4 w-4 text-gray-400 transition-transform', open && 'rotate-180')}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-600 dark:bg-gray-800">
+          {STATUS_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              onClick={() => {
+                onChange(option.value)
+                setOpen(false)
+              }}
+              className={cn(
+                'flex w-full items-center gap-2.5 px-3 py-2 text-sm transition-colors',
+                value === option.value
+                  ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
+                  : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700/50'
+              )}
+            >
+              <span className={cn('h-2 w-2 rounded-full shrink-0', option.dot)} />
+              <span className="flex-1 text-left">{option.label}</span>
+              {value === option.value && (
+                <Check className="h-3.5 w-3.5 shrink-0 text-blue-600 dark:text-blue-400" />
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 

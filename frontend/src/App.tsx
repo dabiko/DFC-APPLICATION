@@ -43,6 +43,7 @@ import { MyTrainingPage } from './pages/MyTrainingPage'
 import { TrainingPlayerPage } from './pages/TrainingPlayerPage'
 import { QuizTakingPage } from './pages/QuizTakingPage'
 import { TrainingAssignmentsPage } from './pages/TrainingAssignmentsPage'
+import { TraineeDetailPage } from './pages/TraineeDetailPage'
 import { TrainingEvidencePage } from './pages/TrainingEvidencePage'
 import { Navigate } from 'react-router-dom'
 
@@ -331,6 +332,16 @@ function App() {
                     pageName="Training Assignments"
                   >
                     <TrainingAssignmentsPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Trainee Detail - Admin/Manager */}
+              <Route
+                path="/procedures/assignments/trainee/:userId"
+                element={
+                  <ProtectedRoute requiredRole={['admin', 'manager']} pageName="Trainee Detail">
+                    <TraineeDetailPage />
                   </ProtectedRoute>
                 }
               />

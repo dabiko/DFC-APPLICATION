@@ -1,7 +1,8 @@
 /**
- * AssignmentList — Filterable assignment table.
+ * AssignmentList — Filterable assignment table with clickable trainees.
  */
 
+import { useNavigate } from 'react-router-dom'
 import { Users, Loader2, AlertTriangle } from 'lucide-react'
 import type { ProcedureAssignment } from '@/services/assignmentService'
 import { AssignmentStatusBadge } from './AssignmentStatusBadge'
@@ -14,6 +15,8 @@ interface AssignmentListProps {
 }
 
 export function AssignmentList({ assignments, loading, error, onWaive }: AssignmentListProps) {
+  const navigate = useNavigate()
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -56,6 +59,12 @@ export function AssignmentList({ assignments, loading, error, onWaive }: Assignm
               Status
             </th>
             <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+              Score
+            </th>
+            <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+              Attempts
+            </th>
+            <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
               Due Date
             </th>
             <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
@@ -69,8 +78,13 @@ export function AssignmentList({ assignments, loading, error, onWaive }: Assignm
         <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
           {assignments.map((a) => (
             <tr key={a.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-              <td className="px-4 py-3 text-gray-900 dark:text-gray-100 font-medium">
-                {a.assigned_to_name}
+              <td className="px-4 py-3">
+                <button
+                  onClick={() => navigate(`/procedures/assignments/trainee/${a.assignee}`)}
+                  className="text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400 dark:hover:text-blue-300 font-medium text-left"
+                >
+                  {a.assignee_name || a.assigned_to_name}
+                </button>
               </td>
               <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
                 {a.procedure_title}
@@ -78,6 +92,31 @@ export function AssignmentList({ assignments, loading, error, onWaive }: Assignm
               </td>
               <td className="px-4 py-3">
                 <AssignmentStatusBadge status={a.status} />
+              </td>
+              <td className="px-4 py-3 text-xs">
+                {a.completion_score != null ? (
+                  <span
+                    className={
+                      a.status === 'completed'
+                        ? 'font-medium text-green-600 dark:text-green-400'
+                        : 'font-medium text-red-500 dark:text-red-400'
+                    }
+                  >
+                    {a.completion_score}%
+                  </span>
+                ) : (
+                  <span className="text-gray-400">—</span>
+                )}
+              </td>
+              <td className="px-4 py-3 text-xs text-gray-500">
+                {a.attempts_used > 0 ? (
+                  <span>
+                    {a.attempts_used}
+                    {a.max_training_attempts > 0 ? ` / ${a.max_training_attempts}` : ''}
+                  </span>
+                ) : (
+                  <span className="text-gray-400">—</span>
+                )}
               </td>
               <td className="px-4 py-3 text-gray-500 text-xs">
                 {a.due_date ? new Date(a.due_date).toLocaleDateString() : '—'}

@@ -12,6 +12,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.db.models import Count, Avg, Q, F
 from django.http import HttpResponse
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from datetime import timedelta, date
 
@@ -1185,6 +1186,17 @@ class ProcedureAssignmentViewSet(viewsets.ModelViewSet):
         if assignee:
             qs = qs.filter(assignee_id=assignee)
 
+        # Free-text search by trainee name or procedure title
+        search = self.request.query_params.get('search', '').strip()
+        if search:
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(assignee__first_name__icontains=search)
+                | Q(assignee__last_name__icontains=search)
+                | Q(assignee__username__icontains=search)
+                | Q(procedure_version__title__icontains=search)
+            )
+
         return qs
 
     def get_serializer_class(self):
@@ -1195,7 +1207,7 @@ class ProcedureAssignmentViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ['create']:
             return [permissions.IsAuthenticated(), (IsProcedureAdmin | IsProcedureManager)()]
-        if self.action in ['waive', 'dashboard', 'analytics']:
+        if self.action in ['waive', 'dashboard', 'analytics', 'trainee_detail']:
             return [permissions.IsAuthenticated(), (IsProcedureAdmin | IsProcedureManager)()]
         return [permissions.IsAuthenticated()]
 
@@ -1615,6 +1627,156 @@ class ProcedureAssignmentViewSet(viewsets.ModelViewSet):
             'step_bottlenecks': step_bottlenecks,
             'quiz_performance': quiz_performance,
             'procedure_comparison': procedure_comparison,
+        })
+
+    @action(detail=False, methods=['get'], url_path='trainee/(?P<user_id>[0-9]+)')
+    def trainee_detail(self, request, user_id=None):
+        """
+        Detailed training history for a specific trainee.
+        Returns user info, aggregate stats, and full assignment/attempt history.
+        """
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+
+        org = request.user.organization
+        trainee = get_object_or_404(User, id=user_id, organization=org)
+
+        # ── Assignments with deep prefetch ────────────────────────────
+        assignments_qs = (
+            ProcedureAssignment.objects
+            .filter(organization=org, assignee=trainee)
+            .select_related(
+                'procedure_version',
+                'procedure_version__procedure',
+            )
+            .prefetch_related(
+                models.Prefetch(
+                    'attempts',
+                    queryset=TrainingAttempt.objects.order_by('attempt_number').prefetch_related(
+                        models.Prefetch(
+                            'quiz_attempts',
+                            queryset=QuizAttempt.objects.select_related('version_quiz').order_by('attempt_number'),
+                        ),
+                        models.Prefetch(
+                            'step_completions',
+                            queryset=StepCompletion.objects.select_related('version_step').order_by('version_step__order'),
+                        ),
+                    ),
+                ),
+            )
+            .order_by('-assigned_at')
+        )
+
+        # ── Aggregate stats ───────────────────────────────────────────
+        total = assignments_qs.count()
+        status_counts = assignments_qs.values('status').annotate(count=Count('id'))
+        counts = {item['status']: item['count'] for item in status_counts}
+
+        completed = counts.get('completed', 0)
+        completed_qs = assignments_qs.filter(status='completed')
+        avg_score = completed_qs.aggregate(avg=Avg('completion_score'))['avg'] or 0
+
+        # Average completion days
+        avg_days = 0
+        if completed > 0:
+            completed_with_time = completed_qs.filter(completed_at__isnull=False)
+            if completed_with_time.exists():
+                total_days = sum(
+                    (a.completed_at.date() - a.assigned_at.date()).days
+                    for a in completed_with_time
+                )
+                avg_days = round(total_days / completed_with_time.count(), 1)
+
+        # Pass rate from training attempts
+        trainee_attempts = TrainingAttempt.objects.filter(
+            assignment__in=assignments_qs,
+            status__in=['passed', 'failed'],
+        )
+        total_attempts_count = trainee_attempts.count()
+        passed_attempts_count = trainee_attempts.filter(status='passed').count()
+        failed_attempts_count = trainee_attempts.filter(status='failed').count()
+        pass_rate = round(passed_attempts_count / total_attempts_count * 100, 1) if total_attempts_count > 0 else 0
+
+        stats = {
+            'total_assignments': total,
+            'completed': completed,
+            'in_progress': counts.get('in_progress', 0),
+            'failed': counts.get('failed', 0),
+            'overdue': counts.get('overdue', 0),
+            'waived': counts.get('waived', 0),
+            'failed_attempts': failed_attempts_count,
+            'total_attempts': total_attempts_count,
+            'average_score': round(float(avg_score), 1),
+            'pass_rate': pass_rate,
+            'avg_completion_days': avg_days,
+        }
+
+        # ── Build assignments list ────────────────────────────────────
+        assignments_data = []
+        for assignment in assignments_qs:
+            pv = assignment.procedure_version
+
+            attempts_data = []
+            for attempt in assignment.attempts.all():
+                # Quiz results for this attempt
+                quiz_results = []
+                for qa in attempt.quiz_attempts.all():
+                    quiz_results.append({
+                        'quiz_title': qa.version_quiz.title,
+                        'score_percent': float(qa.score_percent) if qa.score_percent is not None else None,
+                        'passed': qa.passed,
+                        'attempt_number': qa.attempt_number,
+                        'time_spent_seconds': qa.time_spent_seconds,
+                    })
+
+                # Step completions for this attempt
+                step_completions = []
+                for sc in attempt.step_completions.all():
+                    step_completions.append({
+                        'step_title': sc.version_step.title,
+                        'step_order': sc.version_step.order,
+                        'status': sc.status,
+                        'time_spent_seconds': sc.time_spent_seconds,
+                        'started_at': sc.started_at.isoformat() if sc.started_at else None,
+                        'completed_at': sc.completed_at.isoformat() if sc.completed_at else None,
+                    })
+
+                attempts_data.append({
+                    'attempt_number': attempt.attempt_number,
+                    'status': attempt.status,
+                    'started_at': attempt.started_at.isoformat() if attempt.started_at else None,
+                    'completed_at': attempt.completed_at.isoformat() if attempt.completed_at else None,
+                    'total_time_seconds': attempt.total_time_seconds,
+                    'total_score': float(attempt.total_score) if attempt.total_score is not None else None,
+                    'steps_completed': attempt.steps_completed,
+                    'total_steps': attempt.total_steps,
+                    'quiz_results': quiz_results,
+                    'step_completions': step_completions,
+                })
+
+            assignments_data.append({
+                'id': str(assignment.id),
+                'procedure_title': pv.title,
+                'procedure_id': str(pv.procedure_id),
+                'version_number': pv.version_number,
+                'status': assignment.status,
+                'due_date': str(assignment.due_date),
+                'assigned_at': assignment.assigned_at.isoformat() if assignment.assigned_at else None,
+                'completion_score': float(assignment.completion_score) if assignment.completion_score is not None else None,
+                'completed_at': assignment.completed_at.isoformat() if assignment.completed_at else None,
+                'max_training_attempts': assignment.max_training_attempts,
+                'attempts': attempts_data,
+            })
+
+        return Response({
+            'user': {
+                'user_id': trainee.id,
+                'full_name': trainee.get_full_name(),
+                'email': trainee.email,
+                'department': trainee.department.name if trainee.department_id else None,
+            },
+            'stats': stats,
+            'assignments': assignments_data,
         })
 
 

@@ -43,7 +43,10 @@ export function AssignmentStatusBadge({ status }: AssignmentStatusBadgeProps) {
 
   return (
     <span
-      className={cn('flex items-center gap-1 rounded-full px-2 py-0.5 text-xs w-fit', config.color)}
+      className={cn(
+        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs whitespace-nowrap w-fit',
+        config.color
+      )}
     >
       <Icon className="h-3 w-3" />
       {config.label}

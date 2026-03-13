@@ -20,6 +20,8 @@ export interface ProcedureAssignment {
   procedure_title: string
   version: string
   version_number: number
+  assignee: number
+  assignee_name: string
   assigned_to: string
   assigned_to_name: string
   assigned_by: string
@@ -122,6 +124,76 @@ export interface ContentAnalytics {
 }
 
 // =============================================================================
+// Trainee Detail Types
+// =============================================================================
+
+export interface TraineeQuizResult {
+  quiz_title: string
+  score_percent: number | null
+  passed: boolean
+  attempt_number: number
+  time_spent_seconds: number
+}
+
+export interface TraineeStepResult {
+  step_title: string
+  step_order: number
+  status: string
+  time_spent_seconds: number
+  started_at: string | null
+  completed_at: string | null
+}
+
+export interface TraineeAttemptDetail {
+  id: string
+  attempt_number: number
+  status: string
+  started_at: string
+  completed_at: string | null
+  total_time_seconds: number
+  total_score: number | null
+  steps_completed: number
+  total_steps: number
+  quiz_results: TraineeQuizResult[]
+  step_completions: TraineeStepResult[]
+}
+
+export interface TraineeAssignmentDetail {
+  id: string
+  procedure_title: string
+  procedure_id: string
+  version_number: number
+  status: string
+  due_date: string | null
+  assigned_at: string
+  completion_score: number | null
+  completed_at: string | null
+  max_training_attempts: number
+  attempts: TraineeAttemptDetail[]
+}
+
+export interface TraineeDetailData {
+  user_id: number
+  full_name: string
+  email: string
+  department: string | null
+  stats: {
+    total_assignments: number
+    completed: number
+    in_progress: number
+    failed: number
+    overdue: number
+    waived: number
+    failed_attempts: number
+    total_attempts: number
+    average_score: number
+    pass_rate: number
+    avg_completion_days: number
+  }
+  assignments: TraineeAssignmentDetail[]
+}
+
+// =============================================================================
 // Assignment CRUD
 // =============================================================================
 
@@ -174,6 +246,16 @@ export const getContentAnalytics = async (
   return response.data
 }
 
+export const getTraineeDetail = async (userId: number | string): Promise<TraineeDetailData> => {
+  const response = await apiClient.get(`${BASE}/assignments/trainee/${userId}/`)
+  const data = response.data
+  return {
+    ...data.user,
+    stats: data.stats,
+    assignments: data.assignments,
+  }
+}
+
 // =============================================================================
 // Convenience export
 // =============================================================================
@@ -185,4 +267,5 @@ export const assignmentService = {
   waive: waiveAssignment,
   dashboard: getAssignmentDashboard,
   analytics: getContentAnalytics,
+  traineeDetail: getTraineeDetail,
 }
