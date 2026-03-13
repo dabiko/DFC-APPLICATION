@@ -189,7 +189,7 @@ class VersionStepQuizSummarySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = VersionQuiz
-        fields = ['id', 'title', 'quiz_type']
+        fields = ['id', 'title', 'quiz_type', 'max_attempts']
 
 
 class ProcedureVersionStepSerializer(serializers.ModelSerializer):
@@ -343,6 +343,7 @@ class CreateAssignmentSerializer(serializers.Serializer):
     departments = serializers.ListField(child=serializers.IntegerField(), required=False, default=[])
     roles = serializers.ListField(child=serializers.CharField(), required=False, default=[])
     due_date = serializers.DateField()
+    max_training_attempts = serializers.IntegerField(required=False, default=0, min_value=0)
 
 
 class WaiveAssignmentSerializer(serializers.Serializer):
@@ -362,11 +363,17 @@ class StepCompletionSerializer(serializers.ModelSerializer):
 
 
 class QuestionResponseSerializer(serializers.ModelSerializer):
+    selected_option_ids = serializers.PrimaryKeyRelatedField(
+        source='selected_options', many=True, read_only=True,
+    )
+    text_answer = serializers.CharField(source='text_response', read_only=True)
+    ordering_answer = serializers.JSONField(source='submitted_order', read_only=True)
+
     class Meta:
         model = QuestionResponse
-        fields = '__all__'
-        read_only_fields = ['id', 'quiz_attempt', 'is_correct', 'points_earned',
-                            'graded_by', 'graded_at', 'answered_at']
+        fields = ['id', 'quiz_attempt', 'version_question', 'selected_option_ids',
+                  'text_answer', 'ordering_answer', 'is_correct', 'points_earned']
+        read_only_fields = ['id', 'quiz_attempt', 'is_correct', 'points_earned']
 
 
 class QuizAttemptSerializer(serializers.ModelSerializer):
@@ -389,6 +396,7 @@ class TrainingAttemptSerializer(serializers.ModelSerializer):
     version_number = serializers.IntegerField(source='assignment.procedure_version.version_number', read_only=True)
     procedure_id = serializers.UUIDField(source='assignment.procedure_version.procedure_id', read_only=True)
     procedure_title = serializers.CharField(source='assignment.procedure_version.title', read_only=True)
+    max_training_attempts = serializers.IntegerField(source='assignment.max_training_attempts', read_only=True)
 
     class Meta:
         model = TrainingAttempt

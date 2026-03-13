@@ -14,7 +14,12 @@ import {
   ChevronRight,
   Send,
 } from 'lucide-react'
-import { startQuiz, submitQuiz, type QuizAttemptResponse } from '@/services/trainingService'
+import {
+  startQuiz,
+  submitQuiz,
+  type QuizAttemptResponse,
+  type SubmitQuizResult,
+} from '@/services/trainingService'
 import apiClient from '@/services/apiClient'
 import { QuizTimer } from './QuizTimer'
 import { QuizProgress } from './QuizProgress'
@@ -39,6 +44,7 @@ export function QuizPlayer({ attemptId, quizId }: QuizPlayerProps) {
   const [error, setError] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState(false)
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null)
+  const [correctAnswers, setCorrectAnswers] = useState<Record<string, string[]> | null>(null)
   const [maxAttemptsInfo, setMaxAttemptsInfo] = useState<{
     bestScore: number | null
     passed: boolean
@@ -160,8 +166,13 @@ export function QuizPlayer({ attemptId, quizId }: QuizPlayerProps) {
           ordering_answer: answer?.ordering_answer || [],
         }
       })
-      const result = await submitQuiz(attemptId, quizAttempt.id, responses)
-      setQuizAttempt(result)
+      const { quizAttempt: attemptResult, correctAnswers: answers } = await submitQuiz(
+        attemptId,
+        quizAttempt.id,
+        responses
+      )
+      setQuizAttempt(attemptResult)
+      setCorrectAnswers(answers)
       setSubmitted(true)
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Failed to submit quiz')
@@ -282,7 +293,7 @@ export function QuizPlayer({ attemptId, quizId }: QuizPlayerProps) {
         <div className="max-w-2xl mx-auto">
           {submitted && quiz && quizAttempt ? (
             <QuizResultsPanel
-              quiz={quiz}
+              quiz={enrichQuizWithAnswers(quiz, correctAnswers)}
               quizAttempt={quizAttempt}
               onBack={() => navigate(`/training/${attemptId}`)}
             />
@@ -358,4 +369,25 @@ export function QuizPlayer({ attemptId, quizId }: QuizPlayerProps) {
       </div>
     </div>
   )
+}
+
+/** Enrich quiz options with is_correct from backend correct_answers map. */
+function enrichQuizWithAnswers(
+  quiz: VersionQuiz,
+  correctAnswers: Record<string, string[]> | null
+): VersionQuiz {
+  if (!correctAnswers) return quiz
+  return {
+    ...quiz,
+    questions: quiz.questions.map((q) => {
+      const correctIds = correctAnswers[q.id] || []
+      return {
+        ...q,
+        options: q.options.map((opt) => ({
+          ...opt,
+          is_correct: correctIds.includes(opt.id),
+        })),
+      }
+    }),
+  }
 }

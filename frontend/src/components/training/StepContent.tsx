@@ -5,7 +5,7 @@
 import { Clock, CheckCircle, XCircle, Timer, Target, Lightbulb, FlaskConical } from 'lucide-react'
 import type { VersionStep, StepCompletionResponse } from './types'
 import { AttachmentViewer } from './AttachmentViewer'
-import { StepGateBlocker } from './StepGateBlocker'
+import { StepGateBlocker, type QuizAttemptInfo } from './StepGateBlocker'
 import { StepNavigationButtons } from './StepNavigationButtons'
 
 interface StepContentProps {
@@ -23,6 +23,7 @@ interface StepContentProps {
   onNext: () => void
   onCompleteStep: () => void
   onFinishTraining: () => void
+  quizAttemptInfo?: QuizAttemptInfo | null
   onMarkManualOpened: () => void
   onMarkMediaCompleted: () => void
   onTakeQuiz: () => void
@@ -39,6 +40,7 @@ export function StepContent({
   completing,
   attemptId,
   reviewMode = false,
+  quizAttemptInfo,
   onPrevious,
   onNext,
   onCompleteStep,
@@ -120,7 +122,12 @@ export function StepContent({
           </div>
         )}
 
-        <AttachmentViewer attachments={step.attachments} />
+        <AttachmentViewer
+          attachments={step.attachments}
+          videoUrl={step.video_url || undefined}
+          onMediaCompleted={!reviewMode ? onMarkMediaCompleted : undefined}
+          mediaCompleted={!!completion?.media_completed_at}
+        />
 
         {/* Review mode: step performance summary */}
         {reviewMode && completion && (
@@ -187,6 +194,7 @@ export function StepContent({
             completion={completion}
             actionLoading={actionLoading}
             attemptId={attemptId}
+            quizAttemptInfo={quizAttemptInfo}
             onMarkManualOpened={onMarkManualOpened}
             onMarkMediaCompleted={onMarkMediaCompleted}
             onTakeQuiz={onTakeQuiz}

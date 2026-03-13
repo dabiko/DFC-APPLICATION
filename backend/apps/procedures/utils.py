@@ -307,9 +307,14 @@ def can_advance_to_next_step(step_completion):
     """
     Check if a trainee can advance past a step.
     Returns (can_advance, blocking_reasons).
+
+    When a quiz gate exists and all attempts are exhausted without passing,
+    the trainee is allowed to advance (the step is marked as failed rather
+    than blocking them permanently).
     """
     version_step = step_completion.version_step
     reasons = []
+    quiz_failed_exhausted = False
 
     if version_step.require_manual_open and not step_completion.manual_opened_at:
         reasons.append("You must open the attached manual before continuing.")
@@ -320,13 +325,20 @@ def can_advance_to_next_step(step_completion):
     if version_step.require_quiz_pass:
         quiz = version_step.quizzes.first()
         if quiz:
-            passed_attempt = step_completion.attempt.quiz_attempts.filter(
-                version_quiz=quiz, passed=True
-            ).exists()
-            if not passed_attempt:
-                reasons.append("You must pass the quiz before continuing.")
+            quiz_attempts = step_completion.attempt.quiz_attempts.filter(
+                version_quiz=quiz, completed_at__isnull=False
+            )
+            has_passed = quiz_attempts.filter(passed=True).exists()
+            if not has_passed:
+                attempts_used = quiz_attempts.count()
+                max_attempts = quiz.max_attempts
+                if max_attempts > 0 and attempts_used >= max_attempts:
+                    # All attempts exhausted — allow advancing but flag as failed
+                    quiz_failed_exhausted = True
+                else:
+                    reasons.append("You must pass the quiz before continuing.")
 
-    return (len(reasons) == 0, reasons)
+    return (len(reasons) == 0, reasons, quiz_failed_exhausted)
 
 
 def create_assignments(data, assigned_by, org):
@@ -340,6 +352,7 @@ def create_assignments(data, assigned_by, org):
 
     version = ProcedureVersion.objects.get(id=data['procedure_version_id'])
     due_date = data['due_date']
+    max_training_attempts = data.get('max_training_attempts', 0)
     assignee_ids = set()
 
     # Direct user assignments
@@ -378,6 +391,7 @@ def create_assignments(data, assigned_by, org):
             assigned_by=assigned_by,
             assignment_source=source,
             due_date=due_date,
+            max_training_attempts=max_training_attempts,
         )
         assignments.append(assignment)
 

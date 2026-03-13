@@ -1679,6 +1679,22 @@ class TrainingViewSet(viewsets.GenericViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
 
+        # Check max training attempts
+        if assignment.max_training_attempts > 0:
+            completed_attempts = assignment.attempts.filter(
+                status__in=['passed', 'failed', 'completed']
+            ).count()
+            if completed_attempts >= assignment.max_training_attempts:
+                return Response(
+                    {
+                        'error': 'Maximum training attempts reached.',
+                        'max_attempts_reached': True,
+                        'attempts_used': completed_attempts,
+                        'max_attempts': assignment.max_training_attempts,
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
         # Check for existing in-progress attempt
         existing = assignment.attempts.select_related(
             'assignment__procedure_version',
@@ -1829,7 +1845,7 @@ class TrainingViewSet(viewsets.GenericViewSet):
         step_completion = _resolve_step_completion(attempt, request.data)
 
         # Validate gates
-        can_advance, reasons = can_advance_to_next_step(step_completion)
+        can_advance, reasons, quiz_failed_exhausted = can_advance_to_next_step(step_completion)
         if not can_advance:
             return Response({'can_advance': False, 'reasons': reasons}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -1846,8 +1862,9 @@ class TrainingViewSet(viewsets.GenericViewSet):
         attempt.save(update_fields=['steps_completed'])
 
         # Update trainee context with step result
+        step_result = 'failed' if quiz_failed_exhausted else 'passed'
         attempt.trainee_context.setdefault('step_results', {})
-        attempt.trainee_context['step_results'][str(step_completion.version_step_id)] = 'passed'
+        attempt.trainee_context['step_results'][str(step_completion.version_step_id)] = step_result
         attempt.save(update_fields=['trainee_context'])
 
         # Audit
@@ -1880,28 +1897,30 @@ class TrainingViewSet(viewsets.GenericViewSet):
         attempt = _qs.get()
         version_quiz = VersionQuiz.objects.get(id=quiz_id)
 
-        # Check max attempts
-        existing_count = attempt.quiz_attempts.filter(version_quiz=version_quiz).count()
+        # Clean up abandoned quiz attempts (started but never submitted)
+        attempt.quiz_attempts.filter(
+            version_quiz=version_quiz, completed_at__isnull=True,
+        ).delete()
+
+        # Check max attempts (only count completed ones)
+        existing_count = attempt.quiz_attempts.filter(
+            version_quiz=version_quiz, completed_at__isnull=False,
+        ).count()
         if version_quiz.max_attempts > 0 and existing_count >= version_quiz.max_attempts:
-            best = attempt.quiz_attempts.filter(version_quiz=version_quiz).order_by('-score_percent').first()
+            best = attempt.quiz_attempts.filter(
+                version_quiz=version_quiz, completed_at__isnull=False,
+            ).order_by('-score_percent').first()
             return Response(
                 {
                     'error': f'Maximum attempts ({version_quiz.max_attempts}) reached.',
                     'max_attempts_reached': True,
                     'attempts_used': existing_count,
                     'max_attempts': version_quiz.max_attempts,
-                    'best_score': float(best.score_percent) if best else None,
+                    'best_score': float(best.score_percent) if best and best.score_percent is not None else 0,
                     'passed': best.passed if best else False,
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
-
-        # Check for existing in-progress quiz attempt
-        in_progress = attempt.quiz_attempts.filter(
-            version_quiz=version_quiz, completed_at__isnull=True
-        ).first()
-        if in_progress:
-            return Response(QuizAttemptSerializer(in_progress).data)
 
         quiz_attempt = QuizAttempt.objects.create(
             training_attempt=attempt,
@@ -2037,10 +2056,21 @@ class TrainingViewSet(viewsets.GenericViewSet):
             },
         )
 
-        return Response({
+        response_data = {
             'quiz_attempt': QuizAttemptSerializer(quiz_attempt).data,
             'result': result,
-        })
+        }
+
+        # Include correct answers when quiz allows showing them after submission
+        if version_quiz.show_correct_answers_after:
+            correct_answers = {}
+            for vq in version_quiz.questions.prefetch_related('options').all():
+                correct_answers[str(vq.id)] = [
+                    str(opt.id) for opt in vq.options.filter(is_correct=True)
+                ]
+            response_data['correct_answers'] = correct_answers
+
+        return Response(response_data)
 
     @action(detail=True, methods=['post'], url_path='complete_training')
     def complete_training(self, request, pk=None):
@@ -2112,8 +2142,18 @@ class TrainingViewSet(viewsets.GenericViewSet):
             assignment.completion_score = attempt.total_score
             assignment.save(update_fields=['status', 'completed_at', 'completion_score'])
         else:
-            # Check if more attempts are possible (no global max on assignment — handled per quiz)
-            assignment.save()  # stays in_progress
+            # Check if more attempts are possible
+            if assignment.max_training_attempts > 0:
+                completed_attempts = assignment.attempts.filter(
+                    status__in=['passed', 'failed', 'completed']
+                ).count()
+                if completed_attempts >= assignment.max_training_attempts:
+                    assignment.status = 'failed'
+                    assignment.save(update_fields=['status'])
+                else:
+                    assignment.save()  # stays in_progress
+            else:
+                assignment.save()  # unlimited — stays in_progress
 
         # Audit
         audit_action = (ProcedureAuditLog.Action.TRAINING_COMPLETED if attempt.status == 'passed'

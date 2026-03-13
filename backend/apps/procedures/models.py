@@ -710,6 +710,9 @@ class ProcedureAssignment(models.Model):
     due_date = models.DateField()
     assigned_at = models.DateTimeField(auto_now_add=True)
 
+    # Training attempt limits (0 = unlimited)
+    max_training_attempts = models.PositiveIntegerField(default=0)
+
     # Completion
     completed_at = models.DateTimeField(null=True, blank=True)
     completion_score = models.DecimalField(

@@ -23,7 +23,10 @@ export interface TrainingAttemptResponse {
   started_at: string
   completed_at: string | null
   score: number | null
+  attempt_number: number
+  max_training_attempts: number
   step_completions: StepCompletionResponse[]
+  quiz_attempts: QuizAttemptResponse[]
 }
 
 export interface StepCompletionResponse {
@@ -126,6 +129,11 @@ export const startQuiz = async (
   return response.data
 }
 
+export interface SubmitQuizResult {
+  quizAttempt: QuizAttemptResponse
+  correctAnswers: Record<string, string[]> | null
+}
+
 export const submitQuiz = async (
   attemptId: string,
   quizAttemptId: string,
@@ -135,12 +143,16 @@ export const submitQuiz = async (
     text_answer?: string
     ordering_answer?: string[]
   }[]
-): Promise<QuizAttemptResponse> => {
+): Promise<SubmitQuizResult> => {
   const response = await apiClient.post(`${BASE}/training/${attemptId}/submit_quiz/`, {
     quiz_attempt_id: quizAttemptId,
     responses,
   })
-  return response.data
+  const data = response.data
+  return {
+    quizAttempt: data.quiz_attempt ?? data,
+    correctAnswers: data.correct_answers ?? null,
+  }
 }
 
 export const completeTraining = async (attemptId: string): Promise<TrainingAttemptResponse> => {

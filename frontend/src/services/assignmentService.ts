@@ -53,6 +53,7 @@ export interface CreateAssignmentData {
   departments?: number[]
   roles?: string[]
   due_date: string
+  max_training_attempts?: number
 }
 
 // =============================================================================

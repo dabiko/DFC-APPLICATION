@@ -109,7 +109,14 @@ export function MyTrainingPage() {
       const attempt = await startTraining(assignmentId)
       navigate(`/training/${attempt.id}`)
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to start training')
+      const data = err?.response?.data
+      if (data?.max_attempts_reached) {
+        // Refresh assignments to show updated status
+        loadAssignments()
+        setError(`Maximum training attempts (${data.max_attempts}) reached. Contact your manager.`)
+      } else {
+        setError(data?.error || data?.detail || 'Failed to start training')
+      }
     } finally {
       setStartingId(null)
     }

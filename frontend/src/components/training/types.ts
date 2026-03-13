@@ -8,6 +8,7 @@ export interface VersionStepQuizSummary {
   id: string
   title: string
   quiz_type: string
+  max_attempts: number
 }
 
 export interface VersionStep {
@@ -66,6 +67,7 @@ export interface VersionOption {
   text: string
   order: number
   correct_order: number | null
+  is_correct?: boolean
 }
 
 export interface QuestionAnswer {

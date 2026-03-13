@@ -3,7 +3,7 @@
  * content display, gates, and completion.
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Loader2, AlertTriangle, PlayCircle, ArrowLeft, Eye } from 'lucide-react'
 import {
@@ -21,6 +21,7 @@ import { StepSidebar } from './StepSidebar'
 import { StepContent } from './StepContent'
 import { StepProgressBar } from './StepProgressBar'
 import { TrainingCompletionModal } from './TrainingCompletionModal'
+import type { QuizAttemptInfo } from './StepGateBlocker'
 import type { VersionStep } from './types'
 
 interface TrainingPlayerProps {
@@ -226,6 +227,30 @@ export function TrainingPlayer({ attemptId, reviewMode = false }: TrainingPlayer
     })
   const isStepCompleted = currentCompletion?.status === 'completed'
 
+  const quizAttemptInfo: QuizAttemptInfo | null = useMemo(() => {
+    const quizSummary = currentStep?.quizzes?.[0]
+    if (!quizSummary || !attempt) return null
+    const quizId = quizSummary.id
+    const maxAttempts = quizSummary.max_attempts
+    const attempts = (attempt.quiz_attempts || []).filter(
+      (qa) => qa.version_quiz === quizId && qa.completed_at != null
+    )
+    const attemptsUsed = attempts.length
+    const best = attempts.reduce<{ score: number; passed: boolean } | null>((acc, qa) => {
+      if (!acc || qa.score > acc.score) return { score: qa.score, passed: qa.passed }
+      return acc
+    }, null)
+    const passed = attempts.some((qa) => qa.passed)
+    const exhausted = maxAttempts > 0 && attemptsUsed >= maxAttempts && !passed
+    return {
+      attemptsUsed,
+      maxAttempts,
+      bestScore: best?.score ?? null,
+      passed,
+      exhausted,
+    }
+  }, [currentStep, attempt])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -325,6 +350,7 @@ export function TrainingPlayer({ attemptId, reviewMode = false }: TrainingPlayer
                   completing={completing}
                   attemptId={attemptId}
                   reviewMode={reviewMode}
+                  quizAttemptInfo={quizAttemptInfo}
                   onPrevious={() => handleNavigateStep(currentStepIndex - 1)}
                   onNext={() => handleNavigateStep(currentStepIndex + 1)}
                   onCompleteStep={handleCompleteStep}
@@ -348,6 +374,8 @@ export function TrainingPlayer({ attemptId, reviewMode = false }: TrainingPlayer
         isOpen={showCompletionModal}
         passed={completionResult?.passed ?? false}
         score={completionResult?.score ?? null}
+        attemptNumber={attempt?.attempt_number}
+        maxTrainingAttempts={attempt?.max_training_attempts}
         onClose={() => setShowCompletionModal(false)}
         onBackToTraining={() => navigate('/my-training')}
       />

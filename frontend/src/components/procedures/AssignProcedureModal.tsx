@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   Search,
   Check,
+  RefreshCw,
 } from 'lucide-react'
 import { createAssignments } from '@/services/assignmentService'
 import { getUsers } from '@/services/userManagementService'
@@ -44,6 +45,7 @@ export function AssignProcedureModal({
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([])
   const [selectedDeptIds, setSelectedDeptIds] = useState<number[]>([])
   const [dueDate, setDueDate] = useState('')
+  const [maxTrainingAttempts, setMaxTrainingAttempts] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -62,6 +64,7 @@ export function AssignProcedureModal({
     setSelectedUserIds([])
     setSelectedDeptIds([])
     setDueDate('')
+    setMaxTrainingAttempts(0)
     setError(null)
     setSuccess(null)
     setUserSearch('')
@@ -144,6 +147,7 @@ export function AssignProcedureModal({
         assignees: selectedUserIds.length > 0 ? selectedUserIds : undefined,
         departments: selectedDeptIds.length > 0 ? selectedDeptIds : undefined,
         due_date: dueDate,
+        max_training_attempts: maxTrainingAttempts > 0 ? maxTrainingAttempts : undefined,
       })
       const count = (result as any)?.created ?? selectedUserIds.length + selectedDeptIds.length
       setSuccess(`${count} assignment(s) created successfully!`)
@@ -265,6 +269,30 @@ export function AssignProcedureModal({
                     placeholder="Select due date"
                     dateFormat="PP"
                   />
+                </div>
+
+                {/* Max Training Attempts */}
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    <RefreshCw className="h-4 w-4" />
+                    Max Training Attempts
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="number"
+                      min={0}
+                      value={maxTrainingAttempts}
+                      onChange={(e) =>
+                        setMaxTrainingAttempts(Math.max(0, parseInt(e.target.value) || 0))
+                      }
+                      className="w-24 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    />
+                    <span className="text-xs text-gray-400 dark:text-gray-500">
+                      {maxTrainingAttempts === 0
+                        ? 'Unlimited retries allowed'
+                        : `Trainee can attempt this training ${maxTrainingAttempts} time${maxTrainingAttempts !== 1 ? 's' : ''}`}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Assign to Users */}
