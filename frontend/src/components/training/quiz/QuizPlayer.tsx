@@ -39,10 +39,17 @@ export function QuizPlayer({ attemptId, quizId }: QuizPlayerProps) {
   const [error, setError] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState(false)
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null)
+  const [maxAttemptsInfo, setMaxAttemptsInfo] = useState<{
+    bestScore: number | null
+    passed: boolean
+    attemptsUsed: number
+    maxAttempts: number
+  } | null>(null)
 
   const loadQuiz = useCallback(async () => {
     setLoading(true)
     setError(null)
+    setMaxAttemptsInfo(null)
     try {
       const quizRes = await apiClient.get(`/procedures/version-quizzes/${quizId}/`)
       const quizData: VersionQuiz = quizRes.data
@@ -66,7 +73,17 @@ export function QuizPlayer({ attemptId, quizId }: QuizPlayerProps) {
       })
       setAnswers(initialAnswers)
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to load quiz')
+      const data = err?.response?.data
+      if (data?.max_attempts_reached) {
+        setMaxAttemptsInfo({
+          bestScore: data.best_score,
+          passed: data.passed,
+          attemptsUsed: data.attempts_used,
+          maxAttempts: data.max_attempts,
+        })
+      } else {
+        setError(data?.error || data?.detail || 'Failed to load quiz')
+      }
     } finally {
       setLoading(false)
     }
@@ -167,6 +184,44 @@ export function QuizPlayer({ attemptId, quizId }: QuizPlayerProps) {
       <div className="flex items-center justify-center py-12">
         <Loader2 className="h-6 w-6 animate-spin text-green-500" />
         <span className="ml-2 text-sm text-gray-500">Loading quiz...</span>
+      </div>
+    )
+  }
+
+  if (maxAttemptsInfo) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 px-6">
+        <div className="rounded-full bg-amber-100 p-4 dark:bg-amber-900/30">
+          <AlertTriangle className="h-8 w-8 text-amber-500" />
+        </div>
+        <h2 className="mt-4 text-lg font-semibold text-gray-900 dark:text-white">
+          Maximum Attempts Reached
+        </h2>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          You've used all {maxAttemptsInfo.maxAttempts} attempt
+          {maxAttemptsInfo.maxAttempts > 1 ? 's' : ''} for this quiz.
+        </p>
+        {maxAttemptsInfo.bestScore !== null && (
+          <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 px-6 py-3 text-center dark:border-gray-700 dark:bg-gray-800">
+            <p className="text-xs text-gray-500 dark:text-gray-400">Best Score</p>
+            <p
+              className={`text-2xl font-bold ${maxAttemptsInfo.passed ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+            >
+              {maxAttemptsInfo.bestScore}%
+            </p>
+            <p
+              className={`text-xs font-medium ${maxAttemptsInfo.passed ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+            >
+              {maxAttemptsInfo.passed ? 'Passed' : 'Failed'}
+            </p>
+          </div>
+        )}
+        <button
+          onClick={() => navigate(`/training/${attemptId}`)}
+          className="mt-6 rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700"
+        >
+          Back to Training
+        </button>
       </div>
     )
   }

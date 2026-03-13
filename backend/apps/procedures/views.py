@@ -1883,8 +1883,16 @@ class TrainingViewSet(viewsets.GenericViewSet):
         # Check max attempts
         existing_count = attempt.quiz_attempts.filter(version_quiz=version_quiz).count()
         if version_quiz.max_attempts > 0 and existing_count >= version_quiz.max_attempts:
+            best = attempt.quiz_attempts.filter(version_quiz=version_quiz).order_by('-score_percent').first()
             return Response(
-                {'error': f'Maximum attempts ({version_quiz.max_attempts}) reached.'},
+                {
+                    'error': f'Maximum attempts ({version_quiz.max_attempts}) reached.',
+                    'max_attempts_reached': True,
+                    'attempts_used': existing_count,
+                    'max_attempts': version_quiz.max_attempts,
+                    'best_score': float(best.score_percent) if best else None,
+                    'passed': best.passed if best else False,
+                },
                 status=status.HTTP_400_BAD_REQUEST
             )
 
