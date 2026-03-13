@@ -55,12 +55,26 @@ export function AttachmentViewer({
             <Video className="h-3.5 w-3.5" />
             Video
           </h3>
-          <MediaPlayer
-            src={videoUrl}
-            title="Step Video"
-            onComplete={onMediaCompleted}
-            isCompleted={mediaCompleted}
-          />
+          {isYouTubeOrVimeo(videoUrl) ? (
+            <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+                <iframe
+                  src={getEmbedUrl(videoUrl)}
+                  className="absolute inset-0 w-full h-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  title="Step Video"
+                />
+              </div>
+            </div>
+          ) : (
+            <MediaPlayer
+              src={videoUrl}
+              title="Step Video"
+              onComplete={onMediaCompleted}
+              isCompleted={mediaCompleted}
+            />
+          )}
         </div>
       )}
 

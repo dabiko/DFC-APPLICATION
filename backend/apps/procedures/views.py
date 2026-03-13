@@ -2088,7 +2088,7 @@ class TrainingViewSet(viewsets.GenericViewSet):
 
         # Check all applicable steps are completed or skipped
         incomplete_steps = attempt.step_completions.exclude(
-            status__in=['completed', 'skipped', 'quiz_passed']
+            status__in=['completed', 'skipped', 'quiz_passed', 'quiz_failed']
         ).count()
         if incomplete_steps > 0:
             return Response(

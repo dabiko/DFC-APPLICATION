@@ -90,7 +90,7 @@ function ManualGateRow({
         <span className="text-gray-700 dark:text-gray-300">
           {hasDocuments
             ? `Read: ${docs.map((d) => d.title || d.file_name).join(', ')}`
-            : 'Open manual/document'}
+            : 'I have read the step content'}
         </span>
       </div>
       {completion?.manual_opened_at ? (
@@ -111,7 +111,7 @@ function ManualGateRow({
           disabled={actionLoading}
           className="text-xs text-blue-600 hover:underline disabled:opacity-50"
         >
-          Mark as opened
+          Confirm
         </button>
       )}
     </div>
@@ -146,17 +146,13 @@ function MediaGateRow({
         <span className="flex items-center gap-1 text-xs text-green-600">
           <CheckCircle className="h-3 w-3" /> Done
         </span>
-      ) : hasVideo ? (
-        <span className="text-xs text-purple-500 dark:text-purple-400">
-          Watch the video above to complete
-        </span>
       ) : (
         <button
           onClick={onMarkMediaCompleted}
           disabled={actionLoading}
           className="text-xs text-purple-600 hover:underline disabled:opacity-50"
         >
-          Mark as completed
+          Mark as watched
         </button>
       )}
     </div>

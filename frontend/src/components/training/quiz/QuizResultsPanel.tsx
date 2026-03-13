@@ -40,7 +40,7 @@ export function QuizResultsPanel({ quiz, quizAttempt, onBack }: QuizResultsPanel
           {quizAttempt.passed ? 'Quiz Passed!' : 'Quiz Not Passed'}
         </h2>
         <p className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
-          {quizAttempt.score ?? 0}%
+          {quizAttempt.score_percent ?? 0}%
         </p>
         <p className="text-sm text-gray-500">
           Passing score: {quiz.passing_score_percent ?? 70}%{' · '}
@@ -68,7 +68,7 @@ export function QuizResultsPanel({ quiz, quizAttempt, onBack }: QuizResultsPanel
                 selectedOptionIds={response?.selected_option_ids || []}
                 textAnswer={response?.text_answer || ''}
                 isCorrect={isCorrect}
-                pointsAwarded={response?.points_awarded ?? 0}
+                pointsAwarded={response?.points_earned ?? 0}
               />
             )
           })}

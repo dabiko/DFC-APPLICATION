@@ -22,7 +22,7 @@ export interface TrainingAttemptResponse {
   status: string
   started_at: string
   completed_at: string | null
-  score: number | null
+  total_score: number | null
   attempt_number: number
   max_training_attempts: number
   step_completions: StepCompletionResponse[]
@@ -43,7 +43,9 @@ export interface StepCompletionResponse {
 export interface QuizAttemptResponse {
   id: string
   version_quiz: string
-  score: number
+  score_earned: number
+  score_possible: number
+  score_percent: number
   passed: boolean
   started_at: string
   completed_at: string | null
@@ -57,7 +59,7 @@ export interface QuestionResponseData {
   text_answer: string
   ordering_answer: string[]
   is_correct: boolean | null
-  points_awarded: number
+  points_earned: number
 }
 
 // =============================================================================

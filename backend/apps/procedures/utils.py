@@ -317,10 +317,21 @@ def can_advance_to_next_step(step_completion):
     quiz_failed_exhausted = False
 
     if version_step.require_manual_open and not step_completion.manual_opened_at:
-        reasons.append("You must open the attached manual before continuing.")
+        docs = version_step.attachments.filter(
+            attachment_type__in=['document', 'manual']
+        )
+        if docs.exists():
+            doc_names = ', '.join(d.title or d.file_name for d in docs[:3])
+            reasons.append(f"You must read the document(s): {doc_names}.")
+        else:
+            reasons.append("You must read the step content and confirm before continuing.")
 
     if version_step.require_media_completion and not step_completion.media_completed_at:
-        reasons.append("You must complete the media content before continuing.")
+        videos = version_step.attachments.filter(attachment_type='video')
+        if videos.exists() or version_step.video_url:
+            reasons.append("You must watch the video before continuing.")
+        else:
+            reasons.append("You must complete the media content before continuing.")
 
     if version_step.require_quiz_pass:
         quiz = version_step.quizzes.first()

@@ -33,6 +33,9 @@ export interface ProcedureAssignment {
   source: string
   created_at: string
   latest_attempt_id: string | null
+  max_training_attempts: number
+  attempts_used: number
+  completion_score: number | null
 }
 
 export interface AssignmentDashboard {

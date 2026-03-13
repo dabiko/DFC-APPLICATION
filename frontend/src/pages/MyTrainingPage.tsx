@@ -230,7 +230,7 @@ export function MyTrainingPage() {
                             <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
                               {assignment.procedure_title}
                             </h3>
-                            <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                            <div className="flex flex-wrap items-center gap-3 mt-1 text-xs text-gray-500">
                               <span
                                 className={cn(
                                   'flex items-center gap-1 rounded-full px-2 py-0.5',
@@ -241,6 +241,25 @@ export function MyTrainingPage() {
                                 {config.label}
                               </span>
                               <span>v{assignment.version_number}</span>
+                              {assignment.attempts_used > 0 && (
+                                <span className="text-gray-400 dark:text-gray-500">
+                                  Attempt {assignment.attempts_used}
+                                  {assignment.max_training_attempts > 0
+                                    ? ` of ${assignment.max_training_attempts}`
+                                    : ''}
+                                </span>
+                              )}
+                              {assignment.completion_score != null && (
+                                <span
+                                  className={
+                                    assignment.status === 'completed'
+                                      ? 'text-green-600 dark:text-green-400'
+                                      : 'text-red-500 dark:text-red-400'
+                                  }
+                                >
+                                  Score: {assignment.completion_score}%
+                                </span>
+                              )}
                               {assignment.due_date && (
                                 <span className="flex items-center gap-1">
                                   <Clock className="h-3 w-3" />
@@ -276,16 +295,22 @@ export function MyTrainingPage() {
                           {(assignment.status === 'completed' ||
                             assignment.status === 'failed') && (
                             <div className="flex items-center gap-2 ml-4">
-                              <span
-                                className={`flex items-center gap-1 text-sm ${
-                                  assignment.status === 'completed'
-                                    ? 'text-green-600 dark:text-green-400'
-                                    : 'text-red-600 dark:text-red-400'
-                                }`}
-                              >
-                                <CheckCircle className="h-4 w-4" />
-                                {assignment.status === 'completed' ? 'Done' : 'Failed'}
-                              </span>
+                              {assignment.status === 'failed' &&
+                                (assignment.max_training_attempts === 0 ||
+                                  assignment.attempts_used < assignment.max_training_attempts) && (
+                                  <button
+                                    onClick={() => handleStartTraining(assignment.id)}
+                                    disabled={startingId === assignment.id}
+                                    className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                                  >
+                                    {startingId === assignment.id ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <RefreshCw className="h-4 w-4" />
+                                    )}
+                                    Retry
+                                  </button>
+                                )}
                               {assignment.latest_attempt_id && (
                                 <button
                                   onClick={() =>

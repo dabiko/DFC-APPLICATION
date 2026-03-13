@@ -4,7 +4,7 @@
  */
 
 import { useState } from 'react'
-import { CheckCircle, ChevronDown, Clock, Lock } from 'lucide-react'
+import { CheckCircle, ChevronDown, Clock, Lock, Unlock } from 'lucide-react'
 import type { VersionStep, StepCompletionResponse } from './types'
 import { cn } from '@/utils/cn'
 
@@ -146,38 +146,47 @@ function StepRow({
   const isDone = completion?.status === 'completed'
   const isStarted = !!completion && !isDone
 
+  if (isLocked) {
+    return (
+      <div
+        title="Complete the previous step to unlock"
+        className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left opacity-40 select-none"
+      >
+        <StepNumber index={index} isDone={false} isCurrent={false} isLocked />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium leading-tight text-gray-400 dark:text-gray-500">
+            {step.title || `Step ${index + 1}`}
+          </p>
+          {step.estimated_duration_minutes && (
+            <span className="mt-0.5 flex items-center gap-1 text-[11px] text-gray-400 dark:text-gray-500">
+              <Clock className="h-3 w-3" />
+              {step.estimated_duration_minutes} min
+            </span>
+          )}
+        </div>
+        <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-300 dark:text-gray-600" />
+      </div>
+    )
+  }
+
   return (
     <button
       onClick={onClick}
-      disabled={isLocked}
-      title={isLocked ? 'Complete the previous step to unlock' : undefined}
       className={cn(
-        'flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors',
-        isLocked
-          ? 'cursor-not-allowed opacity-50'
-          : isCurrent
-            ? 'bg-blue-50 dark:bg-blue-900/20'
-            : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'
+        'flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors cursor-pointer',
+        isCurrent ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'
       )}
     >
-      <StepNumber
-        index={index}
-        isDone={isDone}
-        isCurrent={isCurrent}
-        isStarted={isStarted}
-        isLocked={isLocked}
-      />
+      <StepNumber index={index} isDone={isDone} isCurrent={isCurrent} isStarted={isStarted} />
       <div className="min-w-0 flex-1">
         <p
           className={cn(
             'text-sm leading-tight',
-            isLocked
-              ? 'font-medium text-gray-400 dark:text-gray-500'
-              : isCurrent
-                ? 'font-semibold text-blue-700 dark:text-blue-300'
-                : isDone
-                  ? 'font-medium text-gray-500 line-through decoration-gray-300 dark:text-gray-400 dark:decoration-gray-600'
-                  : 'font-medium text-gray-700 dark:text-gray-300'
+            isCurrent
+              ? 'font-semibold text-blue-700 dark:text-blue-300'
+              : isDone
+                ? 'font-medium text-gray-500 line-through decoration-gray-300 dark:text-gray-400 dark:decoration-gray-600'
+                : 'font-medium text-gray-700 dark:text-gray-300'
           )}
         >
           {step.title || `Step ${index + 1}`}
@@ -189,16 +198,16 @@ function StepRow({
           </span>
         )}
       </div>
-      {/* Lock icon for inaccessible steps */}
-      {isLocked && (
-        <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-300 dark:text-gray-600" />
-      )}
-      {/* Completion gates indicator for accessible but incomplete steps */}
-      {!isLocked &&
-        !isDone &&
-        (step.require_quiz_pass || step.require_manual_open || step.require_media_completion) && (
-          <Lock className="mt-0.5 h-3 w-3 shrink-0 text-amber-400 dark:text-amber-500" />
+      <Unlock
+        className={cn(
+          'mt-0.5 h-3.5 w-3.5 shrink-0',
+          isDone
+            ? 'text-green-400 dark:text-green-500'
+            : isCurrent
+              ? 'text-blue-400 dark:text-blue-500'
+              : 'text-gray-400 dark:text-gray-500'
         )}
+      />
     </button>
   )
 }

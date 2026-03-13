@@ -85,18 +85,26 @@ export function TrainingCompletionModal({
         </p>
 
         <div className="flex flex-col gap-2">
+          {!passed && !attemptsExhausted && (
+            <button
+              onClick={onBackToTraining}
+              className="rounded-lg bg-blue-600 px-6 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              Retry Training
+            </button>
+          )}
           <button
-            onClick={onBackToTraining}
+            onClick={onClose}
             className={cn(
-              'rounded-lg px-6 py-2 text-sm font-medium text-white',
-              passed ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'
+              'rounded-lg px-6 py-2 text-sm font-medium',
+              passed
+                ? 'bg-green-600 text-white hover:bg-green-700'
+                : !passed && !attemptsExhausted
+                  ? 'border border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
             )}
           >
-            {passed
-              ? 'Back to My Training'
-              : attemptsExhausted
-                ? 'Back to My Training'
-                : 'Retry Training'}
+            Back to My Training
           </button>
         </div>
       </div>

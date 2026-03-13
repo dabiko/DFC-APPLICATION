@@ -2,7 +2,17 @@
  * StepContent — Center panel displaying rich step content, attachments, and gates.
  */
 
-import { Clock, CheckCircle, XCircle, Timer, Target, Lightbulb, FlaskConical } from 'lucide-react'
+import {
+  Clock,
+  CheckCircle,
+  XCircle,
+  Timer,
+  Target,
+  Lightbulb,
+  FlaskConical,
+  AlertTriangle,
+  X,
+} from 'lucide-react'
 import type { VersionStep, StepCompletionResponse } from './types'
 import { AttachmentViewer } from './AttachmentViewer'
 import { StepGateBlocker, type QuizAttemptInfo } from './StepGateBlocker'
@@ -24,6 +34,8 @@ interface StepContentProps {
   onCompleteStep: () => void
   onFinishTraining: () => void
   quizAttemptInfo?: QuizAttemptInfo | null
+  stepError?: string | null
+  onDismissStepError?: () => void
   onMarkManualOpened: () => void
   onMarkMediaCompleted: () => void
   onTakeQuiz: () => void
@@ -41,6 +53,8 @@ export function StepContent({
   attemptId,
   reviewMode = false,
   quizAttemptInfo,
+  stepError,
+  onDismissStepError,
   onPrevious,
   onNext,
   onCompleteStep,
@@ -199,6 +213,21 @@ export function StepContent({
             onMarkMediaCompleted={onMarkMediaCompleted}
             onTakeQuiz={onTakeQuiz}
           />
+        )}
+
+        {stepError && (
+          <div className="mb-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-900/20">
+            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-red-500" />
+            <p className="flex-1 text-sm text-red-700 dark:text-red-300">{stepError}</p>
+            {onDismissStepError && (
+              <button
+                onClick={onDismissStepError}
+                className="shrink-0 text-red-400 hover:text-red-600 dark:hover:text-red-300"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         )}
 
         <StepNavigationButtons

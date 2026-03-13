@@ -166,13 +166,13 @@ export function QuizPlayer({ attemptId, quizId }: QuizPlayerProps) {
           ordering_answer: answer?.ordering_answer || [],
         }
       })
-      const { quizAttempt: attemptResult, correctAnswers: answers } = await submitQuiz(
+      const { quizAttempt: attemptResult, correctAnswers: corrects } = await submitQuiz(
         attemptId,
         quizAttempt.id,
         responses
       )
       setQuizAttempt(attemptResult)
-      setCorrectAnswers(answers)
+      setCorrectAnswers(corrects)
       setSubmitted(true)
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Failed to submit quiz')
@@ -273,7 +273,7 @@ export function QuizPlayer({ attemptId, quizId }: QuizPlayerProps) {
               </h1>
               <p className="text-xs text-gray-500">
                 {submitted
-                  ? `Score: ${quizAttempt?.score ?? 0}% — ${quizAttempt?.passed ? 'Passed' : 'Failed'}`
+                  ? `Score: ${quizAttempt?.score_percent ?? 0}% — ${quizAttempt?.passed ? 'Passed' : 'Failed'}`
                   : `Question ${currentQuestionIndex + 1} of ${quiz?.questions.length || 0}`}
               </p>
             </div>

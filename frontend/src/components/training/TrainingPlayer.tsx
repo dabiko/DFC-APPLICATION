@@ -39,6 +39,7 @@ export function TrainingPlayer({ attemptId, reviewMode = false }: TrainingPlayer
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [stepError, setStepError] = useState<string | null>(null)
   const [completing, setCompleting] = useState(false)
   const [showCompletionModal, setShowCompletionModal] = useState(false)
   const [completionResult, setCompletionResult] = useState<{
@@ -122,6 +123,7 @@ export function TrainingPlayer({ attemptId, reviewMode = false }: TrainingPlayer
     if (!steps[index]) return
     // Block navigation to steps whose predecessors are not completed
     if (!isStepAccessible(index)) return
+    setStepError(null)
     setCurrentStepIndex(index)
     const step = steps[index]
     const existing = getStepCompletion(step.id)
@@ -176,6 +178,7 @@ export function TrainingPlayer({ attemptId, reviewMode = false }: TrainingPlayer
   const handleCompleteStep = async () => {
     if (!currentCompletion) return
     setActionLoading(true)
+    setStepError(null)
     try {
       const result = await completeStep(attemptId, currentCompletion.id)
       if (result.can_advance) {
@@ -186,15 +189,15 @@ export function TrainingPlayer({ attemptId, reviewMode = false }: TrainingPlayer
           await handleNavigateStep(currentStepIndex + 1)
         }
       } else {
-        setError(`Cannot advance: ${(result.reasons || []).join(', ')}`)
+        setStepError((result.reasons || []).join(' '))
       }
     } catch (err: any) {
       // Backend returns 400 with {can_advance, reasons} when gates block completion
       const data = err?.response?.data
       if (data?.can_advance === false && Array.isArray(data?.reasons)) {
-        setError(data.reasons.join(' '))
+        setStepError(data.reasons.join(' '))
       } else {
-        setError(data?.detail || 'Failed to complete step')
+        setStepError(data?.detail || 'Failed to complete step')
       }
     } finally {
       setActionLoading(false)
@@ -207,11 +210,11 @@ export function TrainingPlayer({ attemptId, reviewMode = false }: TrainingPlayer
       const result = await completeTraining(attemptId)
       setCompletionResult({
         passed: result.status === 'passed' || result.status === 'completed',
-        score: result.score,
+        score: result.total_score,
       })
       setShowCompletionModal(true)
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to complete training')
+      setStepError(err?.response?.data?.detail || 'Failed to complete training')
     } finally {
       setCompleting(false)
     }
@@ -237,7 +240,8 @@ export function TrainingPlayer({ attemptId, reviewMode = false }: TrainingPlayer
     )
     const attemptsUsed = attempts.length
     const best = attempts.reduce<{ score: number; passed: boolean } | null>((acc, qa) => {
-      if (!acc || qa.score > acc.score) return { score: qa.score, passed: qa.passed }
+      if (!acc || qa.score_percent > acc.score)
+        return { score: qa.score_percent, passed: qa.passed }
       return acc
     }, null)
     const passed = attempts.some((qa) => qa.passed)
@@ -333,6 +337,7 @@ export function TrainingPlayer({ attemptId, reviewMode = false }: TrainingPlayer
                 currentStepIndex={currentStepIndex}
                 getStepCompletion={getStepCompletion}
                 onNavigate={handleNavigateStep}
+                isStepAccessible={isStepAccessible}
               />
             </aside>
 
@@ -351,6 +356,8 @@ export function TrainingPlayer({ attemptId, reviewMode = false }: TrainingPlayer
                   attemptId={attemptId}
                   reviewMode={reviewMode}
                   quizAttemptInfo={quizAttemptInfo}
+                  stepError={stepError}
+                  onDismissStepError={() => setStepError(null)}
                   onPrevious={() => handleNavigateStep(currentStepIndex - 1)}
                   onNext={() => handleNavigateStep(currentStepIndex + 1)}
                   onCompleteStep={handleCompleteStep}
@@ -376,7 +383,7 @@ export function TrainingPlayer({ attemptId, reviewMode = false }: TrainingPlayer
         score={completionResult?.score ?? null}
         attemptNumber={attempt?.attempt_number}
         maxTrainingAttempts={attempt?.max_training_attempts}
-        onClose={() => setShowCompletionModal(false)}
+        onClose={() => navigate('/my-training')}
         onBackToTraining={() => navigate('/my-training')}
       />
     </div>

@@ -331,10 +331,16 @@ class ProcedureAssignmentSerializer(serializers.ModelSerializer):
         return None
 
     latest_attempt_id = serializers.SerializerMethodField()
+    attempts_used = serializers.SerializerMethodField()
 
     def get_latest_attempt_id(self, obj):
         attempt = obj.attempts.order_by('-attempt_number').first()
         return str(attempt.id) if attempt else None
+
+    def get_attempts_used(self, obj):
+        return obj.attempts.filter(
+            status__in=['passed', 'failed', 'completed']
+        ).count()
 
 
 class CreateAssignmentSerializer(serializers.Serializer):
