@@ -19,6 +19,14 @@ logger = logging.getLogger(__name__)
 class PermissionChecker:
     """
     Centralized permission checking with caching support.
+
+    Uses two layers of caching:
+    1. In-memory dict (`_global_perm_cache`) — lives for the duration of this
+       checker instance (typically one HTTP request via PermissionContextMiddleware).
+       Avoids repeated DB hits when the same permission is checked multiple
+       times within a single request (middleware + view + serializer).
+    2. Database-backed `PermissionCache` model — 15-minute TTL, shared across
+       requests.  Used for folder-level permission checks.
     """
 
     # Cache TTL: 15 minutes
@@ -27,6 +35,25 @@ class PermissionChecker:
     def __init__(self, user):
         """Initialize with a user"""
         self.user = user
+        # In-memory cache for global permission checks within one request
+        self._global_perm_cache = {}
+        # Cache the resolved roles queryset once per request
+        self._resolved_roles = None
+
+    def _get_active_global_roles(self):
+        """Return the user's active global roles, cached per-instance."""
+        if self._resolved_roles is None:
+            from apps.permissions.models import UserRole
+            self._resolved_roles = list(
+                UserRole.objects.filter(
+                    user=self.user,
+                    scope=UserRole.GLOBAL,
+                    is_active=True,
+                ).filter(
+                    Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now())
+                ).select_related('role')
+            )
+        return self._resolved_roles
 
     def has_global_permission(self, permission):
         """
@@ -38,27 +65,24 @@ class PermissionChecker:
         Returns:
             bool: True if user has permission
         """
-        from apps.permissions.models import UserRole
-
         # Superusers have all permissions
         if self.user.is_superuser:
             return True
 
-        # Check active global roles
-        global_roles = UserRole.objects.filter(
-            user=self.user,
-            scope=UserRole.GLOBAL,
-            is_active=True
-        ).filter(
-            Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now())
-        ).select_related('role')
+        # Check in-memory request-level cache
+        if permission in self._global_perm_cache:
+            return self._global_perm_cache[permission]
 
-        for user_role in global_roles:
+        # Query once, iterate cached roles
+        result = False
+        for user_role in self._get_active_global_roles():
             role = user_role.role
             if hasattr(role, permission) and getattr(role, permission):
-                return True
+                result = True
+                break
 
-        return False
+        self._global_perm_cache[permission] = result
+        return result
 
     def has_department_permission(self, department, permission):
         """

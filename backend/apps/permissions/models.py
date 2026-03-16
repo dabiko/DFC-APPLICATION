@@ -573,6 +573,9 @@ class PermissionAuditLog(models.Model):
         ('DOCUMENT', 'Document'),
         ('ROLE', 'Role'),
         ('DEPARTMENT', 'Department'),
+        ('PROCEDURE', 'Procedure'),
+        ('WORKFLOW', 'Workflow'),
+        ('TRAINING', 'Training'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

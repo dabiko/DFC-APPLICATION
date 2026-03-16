@@ -98,6 +98,138 @@ PERMISSION_RULES = [
         'global_permission': True,
         'admin_only': True
     },
+
+    # -----------------------------------------------------------------------
+    # Procedure endpoints
+    # -----------------------------------------------------------------------
+    {
+        'pattern': r'^/api/v1/procedures/$',
+        'methods': {'POST': 'can_create_procedure'},
+        'resource_type': 'PROCEDURE',
+        'global_permission': True,
+    },
+    {
+        'pattern': r'^/api/v1/procedures/(?P<id>[a-f0-9-]+)/$',
+        'methods': {
+            'PUT': 'can_edit_procedure',
+            'PATCH': 'can_edit_procedure',
+            'DELETE': 'can_delete_procedure',
+        },
+        'resource_type': 'PROCEDURE',
+        'global_permission': True,
+    },
+    {
+        'pattern': r'^/api/v1/procedures/(?P<id>[a-f0-9-]+)/publish/$',
+        'methods': {'POST': 'can_publish_procedure'},
+        'resource_type': 'PROCEDURE',
+        'global_permission': True,
+    },
+    {
+        'pattern': r'^/api/v1/procedures/(?P<id>[a-f0-9-]+)/versions/\d+/retire/$',
+        'methods': {'POST': 'can_publish_procedure'},
+        'resource_type': 'PROCEDURE',
+        'global_permission': True,
+    },
+    # Procedure evidence & audit log
+    {
+        'pattern': r'^/api/v1/procedures/evidence/',
+        'methods': {'GET': 'can_view_training_evidence'},
+        'resource_type': 'TRAINING',
+        'global_permission': True,
+    },
+    {
+        'pattern': r'^/api/v1/procedures/audit-log/',
+        'methods': {'GET': 'can_view_training_evidence'},
+        'resource_type': 'TRAINING',
+        'global_permission': True,
+    },
+    # Training assignments (management actions)
+    {
+        'pattern': r'^/api/v1/procedures/assignments/$',
+        'methods': {'POST': 'can_manage_assignments'},
+        'resource_type': 'TRAINING',
+        'global_permission': True,
+    },
+    {
+        'pattern': r'^/api/v1/procedures/assignments/dashboard/$',
+        'methods': {'GET': 'can_view_training_dashboard'},
+        'resource_type': 'TRAINING',
+        'global_permission': True,
+    },
+    {
+        'pattern': r'^/api/v1/procedures/assignments/analytics/$',
+        'methods': {'GET': 'can_view_training_dashboard'},
+        'resource_type': 'TRAINING',
+        'global_permission': True,
+    },
+    {
+        'pattern': r'^/api/v1/procedures/assignments/trainee/',
+        'methods': {'GET': 'can_view_trainee_details'},
+        'resource_type': 'TRAINING',
+        'global_permission': True,
+    },
+    {
+        'pattern': r'^/api/v1/procedures/assignments/(?P<id>[a-f0-9-]+)/waive/$',
+        'methods': {'POST': 'can_manage_assignments'},
+        'resource_type': 'TRAINING',
+        'global_permission': True,
+    },
+
+    # -----------------------------------------------------------------------
+    # Workflow endpoints
+    # -----------------------------------------------------------------------
+    {
+        'pattern': r'^/api/v1/workflows/templates/$',
+        'methods': {'POST': 'can_create_workflow_template'},
+        'resource_type': 'WORKFLOW',
+        'global_permission': True,
+    },
+    {
+        'pattern': r'^/api/v1/workflows/templates/(?P<id>[a-f0-9-]+)/$',
+        'methods': {
+            'PUT': 'can_create_workflow_template',
+            'PATCH': 'can_create_workflow_template',
+            'DELETE': 'can_delete_workflow_template',
+        },
+        'resource_type': 'WORKFLOW',
+        'global_permission': True,
+    },
+    {
+        'pattern': r'^/api/v1/workflows/instances/$',
+        'methods': {'POST': 'can_start_workflow'},
+        'resource_type': 'WORKFLOW',
+        'global_permission': True,
+    },
+    {
+        'pattern': r'^/api/v1/workflows/instances/start-from-document/$',
+        'methods': {'POST': 'can_start_workflow'},
+        'resource_type': 'WORKFLOW',
+        'global_permission': True,
+    },
+    {
+        'pattern': r'^/api/v1/workflows/instances/(?P<id>[a-f0-9-]+)/cancel/$',
+        'methods': {'POST': 'can_cancel_workflow'},
+        'resource_type': 'WORKFLOW',
+        'global_permission': True,
+    },
+    {
+        'pattern': r'^/api/v1/workflows/auto-trigger-rules/',
+        'methods': {
+            'GET': 'can_manage_auto_triggers',
+            'POST': 'can_manage_auto_triggers',
+            'PUT': 'can_manage_auto_triggers',
+            'PATCH': 'can_manage_auto_triggers',
+            'DELETE': 'can_manage_auto_triggers',
+        },
+        'resource_type': 'WORKFLOW',
+        'global_permission': True,
+    },
+    {
+        'pattern': r'^/api/v1/workflows/stats/$',
+        'methods': {'GET': 'can_view_workflow_analytics'},
+        'resource_type': 'WORKFLOW',
+        'global_permission': True,
+    },
 ]
 
 # URLs that should be excluded from permission checks
@@ -208,7 +340,9 @@ class UniversalPermissionMiddleware:
 
         # Global permission check
         if rule.get('global_permission'):
-            checker = PermissionChecker(user)
+            # Use request-attached checker if available (from PermissionContextMiddleware)
+            # to benefit from in-memory request-level caching
+            checker = getattr(request, 'permission_checker', None) or PermissionChecker(user)
             has_perm = checker.has_global_permission(required_permission)
             if not has_perm:
                 return {
