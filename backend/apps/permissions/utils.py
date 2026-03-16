@@ -592,9 +592,29 @@ def initialize_default_roles():
             'can_view_audit_log': False,
             'can_manage_retention': False,
             'can_manage_classification': False,
+            # Procedure
+            'can_create_procedure': False,
+            'can_edit_procedure': False,
+            'can_delete_procedure': False,
+            'can_publish_procedure': False,
+            'can_review_procedure': False,
+            'can_view_all_procedures': False,
+            # Workflow
+            'can_create_workflow_template': False,
+            'can_delete_workflow_template': False,
+            'can_start_workflow': False,
+            'can_cancel_workflow': False,
+            'can_manage_auto_triggers': False,
+            'can_view_workflow_analytics': False,
+            # Training
+            'can_manage_assignments': False,
+            'can_view_training_dashboard': False,
+            'can_view_trainee_details': False,
+            'can_view_training_evidence': False,
+            'can_audit_training': False,
         },
         Role.EDITOR: {
-            'description': 'Can view, download, upload, and edit documents',
+            'description': 'Can view, download, upload, and edit documents; create and review procedures; start workflows',
             'can_view': True,
             'can_download': True,
             'can_upload': True,
@@ -605,9 +625,29 @@ def initialize_default_roles():
             'can_view_audit_log': False,
             'can_manage_retention': False,
             'can_manage_classification': False,
+            # Procedure
+            'can_create_procedure': True,
+            'can_edit_procedure': True,
+            'can_delete_procedure': False,
+            'can_publish_procedure': False,
+            'can_review_procedure': True,
+            'can_view_all_procedures': False,
+            # Workflow
+            'can_create_workflow_template': False,
+            'can_delete_workflow_template': False,
+            'can_start_workflow': True,
+            'can_cancel_workflow': False,
+            'can_manage_auto_triggers': False,
+            'can_view_workflow_analytics': False,
+            # Training
+            'can_manage_assignments': False,
+            'can_view_training_dashboard': False,
+            'can_view_trainee_details': False,
+            'can_view_training_evidence': False,
+            'can_audit_training': False,
         },
         Role.MANAGER: {
-            'description': 'Can manage documents, share, and control folder permissions',
+            'description': 'Can manage documents, procedures, workflows, and training assignments',
             'can_view': True,
             'can_download': True,
             'can_upload': True,
@@ -618,9 +658,29 @@ def initialize_default_roles():
             'can_view_audit_log': True,
             'can_manage_retention': False,
             'can_manage_classification': False,
+            # Procedure
+            'can_create_procedure': True,
+            'can_edit_procedure': True,
+            'can_delete_procedure': True,
+            'can_publish_procedure': True,
+            'can_review_procedure': True,
+            'can_view_all_procedures': True,
+            # Workflow
+            'can_create_workflow_template': True,
+            'can_delete_workflow_template': False,
+            'can_start_workflow': True,
+            'can_cancel_workflow': True,
+            'can_manage_auto_triggers': False,
+            'can_view_workflow_analytics': True,
+            # Training
+            'can_manage_assignments': True,
+            'can_view_training_dashboard': True,
+            'can_view_trainee_details': True,
+            'can_view_training_evidence': True,
+            'can_audit_training': False,
         },
         Role.ADMIN: {
-            'description': 'Full system access including retention and classification management',
+            'description': 'Full system access including all procedure, workflow, training, and compliance capabilities',
             'can_view': True,
             'can_download': True,
             'can_upload': True,
@@ -631,17 +691,39 @@ def initialize_default_roles():
             'can_view_audit_log': True,
             'can_manage_retention': True,
             'can_manage_classification': True,
+            # Procedure
+            'can_create_procedure': True,
+            'can_edit_procedure': True,
+            'can_delete_procedure': True,
+            'can_publish_procedure': True,
+            'can_review_procedure': True,
+            'can_view_all_procedures': True,
+            # Workflow
+            'can_create_workflow_template': True,
+            'can_delete_workflow_template': True,
+            'can_start_workflow': True,
+            'can_cancel_workflow': True,
+            'can_manage_auto_triggers': True,
+            'can_view_workflow_analytics': True,
+            # Training
+            'can_manage_assignments': True,
+            'can_view_training_dashboard': True,
+            'can_view_trainee_details': True,
+            'can_view_training_evidence': True,
+            'can_audit_training': True,
         },
     }
 
     created_roles = []
     for role_name, config in roles_config.items():
-        role, created = Role.objects.get_or_create(
+        role, created = Role.objects.update_or_create(
             name=role_name,
             defaults=config
         )
         if created:
             created_roles.append(role_name)
             logger.info(f"Created default role: {role_name}")
+        else:
+            logger.info(f"Updated default role: {role_name}")
 
     return created_roles

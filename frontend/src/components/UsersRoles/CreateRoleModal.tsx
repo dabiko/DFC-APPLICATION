@@ -126,6 +126,111 @@ const ALL_PERMISSIONS = [
     category: 'Users',
     description: 'Create and modify custom roles',
   },
+  // Procedure permissions
+  {
+    key: 'create_procedure',
+    label: 'Create Procedures',
+    category: 'Procedures',
+    description: 'Create new procedure documents',
+  },
+  {
+    key: 'edit_procedure',
+    label: 'Edit Procedures',
+    category: 'Procedures',
+    description: 'Edit procedure steps, quizzes, and metadata',
+  },
+  {
+    key: 'delete_procedure',
+    label: 'Delete Procedures',
+    category: 'Procedures',
+    description: 'Delete procedure documents',
+  },
+  {
+    key: 'publish_procedure',
+    label: 'Publish / Retire Procedures',
+    category: 'Procedures',
+    description: 'Publish approved procedures or retire versions',
+  },
+  {
+    key: 'review_procedure',
+    label: 'Review Procedures',
+    category: 'Procedures',
+    description: 'Be assigned as a procedure reviewer',
+  },
+  {
+    key: 'view_all_procedures',
+    label: 'View All Procedures',
+    category: 'Procedures',
+    description: 'View procedures across all departments',
+  },
+  // Workflow permissions
+  {
+    key: 'create_workflow_template',
+    label: 'Create / Edit Templates',
+    category: 'Workflows',
+    description: 'Create and modify workflow templates',
+  },
+  {
+    key: 'delete_workflow_template',
+    label: 'Delete Templates',
+    category: 'Workflows',
+    description: 'Delete non-system workflow templates',
+  },
+  {
+    key: 'start_workflow',
+    label: 'Start Workflows',
+    category: 'Workflows',
+    description: 'Initiate new workflow instances',
+  },
+  {
+    key: 'cancel_workflow',
+    label: 'Cancel Workflows',
+    category: 'Workflows',
+    description: 'Cancel active workflow instances',
+  },
+  {
+    key: 'manage_auto_triggers',
+    label: 'Manage Auto-Trigger Rules',
+    category: 'Workflows',
+    description: 'Create and manage automatic workflow triggers',
+  },
+  {
+    key: 'view_workflow_analytics',
+    label: 'View Analytics',
+    category: 'Workflows',
+    description: 'Access workflow statistics and reports',
+  },
+  // Training permissions
+  {
+    key: 'manage_assignments',
+    label: 'Manage Assignments',
+    category: 'Training',
+    description: 'Create and waive training assignments',
+  },
+  {
+    key: 'view_training_dashboard',
+    label: 'View Dashboard',
+    category: 'Training',
+    description: 'Access training dashboard and metrics',
+  },
+  {
+    key: 'view_trainee_details',
+    label: 'View Trainee Details',
+    category: 'Training',
+    description: 'View individual trainee progress reports',
+  },
+  {
+    key: 'view_training_evidence',
+    label: 'View Evidence',
+    category: 'Training',
+    description: 'Access compliance evidence and export',
+  },
+  {
+    key: 'audit_training',
+    label: 'Audit Training (Read-only)',
+    category: 'Training',
+    description: 'Read-only compliance auditor access to training data',
+  },
   // Admin permissions
   {
     key: 'view_audit_logs',

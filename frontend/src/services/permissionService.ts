@@ -21,6 +21,7 @@ export interface Role {
   name: 'VIEWER' | 'EDITOR' | 'MANAGER' | 'ADMIN'
   display_name: string
   description: string
+  // Document & Folder
   can_view: boolean
   can_download: boolean
   can_upload: boolean
@@ -31,6 +32,26 @@ export interface Role {
   can_view_audit_log: boolean
   can_manage_retention: boolean
   can_manage_classification: boolean
+  // Procedure
+  can_create_procedure: boolean
+  can_edit_procedure: boolean
+  can_delete_procedure: boolean
+  can_publish_procedure: boolean
+  can_review_procedure: boolean
+  can_view_all_procedures: boolean
+  // Workflow
+  can_create_workflow_template: boolean
+  can_delete_workflow_template: boolean
+  can_start_workflow: boolean
+  can_cancel_workflow: boolean
+  can_manage_auto_triggers: boolean
+  can_view_workflow_analytics: boolean
+  // Training
+  can_manage_assignments: boolean
+  can_view_training_dashboard: boolean
+  can_view_trainee_details: boolean
+  can_view_training_evidence: boolean
+  can_audit_training: boolean
   permissions_list: string[]
 }
 

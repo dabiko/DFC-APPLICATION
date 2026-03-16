@@ -25,14 +25,12 @@ export const RolePermissionsEditor: FC<RolePermissionsEditorProps> = ({
 
   // Group permissions by category
   const groupedPermissions = useMemo(() => {
-    const groups: Record<string, Permission[]> = {
-      document: [],
-      folder: [],
-      system: [],
-      compliance: [],
-    }
+    const groups: Record<string, Permission[]> = {}
 
     availablePermissions.forEach((perm) => {
+      if (!groups[perm.category]) {
+        groups[perm.category] = []
+      }
       groups[perm.category].push(perm)
     })
 

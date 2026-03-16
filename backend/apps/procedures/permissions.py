@@ -1,10 +1,14 @@
 """
 Permissions for the Procedures app.
+
+Uses the centralized RBAC permission flags from the permissions app
+instead of hardcoded role name queries.
 """
 
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 from django.contrib.contenttypes.models import ContentType
 from apps.workflows.models import WorkflowTask
+from apps.permissions.utils import PermissionChecker
 
 
 class IsProcedureCreator(BasePermission):
@@ -26,33 +30,38 @@ class IsAssignedReviewer(BasePermission):
 
 
 class IsProcedureAdmin(BasePermission):
+    """User has admin-level procedure access (all procedure permissions)."""
     def has_permission(self, request, view):
         if request.user.is_superuser:
             return True
-        from apps.permissions.models import UserRole
-        return UserRole.objects.filter(
-            user=request.user, role__name__iexact='admin', is_active=True
-        ).exists()
+        checker = PermissionChecker(request.user)
+        # Admin = has delete + publish + view_all (the highest-tier procedure perms)
+        return (
+            checker.has_global_permission('can_delete_procedure')
+            and checker.has_global_permission('can_publish_procedure')
+            and checker.has_global_permission('can_view_all_procedures')
+        )
 
 
 class IsProcedureManager(BasePermission):
+    """User has manager-level procedure access (publish + view all)."""
     def has_permission(self, request, view):
         if request.user.is_superuser:
             return True
-        from apps.permissions.models import UserRole
-        return UserRole.objects.filter(
-            user=request.user, role__name__iregex=r'^(admin|manager)$', is_active=True
-        ).exists()
+        checker = PermissionChecker(request.user)
+        return (
+            checker.has_global_permission('can_publish_procedure')
+            and checker.has_global_permission('can_view_all_procedures')
+        )
 
 
 class CanCreateProcedure(BasePermission):
+    """User can create procedures."""
     def has_permission(self, request, view):
         if request.user.is_superuser:
             return True
-        from apps.permissions.models import UserRole
-        return UserRole.objects.filter(
-            user=request.user, role__name__iregex=r'^(admin|manager|editor)$', is_active=True
-        ).exists()
+        checker = PermissionChecker(request.user)
+        return checker.has_global_permission('can_create_procedure')
 
 
 class IsStepOwner(BasePermission):
@@ -65,15 +74,14 @@ class IsStepOwner(BasePermission):
 
 
 class IsComplianceAuditor(BasePermission):
+    """Read-only compliance auditor access via can_audit_training permission flag."""
     def has_permission(self, request, view):
         if request.method not in SAFE_METHODS:
             return False
         if request.user.is_superuser:
             return True
-        from apps.permissions.models import UserRole
-        return UserRole.objects.filter(
-            user=request.user, role__name__iexact='compliance_auditor', is_active=True
-        ).exists()
+        checker = PermissionChecker(request.user)
+        return checker.has_global_permission('can_audit_training')
 
 
 class IsAssignedTrainee(BasePermission):

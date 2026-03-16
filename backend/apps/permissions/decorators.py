@@ -291,6 +291,224 @@ class CanManageClassification(permissions.BasePermission):
 
 
 # ========================================
+# Procedure Permission Classes
+# ========================================
+
+class CanCreateProcedure(permissions.BasePermission):
+    """Permission to create procedures. Requires can_create_procedure flag."""
+
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser:
+            return True
+        checker = PermissionChecker(request.user)
+        return checker.has_global_permission('can_create_procedure')
+
+
+class CanEditProcedure(permissions.BasePermission):
+    """Permission to edit procedures. Requires can_edit_procedure flag."""
+
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser:
+            return True
+        checker = PermissionChecker(request.user)
+        return checker.has_global_permission('can_edit_procedure')
+
+
+class CanDeleteProcedure(permissions.BasePermission):
+    """Permission to delete procedures. Requires can_delete_procedure flag."""
+
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser:
+            return True
+        checker = PermissionChecker(request.user)
+        return checker.has_global_permission('can_delete_procedure')
+
+
+class CanPublishProcedure(permissions.BasePermission):
+    """Permission to publish/retire procedures. Requires can_publish_procedure flag."""
+
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser:
+            return True
+        checker = PermissionChecker(request.user)
+        return checker.has_global_permission('can_publish_procedure')
+
+
+class CanReviewProcedure(permissions.BasePermission):
+    """Permission to be assigned as reviewer. Requires can_review_procedure flag."""
+
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser:
+            return True
+        checker = PermissionChecker(request.user)
+        return checker.has_global_permission('can_review_procedure')
+
+
+class CanViewAllProcedures(permissions.BasePermission):
+    """Permission to view procedures across all departments."""
+
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser:
+            return True
+        checker = PermissionChecker(request.user)
+        return checker.has_global_permission('can_view_all_procedures')
+
+
+# ========================================
+# Workflow Permission Classes
+# ========================================
+
+class CanCreateWorkflowTemplate(permissions.BasePermission):
+    """Permission to create/edit workflow templates."""
+
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser:
+            return True
+        checker = PermissionChecker(request.user)
+        return checker.has_global_permission('can_create_workflow_template')
+
+
+class CanDeleteWorkflowTemplate(permissions.BasePermission):
+    """Permission to delete workflow templates."""
+
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser:
+            return True
+        checker = PermissionChecker(request.user)
+        return checker.has_global_permission('can_delete_workflow_template')
+
+
+class CanStartWorkflow(permissions.BasePermission):
+    """Permission to start workflow instances."""
+
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser:
+            return True
+        checker = PermissionChecker(request.user)
+        return checker.has_global_permission('can_start_workflow')
+
+
+class CanCancelWorkflow(permissions.BasePermission):
+    """Permission to cancel active workflows."""
+
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser:
+            return True
+        checker = PermissionChecker(request.user)
+        return checker.has_global_permission('can_cancel_workflow')
+
+
+class CanManageAutoTriggers(permissions.BasePermission):
+    """Permission to create/edit/delete auto-trigger rules."""
+
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser:
+            return True
+        checker = PermissionChecker(request.user)
+        return checker.has_global_permission('can_manage_auto_triggers')
+
+
+class CanViewWorkflowAnalytics(permissions.BasePermission):
+    """Permission to view workflow analytics and statistics."""
+
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser:
+            return True
+        checker = PermissionChecker(request.user)
+        return checker.has_global_permission('can_view_workflow_analytics')
+
+
+# ========================================
+# Training Permission Classes
+# ========================================
+
+class CanManageAssignments(permissions.BasePermission):
+    """Permission to create/waive training assignments."""
+
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser:
+            return True
+        checker = PermissionChecker(request.user)
+        return checker.has_global_permission('can_manage_assignments')
+
+
+class CanViewTrainingDashboard(permissions.BasePermission):
+    """Permission to access training dashboard and analytics."""
+
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser:
+            return True
+        checker = PermissionChecker(request.user)
+        return checker.has_global_permission('can_view_training_dashboard')
+
+
+class CanViewTraineeDetails(permissions.BasePermission):
+    """Permission to view individual trainee reports."""
+
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser:
+            return True
+        checker = PermissionChecker(request.user)
+        return checker.has_global_permission('can_view_trainee_details')
+
+
+class CanViewTrainingEvidence(permissions.BasePermission):
+    """Permission to access compliance evidence and export."""
+
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        if request.user.is_superuser:
+            return True
+        checker = PermissionChecker(request.user)
+        return checker.has_global_permission('can_view_training_evidence')
+
+
+class CanAuditTraining(permissions.BasePermission):
+    """Read-only compliance auditor access to training data."""
+
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        if request.method not in ('GET', 'HEAD', 'OPTIONS'):
+            return False
+        if request.user.is_superuser:
+            return True
+        checker = PermissionChecker(request.user)
+        return checker.has_global_permission('can_audit_training')
+
+
+# ========================================
 # View Mixins
 # ========================================
 

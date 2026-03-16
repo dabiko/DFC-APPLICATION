@@ -55,7 +55,7 @@ class Role(models.Model):
         help_text="Description of role permissions and capabilities"
     )
 
-    # Permissions flags
+    # Document & Folder permissions
     can_view = models.BooleanField(default=True)
     can_download = models.BooleanField(default=True)
     can_upload = models.BooleanField(default=False)
@@ -66,6 +66,29 @@ class Role(models.Model):
     can_view_audit_log = models.BooleanField(default=False)
     can_manage_retention = models.BooleanField(default=False)
     can_manage_classification = models.BooleanField(default=False)
+
+    # Procedure permissions
+    can_create_procedure = models.BooleanField(default=False)
+    can_edit_procedure = models.BooleanField(default=False)
+    can_delete_procedure = models.BooleanField(default=False)
+    can_publish_procedure = models.BooleanField(default=False)
+    can_review_procedure = models.BooleanField(default=False)
+    can_view_all_procedures = models.BooleanField(default=False)
+
+    # Workflow permissions
+    can_create_workflow_template = models.BooleanField(default=False)
+    can_delete_workflow_template = models.BooleanField(default=False)
+    can_start_workflow = models.BooleanField(default=False)
+    can_cancel_workflow = models.BooleanField(default=False)
+    can_manage_auto_triggers = models.BooleanField(default=False)
+    can_view_workflow_analytics = models.BooleanField(default=False)
+
+    # Training permissions
+    can_manage_assignments = models.BooleanField(default=False)
+    can_view_training_dashboard = models.BooleanField(default=False)
+    can_view_trainee_details = models.BooleanField(default=False)
+    can_view_training_evidence = models.BooleanField(default=False)
+    can_audit_training = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -79,30 +102,48 @@ class Role(models.Model):
     def __str__(self):
         return self.get_name_display()
 
+    # Map of boolean field names to permission list keys
+    PERMISSION_FLAG_MAP = {
+        # Document & Folder
+        'can_view': 'view_document',
+        'can_download': 'download_document',
+        'can_upload': 'upload_document',
+        'can_edit': 'edit_document',
+        'can_delete': 'delete_document',
+        'can_share': 'share_document',
+        'can_manage_permissions': 'manage_permissions',
+        'can_view_audit_log': 'view_audit_log',
+        'can_manage_retention': 'manage_retention',
+        'can_manage_classification': 'manage_classification',
+        # Procedure
+        'can_create_procedure': 'create_procedure',
+        'can_edit_procedure': 'edit_procedure',
+        'can_delete_procedure': 'delete_procedure',
+        'can_publish_procedure': 'publish_procedure',
+        'can_review_procedure': 'review_procedure',
+        'can_view_all_procedures': 'view_all_procedures',
+        # Workflow
+        'can_create_workflow_template': 'create_workflow_template',
+        'can_delete_workflow_template': 'delete_workflow_template',
+        'can_start_workflow': 'start_workflow',
+        'can_cancel_workflow': 'cancel_workflow',
+        'can_manage_auto_triggers': 'manage_auto_triggers',
+        'can_view_workflow_analytics': 'view_workflow_analytics',
+        # Training
+        'can_manage_assignments': 'manage_assignments',
+        'can_view_training_dashboard': 'view_training_dashboard',
+        'can_view_trainee_details': 'view_trainee_details',
+        'can_view_training_evidence': 'view_training_evidence',
+        'can_audit_training': 'audit_training',
+    }
+
     def get_permissions_list(self):
         """Return list of permissions this role has"""
-        permissions = []
-        if self.can_view:
-            permissions.append('view_document')
-        if self.can_download:
-            permissions.append('download_document')
-        if self.can_upload:
-            permissions.append('upload_document')
-        if self.can_edit:
-            permissions.append('edit_document')
-        if self.can_delete:
-            permissions.append('delete_document')
-        if self.can_share:
-            permissions.append('share_document')
-        if self.can_manage_permissions:
-            permissions.append('manage_permissions')
-        if self.can_view_audit_log:
-            permissions.append('view_audit_log')
-        if self.can_manage_retention:
-            permissions.append('manage_retention')
-        if self.can_manage_classification:
-            permissions.append('manage_classification')
-        return permissions
+        return [
+            perm_key
+            for field_name, perm_key in self.PERMISSION_FLAG_MAP.items()
+            if getattr(self, field_name, False)
+        ]
 
 
 class UserRole(models.Model):

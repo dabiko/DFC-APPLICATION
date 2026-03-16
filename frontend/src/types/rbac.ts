@@ -27,11 +27,43 @@ export type PermissionType =
   | 'export_data'
   | 'manage_metadata'
   | 'restore_versions'
+  // Procedure permissions
+  | 'create_procedure'
+  | 'edit_procedure'
+  | 'delete_procedure'
+  | 'publish_procedure'
+  | 'review_procedure'
+  | 'view_all_procedures'
+  // Workflow permissions
+  | 'create_workflow_template'
+  | 'delete_workflow_template'
+  | 'start_workflow'
+  | 'cancel_workflow'
+  | 'manage_auto_triggers'
+  | 'view_workflow_analytics'
+  // Training permissions
+  | 'manage_assignments'
+  | 'view_training_dashboard'
+  | 'view_trainee_details'
+  | 'view_training_evidence'
+  | 'audit_training'
 
 /**
  * Access Level
  */
 export type AccessLevel = 'none' | 'read' | 'write' | 'admin'
+
+/**
+ * Permission Category
+ */
+export type PermissionCategory =
+  | 'document'
+  | 'folder'
+  | 'system'
+  | 'compliance'
+  | 'procedure'
+  | 'workflow'
+  | 'training'
 
 /**
  * Permission
@@ -40,7 +72,7 @@ export interface Permission {
   type: PermissionType
   label: string
   description: string
-  category: 'document' | 'folder' | 'system' | 'compliance'
+  category: PermissionCategory
   requiresApproval?: boolean
   restrictedTo?: SystemRole[]
 }
@@ -316,13 +348,17 @@ export const SYSTEM_ROLES: Role[] = [
     id: 'editor',
     name: 'editor',
     displayName: 'Editor',
-    description: 'Can view and edit documents',
+    description: 'Can view and edit documents; create and review procedures',
     permissions: [
       'view_document',
       'edit_document',
       'download_document',
       'manage_metadata',
       'restore_versions',
+      'create_procedure',
+      'edit_procedure',
+      'review_procedure',
+      'start_workflow',
     ],
     isSystemRole: true,
     isCustomRole: false,
@@ -334,7 +370,7 @@ export const SYSTEM_ROLES: Role[] = [
     id: 'manager',
     name: 'manager',
     displayName: 'Manager',
-    description: 'Can manage documents and folders within their department',
+    description: 'Can manage documents, procedures, workflows, and training',
     permissions: [
       'view_document',
       'edit_document',
@@ -345,6 +381,20 @@ export const SYSTEM_ROLES: Role[] = [
       'manage_metadata',
       'restore_versions',
       'view_audit_log',
+      'create_procedure',
+      'edit_procedure',
+      'delete_procedure',
+      'publish_procedure',
+      'review_procedure',
+      'view_all_procedures',
+      'create_workflow_template',
+      'start_workflow',
+      'cancel_workflow',
+      'view_workflow_analytics',
+      'manage_assignments',
+      'view_training_dashboard',
+      'view_trainee_details',
+      'view_training_evidence',
     ],
     isSystemRole: true,
     isCustomRole: false,
@@ -356,7 +406,7 @@ export const SYSTEM_ROLES: Role[] = [
     id: 'admin',
     name: 'admin',
     displayName: 'Administrator',
-    description: 'Full system access and user management',
+    description: 'Full system access including all modules',
     permissions: [
       'view_document',
       'edit_document',
@@ -373,6 +423,23 @@ export const SYSTEM_ROLES: Role[] = [
       'export_data',
       'manage_metadata',
       'restore_versions',
+      'create_procedure',
+      'edit_procedure',
+      'delete_procedure',
+      'publish_procedure',
+      'review_procedure',
+      'view_all_procedures',
+      'create_workflow_template',
+      'delete_workflow_template',
+      'start_workflow',
+      'cancel_workflow',
+      'manage_auto_triggers',
+      'view_workflow_analytics',
+      'manage_assignments',
+      'view_training_dashboard',
+      'view_trainee_details',
+      'view_training_evidence',
+      'audit_training',
     ],
     isSystemRole: true,
     isCustomRole: false,
@@ -383,13 +450,16 @@ export const SYSTEM_ROLES: Role[] = [
 ]
 
 export const PERMISSION_CATEGORIES: Record<
-  Permission['category'],
+  PermissionCategory,
   { label: string; icon: string; color: string }
 > = {
   document: { label: 'Document Permissions', icon: '📄', color: 'blue' },
   folder: { label: 'Folder Permissions', icon: '📁', color: 'yellow' },
   system: { label: 'System Permissions', icon: '⚙️', color: 'gray' },
   compliance: { label: 'Compliance Permissions', icon: '🔒', color: 'red' },
+  procedure: { label: 'Procedure Permissions', icon: '📋', color: 'indigo' },
+  workflow: { label: 'Workflow Permissions', icon: '🔄', color: 'purple' },
+  training: { label: 'Training Permissions', icon: '🎓', color: 'green' },
 }
 
 export const ALL_PERMISSIONS: Permission[] = [
@@ -492,6 +562,124 @@ export const ALL_PERMISSIONS: Permission[] = [
     label: 'Restore Versions',
     description: 'Can restore previous document versions',
     category: 'document',
+  },
+  // Procedure permissions
+  {
+    type: 'create_procedure',
+    label: 'Create Procedures',
+    description: 'Can create new procedure documents',
+    category: 'procedure',
+  },
+  {
+    type: 'edit_procedure',
+    label: 'Edit Procedures',
+    description: 'Can edit procedure steps, quizzes, and metadata',
+    category: 'procedure',
+  },
+  {
+    type: 'delete_procedure',
+    label: 'Delete Procedures',
+    description: 'Can delete procedure documents',
+    category: 'procedure',
+    requiresApproval: true,
+  },
+  {
+    type: 'publish_procedure',
+    label: 'Publish / Retire Procedures',
+    description: 'Can publish approved procedures or retire versions',
+    category: 'procedure',
+    restrictedTo: ['manager', 'admin'],
+  },
+  {
+    type: 'review_procedure',
+    label: 'Review Procedures',
+    description: 'Can be assigned as a procedure reviewer',
+    category: 'procedure',
+  },
+  {
+    type: 'view_all_procedures',
+    label: 'View All Procedures',
+    description: 'Can view procedures across all departments',
+    category: 'procedure',
+    restrictedTo: ['manager', 'admin'],
+  },
+  // Workflow permissions
+  {
+    type: 'create_workflow_template',
+    label: 'Create / Edit Templates',
+    description: 'Can create and modify workflow templates',
+    category: 'workflow',
+    restrictedTo: ['manager', 'admin'],
+  },
+  {
+    type: 'delete_workflow_template',
+    label: 'Delete Templates',
+    description: 'Can delete non-system workflow templates',
+    category: 'workflow',
+    restrictedTo: ['admin'],
+  },
+  {
+    type: 'start_workflow',
+    label: 'Start Workflows',
+    description: 'Can initiate new workflow instances',
+    category: 'workflow',
+  },
+  {
+    type: 'cancel_workflow',
+    label: 'Cancel Workflows',
+    description: 'Can cancel active workflow instances',
+    category: 'workflow',
+    restrictedTo: ['manager', 'admin'],
+  },
+  {
+    type: 'manage_auto_triggers',
+    label: 'Manage Auto-Trigger Rules',
+    description: 'Can create and manage automatic workflow triggers',
+    category: 'workflow',
+    restrictedTo: ['admin'],
+  },
+  {
+    type: 'view_workflow_analytics',
+    label: 'View Analytics',
+    description: 'Can access workflow statistics and reports',
+    category: 'workflow',
+    restrictedTo: ['manager', 'admin'],
+  },
+  // Training permissions
+  {
+    type: 'manage_assignments',
+    label: 'Manage Assignments',
+    description: 'Can create and waive training assignments',
+    category: 'training',
+    restrictedTo: ['manager', 'admin'],
+  },
+  {
+    type: 'view_training_dashboard',
+    label: 'View Dashboard',
+    description: 'Can access training dashboard and metrics',
+    category: 'training',
+    restrictedTo: ['manager', 'admin'],
+  },
+  {
+    type: 'view_trainee_details',
+    label: 'View Trainee Details',
+    description: 'Can view individual trainee progress reports',
+    category: 'training',
+    restrictedTo: ['manager', 'admin'],
+  },
+  {
+    type: 'view_training_evidence',
+    label: 'View Evidence',
+    description: 'Can access compliance evidence and export',
+    category: 'training',
+    restrictedTo: ['manager', 'admin'],
+  },
+  {
+    type: 'audit_training',
+    label: 'Audit Training (Read-only)',
+    description: 'Read-only compliance auditor access to training data',
+    category: 'training',
+    restrictedTo: ['admin'],
   },
 ]
 

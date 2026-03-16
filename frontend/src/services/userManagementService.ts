@@ -376,6 +376,26 @@ export const ROLE_PERMISSIONS: Record<OrganizationRole, string[]> = {
     'delete_documents',
     'manage_folders',
     'view_folders',
+    // Procedures
+    'create_procedure',
+    'edit_procedure',
+    'delete_procedure',
+    'publish_procedure',
+    'review_procedure',
+    'view_all_procedures',
+    // Workflows
+    'create_workflow_template',
+    'delete_workflow_template',
+    'start_workflow',
+    'cancel_workflow',
+    'manage_auto_triggers',
+    'view_workflow_analytics',
+    // Training
+    'manage_assignments',
+    'view_training_dashboard',
+    'view_trainee_details',
+    'view_training_evidence',
+    'audit_training',
   ],
   admin: [
     'manage_users',
@@ -390,6 +410,26 @@ export const ROLE_PERMISSIONS: Record<OrganizationRole, string[]> = {
     'delete_documents',
     'manage_folders',
     'view_folders',
+    // Procedures
+    'create_procedure',
+    'edit_procedure',
+    'delete_procedure',
+    'publish_procedure',
+    'review_procedure',
+    'view_all_procedures',
+    // Workflows
+    'create_workflow_template',
+    'delete_workflow_template',
+    'start_workflow',
+    'cancel_workflow',
+    'manage_auto_triggers',
+    'view_workflow_analytics',
+    // Training
+    'manage_assignments',
+    'view_training_dashboard',
+    'view_trainee_details',
+    'view_training_evidence',
+    'audit_training',
   ],
   manager: [
     'invite_users',
@@ -400,6 +440,23 @@ export const ROLE_PERMISSIONS: Record<OrganizationRole, string[]> = {
     'manage_folders',
     'view_folders',
     'view_reports',
+    // Procedures
+    'create_procedure',
+    'edit_procedure',
+    'delete_procedure',
+    'publish_procedure',
+    'review_procedure',
+    'view_all_procedures',
+    // Workflows
+    'create_workflow_template',
+    'start_workflow',
+    'cancel_workflow',
+    'view_workflow_analytics',
+    // Training
+    'manage_assignments',
+    'view_training_dashboard',
+    'view_trainee_details',
+    'view_training_evidence',
   ],
   member: [
     'view_users',
@@ -409,6 +466,12 @@ export const ROLE_PERMISSIONS: Record<OrganizationRole, string[]> = {
     'share_documents',
     'create_folders',
     'view_folders',
+    // Procedures
+    'create_procedure',
+    'edit_procedure',
+    'review_procedure',
+    // Workflows
+    'start_workflow',
   ],
   viewer: ['view_users', 'view_documents', 'view_folders'],
 }

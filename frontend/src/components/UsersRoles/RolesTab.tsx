@@ -59,6 +59,26 @@ const ALL_PERMISSIONS = [
   { key: 'edit_users', label: 'Edit Users', category: 'Users' },
   { key: 'delete_users', label: 'Delete Users', category: 'Users' },
   { key: 'manage_roles', label: 'Manage Roles', category: 'Users' },
+  // Procedure permissions
+  { key: 'create_procedure', label: 'Create Procedures', category: 'Procedures' },
+  { key: 'edit_procedure', label: 'Edit Procedures', category: 'Procedures' },
+  { key: 'delete_procedure', label: 'Delete Procedures', category: 'Procedures' },
+  { key: 'publish_procedure', label: 'Publish / Retire Procedures', category: 'Procedures' },
+  { key: 'review_procedure', label: 'Review Procedures', category: 'Procedures' },
+  { key: 'view_all_procedures', label: 'View All Procedures', category: 'Procedures' },
+  // Workflow permissions
+  { key: 'create_workflow_template', label: 'Create / Edit Templates', category: 'Workflows' },
+  { key: 'delete_workflow_template', label: 'Delete Templates', category: 'Workflows' },
+  { key: 'start_workflow', label: 'Start Workflows', category: 'Workflows' },
+  { key: 'cancel_workflow', label: 'Cancel Workflows', category: 'Workflows' },
+  { key: 'manage_auto_triggers', label: 'Manage Auto-Trigger Rules', category: 'Workflows' },
+  { key: 'view_workflow_analytics', label: 'View Analytics', category: 'Workflows' },
+  // Training permissions
+  { key: 'manage_assignments', label: 'Manage Assignments', category: 'Training' },
+  { key: 'view_training_dashboard', label: 'View Dashboard', category: 'Training' },
+  { key: 'view_trainee_details', label: 'View Trainee Details', category: 'Training' },
+  { key: 'view_training_evidence', label: 'View Evidence', category: 'Training' },
+  { key: 'audit_training', label: 'Audit Training (Read-only)', category: 'Training' },
   // Admin permissions
   { key: 'view_audit_logs', label: 'View Audit Logs', category: 'Administration' },
   { key: 'manage_departments', label: 'Manage Departments', category: 'Administration' },

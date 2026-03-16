@@ -62,6 +62,14 @@ from apps.workflows.engine import (
 from apps.sharing.models import Notification
 from apps.procedures.models import Procedure
 from django.contrib.contenttypes.models import ContentType
+from apps.permissions.decorators import (
+    CanCreateWorkflowTemplate,
+    CanDeleteWorkflowTemplate,
+    CanStartWorkflow,
+    CanCancelWorkflow,
+    CanManageAutoTriggers,
+    CanViewWorkflowAnalytics,
+)
 
 User = get_user_model()
 
@@ -101,6 +109,13 @@ class WorkflowTemplateViewSet(viewsets.ModelViewSet):
     - DELETE /api/v1/workflows/templates/{id}/ - Delete template
     """
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return [permissions.IsAuthenticated(), CanCreateWorkflowTemplate()]
+        elif self.action == 'destroy':
+            return [permissions.IsAuthenticated(), CanDeleteWorkflowTemplate()]
+        return [permissions.IsAuthenticated()]
 
     def get_queryset(self):
         """Filter templates by organization."""
@@ -164,6 +179,15 @@ class WorkflowInstanceViewSet(viewsets.ModelViewSet):
     """
     permission_classes = [permissions.IsAuthenticated]
     http_method_names = ['get', 'post', 'head', 'options']  # No PUT/DELETE
+
+    def get_permissions(self):
+        if self.action == 'create':
+            return [permissions.IsAuthenticated(), CanStartWorkflow()]
+        elif self.action == 'cancel':
+            return [permissions.IsAuthenticated(), CanCancelWorkflow()]
+        elif self.action == 'start_from_document':
+            return [permissions.IsAuthenticated(), CanStartWorkflow()]
+        return [permissions.IsAuthenticated()]
 
     def get_queryset(self):
         """Filter instances by organization and access."""
@@ -587,7 +611,7 @@ class WorkflowStatsView(APIView):
     """
     Get workflow statistics for the current user.
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanViewWorkflowAnalytics]
 
     def get(self, request):
         user = request.user
@@ -713,7 +737,7 @@ class AutoTriggerRuleViewSet(viewsets.ModelViewSet):
     - POST /api/v1/workflows/auto-trigger-rules/{id}/test/ - Test rule against a document
     - POST /api/v1/workflows/auto-trigger-rules/{id}/toggle/ - Toggle rule active state
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanManageAutoTriggers]
 
     def get_queryset(self):
         """Filter rules by organization."""
