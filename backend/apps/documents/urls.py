@@ -77,6 +77,8 @@ from apps.documents.views import (
     DocumentEmptyTrashView,
     # Orphaned document cleanup
     DocumentOrphanedCleanupView,
+    # Dashboard stats
+    DocumentDashboardStatsView,
 )
 from apps.classification.views import ApplyClassificationManuallyView
 
@@ -186,4 +188,7 @@ urlpatterns = [
 
     # Orphaned document cleanup endpoint
     path('<uuid:id>/cleanup-orphaned/', DocumentOrphanedCleanupView.as_view(), name='document_orphaned_cleanup'),
+
+    # Dashboard stats endpoint
+    path('stats/', DocumentDashboardStatsView.as_view(), name='document_dashboard_stats'),
 ]

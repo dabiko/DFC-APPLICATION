@@ -41,7 +41,8 @@
     "react-file-icon": "^1.6.0",
     "react-redux": "^9.2.0",
     "react-router-dom": "^7.9.6",
-    "react-window": "^2.2.3"
+    "react-window": "^2.2.3",
+    "recharts": "^3.8.0"
   },
   "devDependencies": {
     "@chromatic-com/storybook": "^5.0.1",

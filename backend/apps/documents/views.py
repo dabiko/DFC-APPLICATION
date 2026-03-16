@@ -4828,3 +4828,97 @@ class DocumentOrphanedCleanupView(APIView):
         )
 
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# =============================================================================
+# Dashboard Stats
+# =============================================================================
+
+
+@extend_schema(
+    tags=['Documents'],
+    responses={
+        200: OpenApiResponse(description='Dashboard document statistics'),
+    }
+)
+class DocumentDashboardStatsView(APIView):
+    """
+    Aggregated document statistics for the enterprise dashboard.
+
+    Returns total counts, storage usage, and breakdowns by department and type.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from apps.folders.models import Folder
+        from apps.documents.utils import get_user_storage_summary
+        from django.db.models import Count
+        from datetime import timedelta
+
+        user = request.user
+
+        # Base queryset - non-deleted documents
+        docs_qs = Document.objects.filter(is_deleted=False)
+
+        total_documents = docs_qs.count()
+        total_folders = Folder.objects.count()
+
+        # Storage - get org-wide usage for staff, personal for regular users
+        if user.is_staff or user.is_superuser:
+            from apps.documents.utils import get_storage_usage
+            storage_info = get_storage_usage()
+            storage_used = storage_info.get('total_size_bytes', 0)
+        else:
+            storage_summary = get_user_storage_summary(user)
+            personal = storage_summary.get('personal_usage', {})
+            storage_used = personal.get('total_size_bytes', 0)
+
+        # Try to get quota from department
+        storage_limit = 500 * 1024 * 1024 * 1024  # 500GB default
+        if not user.is_staff and hasattr(user, 'department') and user.department:
+            from apps.documents.utils import get_department_quota_status
+            try:
+                quota_info = get_department_quota_status(user.department)
+                if quota_info and quota_info.get('quota_bytes'):
+                    storage_limit = quota_info['quota_bytes']
+            except Exception:
+                pass
+
+        # Documents by department
+        dept_breakdown = (
+            docs_qs
+            .exclude(department__isnull=True)
+            .values('department__name')
+            .annotate(count=Count('id'))
+            .order_by('-count')[:10]
+        )
+        documents_by_department = [
+            {'name': row['department__name'], 'count': row['count']}
+            for row in dept_breakdown
+        ]
+
+        # Documents by type
+        type_breakdown = (
+            docs_qs
+            .values('document_type')
+            .annotate(count=Count('id'))
+            .order_by('-count')[:10]
+        )
+        documents_by_type = [
+            {'type': row['document_type'] or 'Unknown', 'count': row['count']}
+            for row in type_breakdown
+        ]
+
+        # Recent uploads (last 7 days)
+        seven_days_ago = timezone.now() - timedelta(days=7)
+        recent_uploads_count = docs_qs.filter(created_at__gte=seven_days_ago).count()
+
+        return Response({
+            'total_documents': total_documents,
+            'total_folders': total_folders,
+            'storage_used_bytes': storage_used,
+            'storage_limit_bytes': storage_limit,
+            'documents_by_department': documents_by_department,
+            'documents_by_type': documents_by_type,
+            'recent_uploads_count': recent_uploads_count,
+        })

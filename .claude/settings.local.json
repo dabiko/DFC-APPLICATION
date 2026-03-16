@@ -58,7 +58,9 @@
       "Bash(find /c/Users/dabik/PycharmProjects/DFC-APPLICATION/frontend/src -name \"*workflow*\" -o -name \"*review*\" | grep -E \"\\\\.\\(tsx?|jsx?\\)$\")",
       "Bash(cd C:/Users/dabik/PycharmProjects/DFC-APPLICATION/backend && python -c \"\nimport django, os\nos.environ['DJANGO_SETTINGS_MODULE']='config.settings.development'\ndjango.setup\\(\\)\nfrom apps.permissions.utils import PermissionChecker\nfrom django.contrib.auth import get_user_model\nUser = get_user_model\\(\\)\nadmin_user = User.objects.get\\(id=16\\)\nchecker = PermissionChecker\\(admin_user\\)\ntests = ['can_create_procedure', 'can_edit_procedure', 'can_manage_assignments', 'can_audit_training']\nfor perm in tests:\n    r = checker.has_global_permission\\(perm\\)\n    print\\(f'{perm}: {r}'\\)\n\" 2>&1 | tail -6)",
       "Bash(find \"C:/Users/dabik/PycharmProjects/DFC-APPLICATION/frontend/src/components\" -type f -name \"*[Pp]rotect*\" -o -name \"*[Pp]ermission*\" -o -name \"*[Rr]ole*\" 2>/dev/null | head -20)",
-      "Bash(find /c/Users/dabik/PycharmProjects/DFC-APPLICATION/frontend/src/components -type f -name \"*user*\" -o -name \"*User*\" 2>/dev/null | head -20)"
+      "Bash(find /c/Users/dabik/PycharmProjects/DFC-APPLICATION/frontend/src/components -type f -name \"*user*\" -o -name \"*User*\" 2>/dev/null | head -20)",
+      "Bash(cd:*)",
+      "Bash(DJANGO_SETTINGS_MODULE=config.settings.development python -c \"\nimport django; django.setup\\(\\)\nfrom django.urls import reverse\nprint\\(reverse\\('documents:document_dashboard_stats'\\)\\)\n\" 2>&1)"
     ],
     "deny": [],
     "ask": []
