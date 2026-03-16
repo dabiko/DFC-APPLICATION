@@ -1,5 +1,5 @@
 import React from 'react'
-import { TrendingUp, Users, FileText, Globe } from 'lucide-react'
+import { TrendingUp, Users, FileText, Globe, ClipboardList, GraduationCap } from 'lucide-react'
 
 /**
  * Stats Section - Social proof and key metrics
@@ -20,6 +20,20 @@ const StatsSection: React.FC = () => {
       label: 'Documents Managed',
       description: 'Securely stored and organized',
       color: 'from-purple-500 to-pink-500',
+    },
+    {
+      icon: <ClipboardList className="w-8 h-8" />,
+      value: '25,000+',
+      label: 'Procedures Published',
+      description: 'Versioned, reviewed, and approved',
+      color: 'from-indigo-500 to-violet-500',
+    },
+    {
+      icon: <GraduationCap className="w-8 h-8" />,
+      value: '98%',
+      label: 'Training Pass Rate',
+      description: 'With built-in quizzes and tracking',
+      color: 'from-emerald-500 to-teal-500',
     },
     {
       icon: <Globe className="w-8 h-8" />,
@@ -65,7 +79,7 @@ const StatsSection: React.FC = () => {
     <section className="py-16 sm:py-24 bg-white dark:bg-gray-900 transition-colors duration-300">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 mb-16 sm:mb-24">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 mb-16 sm:mb-24">
           {stats.map((stat, index) => (
             <div
               key={index}

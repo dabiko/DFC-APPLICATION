@@ -13,8 +13,8 @@ const CTASection: React.FC<CTASectionProps> = ({ onNavigate }) => {
   const benefits = [
     '14-day free trial',
     'No credit card required',
-    'Full access to all features',
-    'Cancel anytime',
+    'Documents, Procedures & Training',
+    'Approval Workflows built in',
     'Setup in 5 minutes',
     '24/7 support included',
   ]
@@ -33,13 +33,13 @@ const CTASection: React.FC<CTASectionProps> = ({ onNavigate }) => {
           <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 sm:mb-8">
             Ready to Transform Your
             <br />
-            Document Management?
+            Document & Procedure Management?
           </h2>
 
           {/* Subheadline */}
           <p className="text-lg sm:text-xl md:text-2xl text-blue-50 dark:text-blue-100 mb-10 sm:mb-12 max-w-2xl mx-auto">
-            Join 500+ organizations that trust DabiTech DFC for secure, compliant, and efficient
-            document management
+            Join 500+ organizations that trust DabiTech DFC for secure document management,
+            procedure authoring, approval workflows, and compliance training
           </p>
 
           {/* Benefits Grid */}

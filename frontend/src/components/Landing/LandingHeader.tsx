@@ -32,9 +32,9 @@ const LandingHeader: React.FC<LandingHeaderProps> = ({ theme, onToggleTheme, onN
 
   const navLinks = [
     { label: 'Features', href: '#features' },
+    { label: 'Procedures', href: '#procedures' },
     { label: 'Security', href: '#security' },
     { label: 'Pricing', href: '#pricing' },
-    { label: 'About', href: '#about' },
   ]
 
   const scrollToSection = (href: string) => {

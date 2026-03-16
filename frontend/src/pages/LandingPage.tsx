@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTheme } from '../hooks/useTheme'
 import HeroSection from '../components/Landing/HeroSection'
 import FeaturesSection from '../components/Landing/FeaturesSection'
+import ProcedureShowcaseSection from '../components/Landing/ProcedureShowcaseSection'
 import SecuritySection from '../components/Landing/SecuritySection'
 import PricingSection from '../components/Landing/PricingSection'
 import StatsSection from '../components/Landing/StatsSection'
@@ -41,6 +42,9 @@ const LandingPage: React.FC = () => {
 
         {/* Features Section - Core value propositions */}
         <FeaturesSection />
+
+        {/* Procedure Lifecycle Showcase - Author, Review, Train */}
+        <ProcedureShowcaseSection />
 
         {/* Security & Compliance - Trust building */}
         <SecuritySection />

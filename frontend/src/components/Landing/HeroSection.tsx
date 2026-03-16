@@ -224,7 +224,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
           <div className="inline-flex items-center space-x-2 bg-blue-100 dark:bg-blue-900/30 px-4 py-2 rounded-full mb-6 sm:mb-8 animate-fadeIn">
             <Zap className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
-              Enterprise-Grade Document Management
+              Documents, Procedures, Workflows & Training — All in One
             </span>
           </div>
 
@@ -233,7 +233,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
             Secure Digital Filing
             <br />
             <span className="bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">
-              Made Simple
+              & Operational Excellence
             </span>
           </h1>
 
@@ -242,32 +242,38 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
             className="text-lg sm:text-xl md:text-2xl text-gray-600 dark:text-gray-300 mb-8 sm:mb-12 max-w-3xl mx-auto leading-relaxed animate-slideUp"
             style={{ animationDelay: '0.1s' }}
           >
-            Transform your document management with military-grade security, AI-powered
-            classification, and seamless collaboration. Built for financial institutions and
+            Manage documents, author procedures, automate approval workflows, and deliver compliance
+            training — all from a single secure platform built for financial institutions and
             enterprises.
           </p>
 
           {/* Key Benefits */}
           <div
-            className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-10 sm:mb-12 max-w-3xl mx-auto animate-slideUp"
+            className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-10 sm:mb-12 max-w-4xl mx-auto animate-slideUp"
             style={{ animationDelay: '0.2s' }}
           >
-            <div className="flex items-center justify-center space-x-2 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm px-4 py-3 rounded-lg">
-              <Shield className="w-5 h-5 text-green-600 dark:text-green-400" />
+            <div className="flex items-center justify-center space-x-2 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm px-3 py-3 rounded-lg">
+              <Shield className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Bank-Level Security
               </span>
             </div>
-            <div className="flex items-center justify-center space-x-2 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm px-4 py-3 rounded-lg">
-              <CheckCircle className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            <div className="flex items-center justify-center space-x-2 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm px-3 py-3 rounded-lg">
+              <CheckCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 GDPR Compliant
               </span>
             </div>
-            <div className="flex items-center justify-center space-x-2 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm px-4 py-3 rounded-lg">
-              <FileText className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+            <div className="flex items-center justify-center space-x-2 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm px-3 py-3 rounded-lg">
+              <FileText className="w-5 h-5 text-purple-600 dark:text-purple-400 flex-shrink-0" />
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                99.9% Uptime SLA
+                Procedure Management
+              </span>
+            </div>
+            <div className="flex items-center justify-center space-x-2 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm px-3 py-3 rounded-lg">
+              <Zap className="w-5 h-5 text-orange-600 dark:text-orange-400 flex-shrink-0" />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Training & Quizzes
               </span>
             </div>
           </div>
