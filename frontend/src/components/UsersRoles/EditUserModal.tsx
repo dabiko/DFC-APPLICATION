@@ -17,7 +17,14 @@ import {
   AlertCircle,
   CheckCircle,
   Phone,
+  Crown,
+  ShieldCheck,
+  Users,
+  Edit3,
+  Eye,
+  Sparkles,
 } from 'lucide-react'
+import { CustomSelect, type SelectOption } from './CustomSelect'
 import {
   updateUser,
   getDepartments,
@@ -40,6 +47,79 @@ interface EditUserModalProps {
   user: UserType | null
   onClose: () => void
   onSuccess: () => void
+}
+
+// ============================================================================
+// ROLE STYLING HELPERS
+// ============================================================================
+
+const ROLE_ICONS: Record<string, React.ReactNode> = {
+  owner: <Crown className="w-4 h-4" />,
+  admin: <ShieldCheck className="w-4 h-4" />,
+  manager: <Users className="w-4 h-4" />,
+  member: <Edit3 className="w-4 h-4" />,
+  editor: <Edit3 className="w-4 h-4" />,
+  viewer: <Eye className="w-4 h-4" />,
+}
+
+const ROLE_COLORS: Record<string, { bg: string; text: string; ring: string }> = {
+  owner: {
+    bg: 'bg-purple-50 dark:bg-purple-900/20',
+    text: 'text-purple-700 dark:text-purple-300',
+    ring: 'ring-purple-200 dark:ring-purple-800',
+  },
+  admin: {
+    bg: 'bg-red-50 dark:bg-red-900/20',
+    text: 'text-red-700 dark:text-red-300',
+    ring: 'ring-red-200 dark:ring-red-800',
+  },
+  manager: {
+    bg: 'bg-blue-50 dark:bg-blue-900/20',
+    text: 'text-blue-700 dark:text-blue-300',
+    ring: 'ring-blue-200 dark:ring-blue-800',
+  },
+  member: {
+    bg: 'bg-green-50 dark:bg-green-900/20',
+    text: 'text-green-700 dark:text-green-300',
+    ring: 'ring-green-200 dark:ring-green-800',
+  },
+  editor: {
+    bg: 'bg-green-50 dark:bg-green-900/20',
+    text: 'text-green-700 dark:text-green-300',
+    ring: 'ring-green-200 dark:ring-green-800',
+  },
+  viewer: {
+    bg: 'bg-gray-50 dark:bg-gray-700/50',
+    text: 'text-gray-700 dark:text-gray-300',
+    ring: 'ring-gray-200 dark:ring-gray-700',
+  },
+}
+
+const DEFAULT_ROLE_COLOR = {
+  bg: 'bg-indigo-50 dark:bg-indigo-900/20',
+  text: 'text-indigo-700 dark:text-indigo-300',
+  ring: 'ring-indigo-200 dark:ring-indigo-800',
+}
+
+function getRoleColor(roleName: string) {
+  return ROLE_COLORS[roleName.toLowerCase()] || DEFAULT_ROLE_COLOR
+}
+
+function getRoleIcon(roleName: string) {
+  return ROLE_ICONS[roleName.toLowerCase()] || <Sparkles className="w-4 h-4" />
+}
+
+function getRoleDescription(roleName: string): string {
+  const descriptions: Record<string, string> = {
+    owner: 'Full organization control and billing',
+    admin: 'System-wide administration access',
+    administrator: 'System-wide administration access',
+    manager: 'Team and content management',
+    member: 'Standard content creation access',
+    editor: 'Document and procedure editing',
+    viewer: 'Read-only access to content',
+  }
+  return descriptions[roleName.toLowerCase()] || 'Custom role with specific permissions'
 }
 
 // ============================================================================
@@ -176,6 +256,52 @@ export function EditUserModal({ isOpen, user, onClose, onSuccess }: EditUserModa
     }
   }
 
+  // Build role options for the custom select
+  const roleOptions: SelectOption[] = [
+    ...ROLE_OPTIONS.map((option) => {
+      const colors = getRoleColor(option.value)
+      return {
+        value: option.value,
+        label: option.label,
+        description: getRoleDescription(option.value),
+        icon: getRoleIcon(option.value),
+        badge: 'System',
+        badgeColor: `${colors.bg} ${colors.text}`,
+        group: 'System Roles',
+      }
+    }),
+    ...roles
+      .filter((r) => !r.is_system)
+      .map((role) => ({
+        value: role.name,
+        label: role.display_name || role.name,
+        description:
+          role.description || `Custom role with ${role.permissions?.length || 0} permissions`,
+        icon: <Sparkles className="w-4 h-4" />,
+        badge: 'Custom',
+        badgeColor: DEFAULT_ROLE_COLOR.bg + ' ' + DEFAULT_ROLE_COLOR.text,
+        group: 'Custom Roles',
+      })),
+  ]
+
+  // Build department options for the custom select
+  const departmentOptions: SelectOption[] = [
+    {
+      value: '',
+      label: 'No Department',
+      description: 'User will not be assigned to any department',
+      icon: <Building2 className="w-4 h-4" />,
+      badgeColor: 'bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400',
+    },
+    ...departments.map((dept) => ({
+      value: dept.id.toString(),
+      label: dept.name,
+      description: dept.code ? `Code: ${dept.code}` : undefined,
+      icon: <Building2 className="w-4 h-4" />,
+      badgeColor: 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400',
+    })),
+  ]
+
   if (!isOpen || !user) return null
 
   return (
@@ -184,7 +310,7 @@ export function EditUserModal({ isOpen, user, onClose, onSuccess }: EditUserModa
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
 
       {/* Modal */}
-      <div className="relative w-full max-w-lg bg-white dark:bg-gray-800 rounded-xl shadow-2xl overflow-hidden">
+      <div className="relative w-full max-w-2xl bg-white dark:bg-gray-800 rounded-xl shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-3">
@@ -214,7 +340,7 @@ export function EditUserModal({ isOpen, user, onClose, onSuccess }: EditUserModa
 
         {/* Content */}
         <form onSubmit={handleSubmit}>
-          <div className="p-6 space-y-5">
+          <div className="p-6 space-y-5 max-h-[calc(100vh-220px)] overflow-y-auto">
             {/* Success Message */}
             {success && (
               <div className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-lg">
@@ -243,7 +369,7 @@ export function EditUserModal({ isOpen, user, onClose, onSuccess }: EditUserModa
                     type="text"
                     value={formData.first_name}
                     onChange={(e) => handleChange('first_name', e.target.value)}
-                    className="w-full pl-10 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full pl-10 pr-3 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
                   />
                 </div>
@@ -256,7 +382,7 @@ export function EditUserModal({ isOpen, user, onClose, onSuccess }: EditUserModa
                   type="text"
                   value={formData.last_name}
                   onChange={(e) => handleChange('last_name', e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required
                 />
               </div>
@@ -273,7 +399,7 @@ export function EditUserModal({ isOpen, user, onClose, onSuccess }: EditUserModa
                   type="email"
                   value={formData.email}
                   onChange={(e) => handleChange('email', e.target.value)}
-                  className="w-full pl-10 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pl-10 pr-3 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required
                 />
               </div>
@@ -291,95 +417,76 @@ export function EditUserModal({ isOpen, user, onClose, onSuccess }: EditUserModa
                   value={formData.phone_number}
                   onChange={(e) => handleChange('phone_number', e.target.value)}
                   placeholder="+1 (555) 000-0000"
-                  className="w-full pl-10 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pl-10 pr-3 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
             </div>
 
-            {/* Role and Department */}
+            {/* Role and Department — Custom Selects */}
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  <Shield className="inline w-4 h-4 mr-1" />
-                  Role *
-                </label>
-                <select
-                  value={formData.organization_role}
-                  onChange={(e) => handleChange('organization_role', e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                  disabled={isLoadingRoles}
-                >
-                  {ROLE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                  {roles
-                    .filter((r) => !r.is_system)
-                    .map((role) => (
-                      <option key={role.id} value={role.name}>
-                        {role.name}
-                      </option>
-                    ))}
-                </select>
-              </div>
+              <CustomSelect
+                value={formData.organization_role}
+                onChange={(val) => handleChange('organization_role', val)}
+                options={roleOptions}
+                icon={<Shield className="w-4 h-4" />}
+                label="Role"
+                required
+                disabled={isLoadingRoles}
+                searchable
+                placeholder="Select role..."
+              />
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  <Building2 className="inline w-4 h-4 mr-1" />
-                  Department
-                </label>
-                <select
-                  value={formData.department_id}
-                  onChange={(e) => handleChange('department_id', e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  disabled={isLoadingDepartments}
-                >
-                  <option value="">No department</option>
-                  {departments.map((dept) => (
-                    <option key={dept.id} value={dept.id}>
-                      {dept.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <CustomSelect
+                value={formData.department_id}
+                onChange={(val) => handleChange('department_id', val)}
+                options={departmentOptions}
+                icon={<Building2 className="w-4 h-4" />}
+                label="Department"
+                disabled={isLoadingDepartments}
+                searchable={departments.length > 5}
+                placeholder="Select department..."
+              />
             </div>
 
             {/* User Status Info */}
-            <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-              <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
-                <div className="flex justify-between">
-                  <span>Account Status:</span>
-                  <span
+            <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-100 dark:border-gray-700">
+              <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2.5">
+                Account Info
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="text-center">
+                  <div
                     className={cn(
-                      'font-medium',
+                      'text-sm font-semibold',
                       user.is_active
                         ? 'text-green-600 dark:text-green-400'
                         : 'text-red-600 dark:text-red-400'
                     )}
                   >
                     {user.is_active ? 'Active' : 'Inactive'}
-                  </span>
+                  </div>
+                  <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">Status</div>
                 </div>
-                <div className="flex justify-between">
-                  <span>MFA Enabled:</span>
-                  <span
+                <div className="text-center border-x border-gray-200 dark:border-gray-600">
+                  <div
                     className={cn(
-                      'font-medium',
+                      'text-sm font-semibold',
                       user.mfa_enabled
                         ? 'text-green-600 dark:text-green-400'
-                        : 'text-gray-600 dark:text-gray-400'
+                        : 'text-gray-500 dark:text-gray-400'
                     )}
                   >
-                    {user.mfa_enabled ? 'Yes' : 'No'}
-                  </span>
+                    {user.mfa_enabled ? 'Enabled' : 'Disabled'}
+                  </div>
+                  <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">MFA</div>
                 </div>
-                <div className="flex justify-between">
-                  <span>Last Login:</span>
-                  <span className="font-medium text-gray-900 dark:text-gray-100">
+                <div className="text-center">
+                  <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                     {user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never'}
-                  </span>
+                  </div>
+                  <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
+                    Last Login
+                  </div>
                 </div>
               </div>
             </div>

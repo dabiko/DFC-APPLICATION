@@ -496,7 +496,7 @@ def get_user_permissions_summary(user):
             {
                 'id': str(role.id),
                 'role': role.role.name,
-                'role_display': role.role.get_name_display(),
+                'role_display': role.role.display_name or role.role.name,
                 'expires_at': role.expires_at.isoformat() if role.expires_at else None
             }
             for role in global_roles
@@ -505,7 +505,7 @@ def get_user_permissions_summary(user):
             {
                 'id': str(role.id),
                 'role': role.role.name,
-                'role_display': role.role.get_name_display(),
+                'role_display': role.role.display_name or role.role.name,
                 'department': role.department.name,
                 'expires_at': role.expires_at.isoformat() if role.expires_at else None
             }

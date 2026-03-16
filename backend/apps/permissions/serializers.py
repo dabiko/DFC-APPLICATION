@@ -17,13 +17,29 @@ from apps.folders.models import Folder
 User = get_user_model()
 
 
+# All permission boolean field names on the Role model
+ROLE_PERMISSION_FIELDS = [
+    'can_view', 'can_download', 'can_upload', 'can_edit', 'can_delete',
+    'can_share', 'can_manage_permissions', 'can_view_audit_log',
+    'can_manage_retention', 'can_manage_classification',
+    'can_create_procedure', 'can_edit_procedure', 'can_delete_procedure',
+    'can_publish_procedure', 'can_review_procedure', 'can_view_all_procedures',
+    'can_create_workflow_template', 'can_delete_workflow_template',
+    'can_start_workflow', 'can_cancel_workflow', 'can_manage_auto_triggers',
+    'can_view_workflow_analytics',
+    'can_manage_assignments', 'can_view_training_dashboard',
+    'can_view_trainee_details', 'can_view_training_evidence', 'can_audit_training',
+]
+
+
 class RoleSerializer(serializers.ModelSerializer):
     """
     Serializer for Role model.
     Used for role listing and details.
     """
     permissions_list = serializers.SerializerMethodField()
-    display_name = serializers.CharField(source='get_name_display', read_only=True)
+    is_custom = serializers.BooleanField(read_only=True)
+    user_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Role
@@ -32,62 +48,118 @@ class RoleSerializer(serializers.ModelSerializer):
             'name',
             'display_name',
             'description',
-            # Document & Folder
-            'can_view',
-            'can_download',
-            'can_upload',
-            'can_edit',
-            'can_delete',
-            'can_share',
-            'can_manage_permissions',
-            'can_view_audit_log',
-            'can_manage_retention',
-            'can_manage_classification',
-            # Procedure
-            'can_create_procedure',
-            'can_edit_procedure',
-            'can_delete_procedure',
-            'can_publish_procedure',
-            'can_review_procedure',
-            'can_view_all_procedures',
-            # Workflow
-            'can_create_workflow_template',
-            'can_delete_workflow_template',
-            'can_start_workflow',
-            'can_cancel_workflow',
-            'can_manage_auto_triggers',
-            'can_view_workflow_analytics',
-            # Training
-            'can_manage_assignments',
-            'can_view_training_dashboard',
-            'can_view_trainee_details',
-            'can_view_training_evidence',
-            'can_audit_training',
+            'is_system',
+            'is_custom',
+            'user_count',
+        ] + ROLE_PERMISSION_FIELDS + [
             'permissions_list',
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'is_system', 'created_at', 'updated_at']
 
     def get_permissions_list(self, obj):
         """Get list of permission names this role has"""
         return obj.get_permissions_list()
 
+    def get_user_count(self, obj):
+        """Count of users currently assigned this role"""
+        from apps.permissions.models import UserRole
+        return UserRole.objects.filter(role=obj, is_active=True).count()
 
-class RoleListSerializer(serializers.ModelSerializer):
+
+class RoleCreateSerializer(serializers.ModelSerializer):
     """
-    Minimal serializer for role listings.
+    Serializer for creating/updating custom roles.
+    Accepts a permissions list and maps it to boolean fields.
     """
-    display_name = serializers.CharField(source='get_name_display', read_only=True)
-    permission_count = serializers.SerializerMethodField()
+    permissions = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        write_only=True,
+        help_text="List of permission keys (e.g. ['view_document', 'create_procedure'])"
+    )
 
     class Meta:
         model = Role
-        fields = ['id', 'name', 'display_name', 'description', 'permission_count']
+        fields = [
+            'name',
+            'display_name',
+            'description',
+            'permissions',
+        ] + ROLE_PERMISSION_FIELDS
+        extra_kwargs = {f: {'required': False} for f in ROLE_PERMISSION_FIELDS}
+
+    def validate_name(self, value):
+        """Prevent creating a role with a system role name."""
+        if value.upper() in Role.SYSTEM_ROLE_NAMES:
+            # Allow if we're updating the same role
+            if self.instance and self.instance.name == value:
+                return value
+            raise serializers.ValidationError(
+                f"'{value}' is reserved for a system role."
+            )
+        return value
+
+    def _apply_permissions_list(self, validated_data):
+        """Convert a permissions list to boolean fields."""
+        permissions = validated_data.pop('permissions', None)
+        if permissions is not None:
+            # Build reverse map: permission_key → field_name
+            reverse_map = {v: k for k, v in Role.PERMISSION_FLAG_MAP.items()}
+            # Reset all permission fields to False first
+            for field in ROLE_PERMISSION_FIELDS:
+                validated_data.setdefault(field, False)
+            # Enable the requested ones
+            for perm_key in permissions:
+                field_name = reverse_map.get(perm_key)
+                if field_name:
+                    validated_data[field_name] = True
+        return validated_data
+
+    def create(self, validated_data):
+        validated_data = self._apply_permissions_list(validated_data)
+        validated_data['is_system'] = False
+        if not validated_data.get('display_name'):
+            validated_data['display_name'] = validated_data['name']
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        if instance.is_system:
+            # Only allow updating description and display_name on system roles
+            allowed = {'description', 'display_name'}
+            for key in list(validated_data.keys()):
+                if key not in allowed:
+                    validated_data.pop(key)
+            return super().update(instance, validated_data)
+        validated_data = self._apply_permissions_list(validated_data)
+        return super().update(instance, validated_data)
+
+
+class RoleListSerializer(serializers.ModelSerializer):
+    """
+    Serializer for role listings.
+    Includes permissions_list so the frontend can display and pre-populate edit forms.
+    """
+    permissions_list = serializers.SerializerMethodField()
+    permission_count = serializers.SerializerMethodField()
+    is_custom = serializers.BooleanField(read_only=True)
+    user_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Role
+        fields = ['id', 'name', 'display_name', 'description', 'is_system', 'is_custom', 'permission_count', 'user_count', 'permissions_list']
+
+    def get_permissions_list(self, obj):
+        return obj.get_permissions_list()
 
     def get_permission_count(self, obj):
         """Count of active permissions"""
         return len(obj.get_permissions_list())
+
+    def get_user_count(self, obj):
+        from apps.permissions.models import UserRole
+        return UserRole.objects.filter(role=obj, is_active=True).count()
 
 
 class UserRoleSerializer(serializers.ModelSerializer):
@@ -97,7 +169,7 @@ class UserRoleSerializer(serializers.ModelSerializer):
     user_username = serializers.CharField(source='user.username', read_only=True)
     user_email = serializers.EmailField(source='user.email', read_only=True)
     user_full_name = serializers.CharField(source='user.get_full_name', read_only=True)
-    role_name = serializers.CharField(source='role.get_name_display', read_only=True)
+    role_name = serializers.CharField(source='role.display_name', read_only=True)
     department_name = serializers.CharField(source='department.name', read_only=True, allow_null=True)
     granted_by_username = serializers.CharField(source='granted_by.username', read_only=True, allow_null=True)
     scope_display = serializers.CharField(source='get_scope_display', read_only=True)

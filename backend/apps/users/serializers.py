@@ -48,11 +48,14 @@ class UserSerializer(serializers.ModelSerializer):
     """
     Serializer for CustomUser model.
     Used for retrieving and updating user information.
+
+    The `role` field reads/writes the user's OrganizationMember role.
     """
     department_name = serializers.CharField(source='department.name', read_only=True)
     department_code = serializers.CharField(source='department.code', read_only=True)
     organization_name = serializers.CharField(source='organization.name', read_only=True)
     organization_id = serializers.UUIDField(source='organization.id', read_only=True)
+    role = serializers.CharField(required=False)
 
     class Meta:
         model = CustomUser
@@ -63,7 +66,8 @@ class UserSerializer(serializers.ModelSerializer):
             'organization', 'organization_name', 'organization_id',
             'avatar', 'is_staff', 'is_superuser', 'is_active',
             'mfa_enabled', 'date_joined', 'last_login',
-            'created_at', 'updated_at'
+            'created_at', 'updated_at',
+            'role',
         ]
         read_only_fields = [
             'id', 'employee_id', 'date_joined', 'last_login',
@@ -73,6 +77,41 @@ class UserSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'password': {'write_only': True}
         }
+
+    def _get_membership(self, user):
+        from apps.organizations.models import OrganizationMember
+        return OrganizationMember.objects.filter(
+            user=user,
+            organization=user.organization,
+        ).first()
+
+    def to_representation(self, instance):
+        """Include the organization role when reading."""
+        data = super().to_representation(instance)
+        membership = self._get_membership(instance)
+        if membership:
+            data['role'] = membership.role
+        elif instance.is_superuser:
+            data['role'] = 'admin'
+        elif instance.is_staff:
+            data['role'] = 'manager'
+        else:
+            data['role'] = 'member'
+        return data
+
+    def update(self, instance, validated_data):
+        """Handle the role field separately — update OrganizationMember."""
+        new_role = validated_data.pop('role', None)
+        instance = super().update(instance, validated_data)
+
+        if new_role is not None:
+            from apps.organizations.models import OrganizationMember
+            OrganizationMember.objects.update_or_create(
+                user=instance,
+                organization=instance.organization,
+                defaults={'role': new_role},
+            )
+        return instance
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):

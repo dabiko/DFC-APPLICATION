@@ -39,26 +39,17 @@ interface RolesTabProps {
 }
 
 // All available permissions in the system
+// Keys MUST match the backend Role.PERMISSION_FLAG_MAP values
+// (i.e. what get_permissions_list() returns)
 const ALL_PERMISSIONS = [
-  // Document permissions
-  { key: 'view_documents', label: 'View Documents', category: 'Documents' },
-  { key: 'create_documents', label: 'Create Documents', category: 'Documents' },
-  { key: 'edit_documents', label: 'Edit Documents', category: 'Documents' },
-  { key: 'delete_documents', label: 'Delete Documents', category: 'Documents' },
-  { key: 'download_documents', label: 'Download Documents', category: 'Documents' },
-  { key: 'share_documents', label: 'Share Documents', category: 'Documents' },
-  // Folder permissions
-  { key: 'view_folders', label: 'View Folders', category: 'Folders' },
-  { key: 'create_folders', label: 'Create Folders', category: 'Folders' },
-  { key: 'edit_folders', label: 'Edit Folders', category: 'Folders' },
-  { key: 'delete_folders', label: 'Delete Folders', category: 'Folders' },
-  { key: 'manage_folder_permissions', label: 'Manage Folder Permissions', category: 'Folders' },
-  // User permissions
-  { key: 'view_users', label: 'View Users', category: 'Users' },
-  { key: 'invite_users', label: 'Invite Users', category: 'Users' },
-  { key: 'edit_users', label: 'Edit Users', category: 'Users' },
-  { key: 'delete_users', label: 'Delete Users', category: 'Users' },
-  { key: 'manage_roles', label: 'Manage Roles', category: 'Users' },
+  // Document & Folder permissions
+  { key: 'view_document', label: 'View Documents', category: 'Documents & Folders' },
+  { key: 'download_document', label: 'Download Documents', category: 'Documents & Folders' },
+  { key: 'upload_document', label: 'Upload Documents', category: 'Documents & Folders' },
+  { key: 'edit_document', label: 'Edit Documents', category: 'Documents & Folders' },
+  { key: 'delete_document', label: 'Delete Documents', category: 'Documents & Folders' },
+  { key: 'share_document', label: 'Share Documents', category: 'Documents & Folders' },
+  { key: 'manage_permissions', label: 'Manage Permissions', category: 'Documents & Folders' },
   // Procedure permissions
   { key: 'create_procedure', label: 'Create Procedures', category: 'Procedures' },
   { key: 'edit_procedure', label: 'Edit Procedures', category: 'Procedures' },
@@ -79,11 +70,10 @@ const ALL_PERMISSIONS = [
   { key: 'view_trainee_details', label: 'View Trainee Details', category: 'Training' },
   { key: 'view_training_evidence', label: 'View Evidence', category: 'Training' },
   { key: 'audit_training', label: 'Audit Training (Read-only)', category: 'Training' },
-  // Admin permissions
-  { key: 'view_audit_logs', label: 'View Audit Logs', category: 'Administration' },
-  { key: 'manage_departments', label: 'Manage Departments', category: 'Administration' },
-  { key: 'manage_settings', label: 'Manage Settings', category: 'Administration' },
-  { key: 'manage_security', label: 'Manage Security', category: 'Administration' },
+  // Administration permissions
+  { key: 'view_audit_log', label: 'View Audit Logs', category: 'Administration' },
+  { key: 'manage_retention', label: 'Manage Retention Policies', category: 'Administration' },
+  { key: 'manage_classification', label: 'Manage Classification', category: 'Administration' },
 ]
 
 // Group permissions by category

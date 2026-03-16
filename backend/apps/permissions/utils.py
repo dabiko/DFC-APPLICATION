@@ -605,6 +605,8 @@ def initialize_default_roles():
 
     roles_config = {
         Role.VIEWER: {
+            'display_name': 'Viewer',
+            'is_system': True,
             'description': 'Can view and download documents',
             'can_view': True,
             'can_download': True,
@@ -638,6 +640,8 @@ def initialize_default_roles():
             'can_audit_training': False,
         },
         Role.EDITOR: {
+            'display_name': 'Editor',
+            'is_system': True,
             'description': 'Can view, download, upload, and edit documents; create and review procedures; start workflows',
             'can_view': True,
             'can_download': True,
@@ -671,6 +675,8 @@ def initialize_default_roles():
             'can_audit_training': False,
         },
         Role.MANAGER: {
+            'display_name': 'Manager',
+            'is_system': True,
             'description': 'Can manage documents, procedures, workflows, and training assignments',
             'can_view': True,
             'can_download': True,
@@ -704,6 +710,8 @@ def initialize_default_roles():
             'can_audit_training': False,
         },
         Role.ADMIN: {
+            'display_name': 'Administrator',
+            'is_system': True,
             'description': 'Full system access including all procedure, workflow, training, and compliance capabilities',
             'can_view': True,
             'can_download': True,

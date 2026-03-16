@@ -13,7 +13,7 @@ import apiClient from './apiClient'
 
 export type UserStatus = 'active' | 'inactive' | 'locked' | 'pending'
 
-export type OrganizationRole = 'owner' | 'admin' | 'manager' | 'member' | 'viewer'
+export type OrganizationRole = 'owner' | 'admin' | 'manager' | 'member' | 'viewer' | (string & {})
 
 export interface Department {
   id: string
@@ -156,13 +156,16 @@ export interface Permission {
 
 export interface Role {
   id: string
-  name: OrganizationRole
+  name: string
   display_name: string
   description: string
   user_count: number
   permissions: string[]
+  permissions_list?: string[]
   is_system: boolean
+  is_custom?: boolean
   created_at?: string
+  updated_at?: string
 }
 
 export interface CustomRole {
@@ -691,49 +694,39 @@ export async function deleteDepartment(id: string | number): Promise<void> {
  * Get all roles with user counts
  */
 export async function getRoles(): Promise<Role[]> {
-  // Since roles are predefined, we'll construct them with user counts
-  // In a real implementation, this would be an API call
-  const users = await getUsers({ page_size: 1000 })
-
-  const roleCounts: Record<OrganizationRole, number> = {
-    owner: 0,
-    admin: 0,
-    manager: 0,
-    member: 0,
-    viewer: 0,
+  try {
+    const response = await apiClient.get<Role[] | { results: Role[] }>('/permissions/roles/')
+    const data = Array.isArray(response.data) ? response.data : response.data.results
+    return data.map((role) => ({
+      ...role,
+      permissions: role.permissions_list || ROLE_PERMISSIONS[role.name as OrganizationRole] || [],
+    }))
+  } catch {
+    // Fallback: construct from static definitions
+    return ROLE_OPTIONS.map((role) => ({
+      id: role.value,
+      name: role.value,
+      display_name: role.label,
+      description: role.description,
+      user_count: 0,
+      permissions: ROLE_PERMISSIONS[role.value],
+      is_system: true,
+    }))
   }
-
-  users.results.forEach((user) => {
-    if (user.role && roleCounts[user.role] !== undefined) {
-      roleCounts[user.role]++
-    }
-  })
-
-  return ROLE_OPTIONS.map((role) => ({
-    id: role.value,
-    name: role.value,
-    display_name: role.label,
-    description: role.description,
-    user_count: roleCounts[role.value],
-    permissions: ROLE_PERMISSIONS[role.value],
-    is_system: true,
-  }))
 }
 
 /**
- * Get custom roles
+ * Get custom roles (non-system roles)
  */
 export async function getCustomRoles(): Promise<CustomRole[]> {
   try {
-    const response = await apiClient.get<{ results: CustomRole[] } | CustomRole[]>(
-      '/auth/custom-roles/'
+    const response = await apiClient.get<CustomRole[] | { results: CustomRole[] }>(
+      '/permissions/roles/',
+      { params: { is_system: 'false' } }
     )
-    if (Array.isArray(response.data)) {
-      return response.data
-    }
-    return response.data.results
+    const data = Array.isArray(response.data) ? response.data : response.data.results
+    return data
   } catch {
-    // If endpoint doesn't exist, return empty array
     return []
   }
 }
@@ -742,7 +735,7 @@ export async function getCustomRoles(): Promise<CustomRole[]> {
  * Create a custom role
  */
 export async function createCustomRole(data: CreateCustomRoleRequest): Promise<CustomRole> {
-  const response = await apiClient.post<CustomRole>('/auth/custom-roles/', data)
+  const response = await apiClient.post<CustomRole>('/permissions/roles/', data)
   return response.data
 }
 
@@ -753,7 +746,7 @@ export async function updateCustomRole(
   id: string,
   data: Partial<CreateCustomRoleRequest>
 ): Promise<CustomRole> {
-  const response = await apiClient.patch<CustomRole>(`/auth/custom-roles/${id}/`, data)
+  const response = await apiClient.patch<CustomRole>(`/permissions/roles/${id}/`, data)
   return response.data
 }
 
@@ -761,7 +754,7 @@ export async function updateCustomRole(
  * Delete a custom role
  */
 export async function deleteCustomRole(id: string): Promise<void> {
-  await apiClient.delete(`/auth/custom-roles/${id}/`)
+  await apiClient.delete(`/permissions/roles/${id}/`)
 }
 
 /**
@@ -1156,7 +1149,7 @@ export function getStatusColorClasses(status: UserStatus): { bg: string; text: s
  * Get role badge color classes
  */
 export function getRoleColorClasses(role: OrganizationRole): { bg: string; text: string } {
-  const colors: Record<OrganizationRole, { bg: string; text: string }> = {
+  const colors: Record<string, { bg: string; text: string }> = {
     owner: {
       bg: 'bg-purple-100 dark:bg-purple-900/30',
       text: 'text-purple-700 dark:text-purple-400',
@@ -1165,9 +1158,17 @@ export function getRoleColorClasses(role: OrganizationRole): { bg: string; text:
       bg: 'bg-blue-100 dark:bg-blue-900/30',
       text: 'text-blue-700 dark:text-blue-400',
     },
+    administrator: {
+      bg: 'bg-blue-100 dark:bg-blue-900/30',
+      text: 'text-blue-700 dark:text-blue-400',
+    },
     manager: {
       bg: 'bg-indigo-100 dark:bg-indigo-900/30',
       text: 'text-indigo-700 dark:text-indigo-400',
+    },
+    editor: {
+      bg: 'bg-teal-100 dark:bg-teal-900/30',
+      text: 'text-teal-700 dark:text-teal-400',
     },
     member: {
       bg: 'bg-green-100 dark:bg-green-900/30',
@@ -1178,7 +1179,13 @@ export function getRoleColorClasses(role: OrganizationRole): { bg: string; text:
       text: 'text-gray-700 dark:text-gray-400',
     },
   }
-  return colors[role]
+  // Fallback for custom roles (e.g. "god mode", "compliance_auditor")
+  return (
+    colors[role.toLowerCase()] || {
+      bg: 'bg-amber-100 dark:bg-amber-900/30',
+      text: 'text-amber-700 dark:text-amber-400',
+    }
+  )
 }
 
 /**

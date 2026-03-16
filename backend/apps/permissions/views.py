@@ -22,6 +22,7 @@ from apps.permissions.models import Role, UserRole, FolderPermission, DocumentPe
 from apps.permissions.serializers import (
     RoleSerializer,
     RoleListSerializer,
+    RoleCreateSerializer,
     UserRoleSerializer,
     UserRoleCreateSerializer,
     FolderPermissionSerializer,
@@ -51,31 +52,62 @@ from apps.audit.utils import log_audit_event
 User = get_user_model()
 
 
-class RoleViewSet(viewsets.ReadOnlyModelViewSet):
+class RoleViewSet(viewsets.ModelViewSet):
     """
     ViewSet for Role management.
 
-    Roles are predefined and read-only.
-    Only admins can view roles.
+    System roles (VIEWER, EDITOR, MANAGER, ADMIN) are read-only.
+    Custom roles can be created, updated, and deleted by users
+    with can_manage_permissions.
     """
     queryset = Role.objects.all()
     permission_classes = [drf_permissions.IsAuthenticated]
 
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [drf_permissions.IsAuthenticated(), CanManagePermissions()]
+        return [drf_permissions.IsAuthenticated()]
+
     def get_serializer_class(self):
         if self.action == 'list':
             return RoleListSerializer
+        if self.action in ['create', 'update', 'partial_update']:
+            return RoleCreateSerializer
         return RoleSerializer
 
     def get_queryset(self):
         """Filter roles based on user permissions"""
-        queryset = Role.objects.all().order_by('name')
+        queryset = Role.objects.all().order_by('is_system', 'name')
 
         # Filter by role name if provided
         role_name = self.request.query_params.get('name')
         if role_name:
             queryset = queryset.filter(name=role_name)
 
+        # Filter system vs custom
+        is_system = self.request.query_params.get('is_system')
+        if is_system is not None:
+            queryset = queryset.filter(is_system=is_system.lower() == 'true')
+
         return queryset
+
+    def destroy(self, request, *args, **kwargs):
+        """Prevent deletion of system roles."""
+        instance = self.get_object()
+        if instance.is_system:
+            return Response(
+                {'error': 'System roles cannot be deleted.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        # Check no users are assigned
+        from apps.permissions.models import UserRole as UserRoleModel
+        user_count = UserRoleModel.objects.filter(role=instance, is_active=True).count()
+        if user_count > 0:
+            return Response(
+                {'error': f'Cannot delete role with {user_count} active user assignment(s). Reassign them first.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        return super().destroy(request, *args, **kwargs)
 
     @action(detail=True, methods=['get'])
     def users(self, request, pk=None):

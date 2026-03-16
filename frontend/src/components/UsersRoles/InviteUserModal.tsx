@@ -16,6 +16,12 @@ import {
   CheckCircle,
   Plus,
   Trash2,
+  Crown,
+  ShieldCheck,
+  Users,
+  Edit3,
+  Eye,
+  Sparkles,
 } from 'lucide-react'
 import {
   createInvitation,
@@ -27,6 +33,7 @@ import {
   type OrganizationRole,
   ROLE_OPTIONS,
 } from '@/services/userManagementService'
+import { CustomSelect, type SelectOption } from './CustomSelect'
 import { cn } from '@/utils/cn'
 
 // ============================================================================
@@ -43,6 +50,91 @@ interface InviteeForm {
   email: string
   first_name: string
   last_name: string
+}
+
+// ============================================================================
+// OPTION BUILDERS
+// ============================================================================
+
+const ROLE_ICONS: Record<string, React.ReactNode> = {
+  owner: <Crown className="w-4 h-4" />,
+  admin: <ShieldCheck className="w-4 h-4" />,
+  manager: <Users className="w-4 h-4" />,
+  member: <Edit3 className="w-4 h-4" />,
+  editor: <Edit3 className="w-4 h-4" />,
+  viewer: <Eye className="w-4 h-4" />,
+}
+
+const ROLE_COLORS: Record<string, { bg: string; text: string }> = {
+  owner: { bg: 'bg-purple-50 dark:bg-purple-900/20', text: 'text-purple-700 dark:text-purple-300' },
+  admin: { bg: 'bg-red-50 dark:bg-red-900/20', text: 'text-red-700 dark:text-red-300' },
+  manager: { bg: 'bg-blue-50 dark:bg-blue-900/20', text: 'text-blue-700 dark:text-blue-300' },
+  member: { bg: 'bg-green-50 dark:bg-green-900/20', text: 'text-green-700 dark:text-green-300' },
+  editor: { bg: 'bg-green-50 dark:bg-green-900/20', text: 'text-green-700 dark:text-green-300' },
+  viewer: { bg: 'bg-gray-50 dark:bg-gray-700/50', text: 'text-gray-700 dark:text-gray-300' },
+}
+
+const ROLE_DESCRIPTIONS: Record<string, string> = {
+  owner: 'Full organization control and billing',
+  admin: 'System-wide administration access',
+  administrator: 'System-wide administration access',
+  manager: 'Team and content management',
+  member: 'Standard content creation access',
+  editor: 'Document and procedure editing',
+  viewer: 'Read-only access to content',
+}
+
+function buildRoleOptions(roles: Role[]): SelectOption[] {
+  const defaultColor = {
+    bg: 'bg-indigo-50 dark:bg-indigo-900/20',
+    text: 'text-indigo-700 dark:text-indigo-300',
+  }
+
+  return [
+    ...ROLE_OPTIONS.map((option) => {
+      const colors = ROLE_COLORS[option.value.toLowerCase()] || defaultColor
+      return {
+        value: option.value,
+        label: option.label,
+        description: ROLE_DESCRIPTIONS[option.value.toLowerCase()] || '',
+        icon: ROLE_ICONS[option.value.toLowerCase()] || <Sparkles className="w-4 h-4" />,
+        badge: 'System',
+        badgeColor: `${colors.bg} ${colors.text}`,
+        group: 'System Roles',
+      }
+    }),
+    ...roles
+      .filter((r) => !r.is_system)
+      .map((role) => ({
+        value: role.name,
+        label: role.display_name || role.name,
+        description:
+          role.description || `Custom role with ${role.permissions?.length || 0} permissions`,
+        icon: <Sparkles className="w-4 h-4" />,
+        badge: 'Custom',
+        badgeColor: `${defaultColor.bg} ${defaultColor.text}`,
+        group: 'Custom Roles',
+      })),
+  ]
+}
+
+function buildDepartmentOptions(departments: Department[]): SelectOption[] {
+  return [
+    {
+      value: '',
+      label: 'No Department',
+      description: 'User will not be assigned to any department',
+      icon: <Building2 className="w-4 h-4" />,
+      badgeColor: 'bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400',
+    },
+    ...departments.map((dept) => ({
+      value: dept.id.toString(),
+      label: dept.name,
+      description: dept.code ? `Code: ${dept.code}` : undefined,
+      icon: <Building2 className="w-4 h-4" />,
+      badgeColor: 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400',
+    })),
+  ]
 }
 
 // ============================================================================
@@ -342,54 +434,30 @@ export function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUserModalP
               ))}
             </div>
 
-            {/* Role Selection */}
+            {/* Role and Department Selection */}
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  <Shield className="inline w-4 h-4 mr-1" />
-                  Role *
-                </label>
-                <select
-                  value={selectedRole}
-                  onChange={(e) => setSelectedRole(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                  disabled={isLoadingRoles}
-                >
-                  {ROLE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                  {roles
-                    .filter((r) => !r.is_system)
-                    .map((role) => (
-                      <option key={role.id} value={role.name}>
-                        {role.name}
-                      </option>
-                    ))}
-                </select>
-              </div>
+              <CustomSelect
+                value={selectedRole}
+                onChange={(val) => setSelectedRole(val)}
+                options={buildRoleOptions(roles)}
+                icon={<Shield className="w-4 h-4" />}
+                label="Role"
+                required
+                disabled={isLoadingRoles}
+                searchable
+                placeholder="Select role..."
+              />
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  <Building2 className="inline w-4 h-4 mr-1" />
-                  Department
-                </label>
-                <select
-                  value={selectedDepartment}
-                  onChange={(e) => setSelectedDepartment(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  disabled={isLoadingDepartments}
-                >
-                  <option value="">Select department (optional)</option>
-                  {departments.map((dept) => (
-                    <option key={dept.id} value={dept.id}>
-                      {dept.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <CustomSelect
+                value={selectedDepartment}
+                onChange={(val) => setSelectedDepartment(val)}
+                options={buildDepartmentOptions(departments)}
+                icon={<Building2 className="w-4 h-4" />}
+                label="Department"
+                disabled={isLoadingDepartments}
+                searchable={departments.length > 5}
+                placeholder="Select department..."
+              />
             </div>
 
             {/* Custom Message */}

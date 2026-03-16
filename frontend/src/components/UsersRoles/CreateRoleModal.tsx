@@ -25,106 +25,51 @@ interface CreateRoleModalProps {
   onSuccess: () => void
 }
 
-// All available permissions in the system
+// Keys MUST match the backend Role.PERMISSION_FLAG_MAP values
+// (i.e. what get_permissions_list() returns)
 const ALL_PERMISSIONS = [
-  // Document permissions
+  // Document & Folder permissions
   {
-    key: 'view_documents',
+    key: 'view_document',
     label: 'View Documents',
-    category: 'Documents',
+    category: 'Documents & Folders',
     description: 'View document content and metadata',
   },
   {
-    key: 'create_documents',
-    label: 'Create Documents',
-    category: 'Documents',
-    description: 'Upload and create new documents',
-  },
-  {
-    key: 'edit_documents',
-    label: 'Edit Documents',
-    category: 'Documents',
-    description: 'Modify document metadata and content',
-  },
-  {
-    key: 'delete_documents',
-    label: 'Delete Documents',
-    category: 'Documents',
-    description: 'Delete documents from the system',
-  },
-  {
-    key: 'download_documents',
+    key: 'download_document',
     label: 'Download Documents',
-    category: 'Documents',
+    category: 'Documents & Folders',
     description: 'Download document files',
   },
   {
-    key: 'share_documents',
+    key: 'upload_document',
+    label: 'Upload Documents',
+    category: 'Documents & Folders',
+    description: 'Upload and create new documents',
+  },
+  {
+    key: 'edit_document',
+    label: 'Edit Documents',
+    category: 'Documents & Folders',
+    description: 'Modify document metadata and content',
+  },
+  {
+    key: 'delete_document',
+    label: 'Delete Documents',
+    category: 'Documents & Folders',
+    description: 'Delete documents from the system',
+  },
+  {
+    key: 'share_document',
     label: 'Share Documents',
-    category: 'Documents',
+    category: 'Documents & Folders',
     description: 'Share documents with other users',
   },
-  // Folder permissions
   {
-    key: 'view_folders',
-    label: 'View Folders',
-    category: 'Folders',
-    description: 'View folder structure and contents',
-  },
-  {
-    key: 'create_folders',
-    label: 'Create Folders',
-    category: 'Folders',
-    description: 'Create new folders',
-  },
-  {
-    key: 'edit_folders',
-    label: 'Edit Folders',
-    category: 'Folders',
-    description: 'Rename and modify folders',
-  },
-  {
-    key: 'delete_folders',
-    label: 'Delete Folders',
-    category: 'Folders',
-    description: 'Delete folders and their contents',
-  },
-  {
-    key: 'manage_folder_permissions',
-    label: 'Manage Folder Permissions',
-    category: 'Folders',
-    description: 'Set access permissions on folders',
-  },
-  // User permissions
-  {
-    key: 'view_users',
-    label: 'View Users',
-    category: 'Users',
-    description: 'View user profiles and lists',
-  },
-  {
-    key: 'invite_users',
-    label: 'Invite Users',
-    category: 'Users',
-    description: 'Send invitations to new users',
-  },
-  {
-    key: 'edit_users',
-    label: 'Edit Users',
-    category: 'Users',
-    description: 'Modify user profiles and settings',
-  },
-  {
-    key: 'delete_users',
-    label: 'Delete Users',
-    category: 'Users',
-    description: 'Remove users from the system',
-  },
-  {
-    key: 'manage_roles',
-    label: 'Manage Roles',
-    category: 'Users',
-    description: 'Create and modify custom roles',
+    key: 'manage_permissions',
+    label: 'Manage Permissions',
+    category: 'Documents & Folders',
+    description: 'Manage folder and document access permissions',
   },
   // Procedure permissions
   {
@@ -231,30 +176,24 @@ const ALL_PERMISSIONS = [
     category: 'Training',
     description: 'Read-only compliance auditor access to training data',
   },
-  // Admin permissions
+  // Administration permissions
   {
-    key: 'view_audit_logs',
+    key: 'view_audit_log',
     label: 'View Audit Logs',
     category: 'Administration',
     description: 'View system audit trail',
   },
   {
-    key: 'manage_departments',
-    label: 'Manage Departments',
+    key: 'manage_retention',
+    label: 'Manage Retention Policies',
     category: 'Administration',
-    description: 'Create and modify departments',
+    description: 'Set and modify document retention policies',
   },
   {
-    key: 'manage_settings',
-    label: 'Manage Settings',
+    key: 'manage_classification',
+    label: 'Manage Classification',
     category: 'Administration',
-    description: 'Modify system settings',
-  },
-  {
-    key: 'manage_security',
-    label: 'Manage Security',
-    category: 'Administration',
-    description: 'Configure security options',
+    description: 'Configure document classification rules',
   },
 ]
 
@@ -292,9 +231,9 @@ export function CreateRoleModal({ isOpen, role, onClose, onSuccess }: CreateRole
   // Populate form when editing
   useEffect(() => {
     if (role && isOpen) {
-      setName(role.name)
+      setName(role.display_name || role.name)
       setDescription(role.description || '')
-      setSelectedPermissions(new Set(role.permissions || []))
+      setSelectedPermissions(new Set(role.permissions || role.permissions_list || []))
     } else if (!role && isOpen) {
       setName('')
       setDescription('')

@@ -20,39 +20,47 @@ User = get_user_model()
 
 class Role(models.Model):
     """
-    Predefined roles for RBAC system.
+    Roles for RBAC system.
 
-    Roles:
+    System roles (immutable):
     - VIEWER: Can view and download documents
     - EDITOR: Can view, download, upload, and edit documents
     - MANAGER: Can view, edit, delete, share, and manage folder permissions
     - ADMIN: Full access to all operations including system configuration
+
+    Custom roles can be created by administrators with any combination
+    of permission flags.
     """
 
-    # Role choices
+    # Well-known system role names (used as constants, not DB constraints)
     VIEWER = 'VIEWER'
     EDITOR = 'EDITOR'
     MANAGER = 'MANAGER'
     ADMIN = 'ADMIN'
 
-    ROLE_CHOICES = [
-        (VIEWER, 'Viewer'),
-        (EDITOR, 'Editor'),
-        (MANAGER, 'Manager'),
-        (ADMIN, 'Administrator'),
-    ]
+    SYSTEM_ROLE_NAMES = [VIEWER, EDITOR, MANAGER, ADMIN]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(
         max_length=50,
-        choices=ROLE_CHOICES,
         unique=True,
-        help_text="Role name (VIEWER, EDITOR, MANAGER, ADMIN)"
+        help_text="Role name — system roles: VIEWER, EDITOR, MANAGER, ADMIN; custom roles: any unique name"
+    )
+
+    display_name = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Human-readable display name"
     )
 
     description = models.TextField(
         blank=True,
         help_text="Description of role permissions and capabilities"
+    )
+
+    is_system = models.BooleanField(
+        default=False,
+        help_text="True for built-in system roles that cannot be deleted or renamed"
     )
 
     # Document & Folder permissions
@@ -100,7 +108,11 @@ class Role(models.Model):
         verbose_name_plural = 'Roles'
 
     def __str__(self):
-        return self.get_name_display()
+        return self.display_name or self.name
+
+    @property
+    def is_custom(self):
+        return not self.is_system
 
     # Map of boolean field names to permission list keys
     PERMISSION_FLAG_MAP = {
