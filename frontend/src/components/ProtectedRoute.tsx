@@ -194,12 +194,20 @@ function getPageNameFromPath(path: string): string {
     '/users': 'Users & Roles',
     '/retention': 'Retention Management',
     '/workflows': 'Workflow Center',
+    '/workflows/designer': 'Workflow Designer',
     '/automation': 'Automation',
     '/compliance': 'Compliance Center',
     '/organization-settings': 'Organization Settings',
     '/integrations': 'Integrations',
     '/admin/system': 'System Settings',
     '/billing': 'Billing',
+    // Procedures
+    '/procedures': 'Procedures',
+    '/procedures/new': 'New Procedure',
+    '/procedures/assignments': 'Training Assignments',
+    '/procedures/evidence': 'Training Evidence',
+    // Training
+    '/my-training': 'My Training',
   }
 
   return pathMap[path] || path.split('/').pop()?.replace(/-/g, ' ') || 'this page'
@@ -209,7 +217,8 @@ function getPageNameFromPath(path: string): string {
  * Get display-friendly permission name
  */
 function getPermissionDisplayName(permission: PermissionAction): string {
-  const permissionMap: Record<PermissionAction, string> = {
+  const permissionMap: Partial<Record<PermissionAction, string>> = {
+    // Document & Folder
     can_view: 'View',
     can_download: 'Download',
     can_upload: 'Upload',
@@ -220,9 +229,29 @@ function getPermissionDisplayName(permission: PermissionAction): string {
     can_view_audit_log: 'View Audit Logs',
     can_manage_retention: 'Manage Retention',
     can_manage_classification: 'Manage Classification',
+    // Procedure
+    create_procedure: 'Create Procedures',
+    edit_procedure: 'Edit Procedures',
+    delete_procedure: 'Delete Procedures',
+    publish_procedure: 'Publish Procedures',
+    review_procedure: 'Review Procedures',
+    view_all_procedures: 'View All Procedures',
+    // Workflow
+    create_workflow_template: 'Create Workflow Templates',
+    delete_workflow_template: 'Delete Workflow Templates',
+    start_workflow: 'Start Workflows',
+    cancel_workflow: 'Cancel Workflows',
+    manage_auto_triggers: 'Manage Auto-Trigger Rules',
+    view_workflow_analytics: 'View Workflow Analytics',
+    // Training
+    manage_assignments: 'Manage Training Assignments',
+    view_training_dashboard: 'View Training Dashboard',
+    view_trainee_details: 'View Trainee Details',
+    view_training_evidence: 'View Training Evidence',
+    audit_training: 'Audit Training',
   }
 
-  return permissionMap[permission] || permission
+  return permissionMap[permission] || permission.replace(/_/g, ' ')
 }
 
 /**

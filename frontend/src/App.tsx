@@ -245,21 +245,27 @@ function App() {
                 element={<Navigate to="/retention?tab=schedules" replace />}
               />
 
-              {/* Workflows - Requires can_edit permission (manage workflows) */}
+              {/* Workflows - Requires start_workflow or view_workflow_analytics */}
               <Route
                 path="/workflows"
                 element={
-                  <ProtectedRoute requiredRole={['admin', 'manager']} pageName="Workflow Center">
+                  <ProtectedRoute
+                    requiredPermission={['start_workflow', 'view_workflow_analytics']}
+                    pageName="Workflow Center"
+                  >
                     <WorkflowCenterPage />
                   </ProtectedRoute>
                 }
               />
 
-              {/* Workflow Designer - Requires admin or manager role */}
+              {/* Workflow Designer - Requires create_workflow_template permission */}
               <Route
                 path="/workflows/designer"
                 element={
-                  <ProtectedRoute requiredRole={['admin', 'manager']} pageName="Workflow Designer">
+                  <ProtectedRoute
+                    requiredPermission="create_workflow_template"
+                    pageName="Workflow Designer"
+                  >
                     <WorkflowDesignerPage />
                   </ProtectedRoute>
                 }
@@ -267,7 +273,10 @@ function App() {
               <Route
                 path="/workflows/designer/:templateId"
                 element={
-                  <ProtectedRoute requiredRole={['admin', 'manager']} pageName="Workflow Designer">
+                  <ProtectedRoute
+                    requiredPermission="create_workflow_template"
+                    pageName="Workflow Designer"
+                  >
                     <WorkflowDesignerPage />
                   </ProtectedRoute>
                 }
@@ -277,7 +286,7 @@ function App() {
               <Route
                 path="/procedures/new"
                 element={
-                  <ProtectedRoute requiredRole={['admin', 'manager']} pageName="New Procedure">
+                  <ProtectedRoute requiredPermission="create_procedure" pageName="New Procedure">
                     <ProcedureBuilderPage />
                   </ProtectedRoute>
                 }
@@ -309,7 +318,10 @@ function App() {
               <Route
                 path="/procedures/:id/versions/diff"
                 element={
-                  <ProtectedRoute requiredRole={['admin', 'manager']} pageName="Version Diff">
+                  <ProtectedRoute
+                    requiredPermission={['edit_procedure', 'publish_procedure']}
+                    pageName="Version Diff"
+                  >
                     <ProcedureVersionDiffPage />
                   </ProtectedRoute>
                 }
@@ -317,18 +329,21 @@ function App() {
               <Route
                 path="/procedures/:id/versions/:versionNumber"
                 element={
-                  <ProtectedRoute requiredRole={['admin', 'manager']} pageName="Procedure Version">
+                  <ProtectedRoute
+                    requiredPermission={['edit_procedure', 'publish_procedure']}
+                    pageName="Procedure Version"
+                  >
                     <ProcedureVersionPage />
                   </ProtectedRoute>
                 }
               />
 
-              {/* Training Assignments - Admin/Manager */}
+              {/* Training Assignments - requires manage_assignments or view_training_dashboard */}
               <Route
                 path="/procedures/assignments"
                 element={
                   <ProtectedRoute
-                    requiredRole={['admin', 'manager']}
+                    requiredPermission={['manage_assignments', 'view_training_dashboard']}
                     pageName="Training Assignments"
                   >
                     <TrainingAssignmentsPage />
@@ -336,21 +351,27 @@ function App() {
                 }
               />
 
-              {/* Trainee Detail - Admin/Manager */}
+              {/* Trainee Detail - requires view_trainee_details */}
               <Route
                 path="/procedures/assignments/trainee/:userId"
                 element={
-                  <ProtectedRoute requiredRole={['admin', 'manager']} pageName="Trainee Detail">
+                  <ProtectedRoute
+                    requiredPermission="view_trainee_details"
+                    pageName="Trainee Detail"
+                  >
                     <TraineeDetailPage />
                   </ProtectedRoute>
                 }
               />
 
-              {/* Training Evidence - Admin/Compliance */}
+              {/* Training Evidence - requires view_training_evidence or audit_training */}
               <Route
                 path="/procedures/evidence"
                 element={
-                  <ProtectedRoute requiredRole={['admin', 'manager']} pageName="Training Evidence">
+                  <ProtectedRoute
+                    requiredPermission={['view_training_evidence', 'audit_training']}
+                    pageName="Training Evidence"
+                  >
                     <TrainingEvidencePage />
                   </ProtectedRoute>
                 }

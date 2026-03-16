@@ -16,6 +16,7 @@ import { ProcedureCard } from '@/components/procedures/ProcedureCard'
 import { ProcedureFilters } from '@/components/procedures/ProcedureFilters'
 import { authService } from '@/services/auth.service'
 import { listProcedures } from '@/services/procedureService'
+import { usePermissions } from '@/contexts/PermissionContext'
 import type { Procedure, ProcedureFilters as Filters } from '@/types/procedure'
 
 export function ProceduresListPage() {
@@ -35,7 +36,8 @@ export function ProceduresListPage() {
     is_superuser: userData?.is_superuser || false,
   }
 
-  const isAdmin = user.is_staff || user.is_superuser
+  const { hasGlobalPermission } = usePermissions()
+  const canCreateProcedure = hasGlobalPermission('create_procedure')
 
   const loadProcedures = useCallback(async () => {
     setLoading(true)
@@ -92,7 +94,7 @@ export function ProceduresListPage() {
                 >
                   <RefreshCw className="h-4 w-4" />
                 </button>
-                {isAdmin && (
+                {canCreateProcedure && (
                   <button
                     onClick={() => navigate('/procedures/new')}
                     className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700"

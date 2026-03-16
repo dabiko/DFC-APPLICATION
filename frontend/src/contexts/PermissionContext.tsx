@@ -45,8 +45,16 @@ import permissionSyncService, {
   type ConnectionStatus,
 } from '@/services/permissionSyncService'
 
-// Permission types
+/**
+ * Permission action identifiers.
+ *
+ * Two formats co-exist:
+ * - Resource-level checks (document/folder APIs) use `can_*` format (e.g. 'can_view', 'can_edit')
+ * - Global permission checks use the keys from Role.get_permissions_list() (e.g. 'view_document',
+ *   'create_procedure'). The `hasGlobalPermission()` function normalises both formats.
+ */
 export type PermissionAction =
+  // Document & Folder — resource-level format (used by checkDocumentPermission / checkFolderPermission)
   | 'can_view'
   | 'can_download'
   | 'can_upload'
@@ -57,6 +65,37 @@ export type PermissionAction =
   | 'can_view_audit_log'
   | 'can_manage_retention'
   | 'can_manage_classification'
+  // Document & Folder — global permission list format (returned by backend all_permissions)
+  | 'view_document'
+  | 'download_document'
+  | 'upload_document'
+  | 'edit_document'
+  | 'delete_document'
+  | 'share_document'
+  | 'manage_permissions'
+  | 'view_audit_log'
+  | 'manage_retention'
+  | 'manage_classification'
+  // Procedure
+  | 'create_procedure'
+  | 'edit_procedure'
+  | 'delete_procedure'
+  | 'publish_procedure'
+  | 'review_procedure'
+  | 'view_all_procedures'
+  // Workflow
+  | 'create_workflow_template'
+  | 'delete_workflow_template'
+  | 'start_workflow'
+  | 'cancel_workflow'
+  | 'manage_auto_triggers'
+  | 'view_workflow_analytics'
+  // Training
+  | 'manage_assignments'
+  | 'view_training_dashboard'
+  | 'view_trainee_details'
+  | 'view_training_evidence'
+  | 'audit_training'
 
 export interface PermissionCheckResult {
   allowed: boolean
@@ -324,25 +363,35 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
   )
 
   /**
-   * Check global permission based on server-provided permission summary
-   * SECURITY: Only uses data from permissionSummary (fetched from server)
-   * Does NOT trust client-side user object for permission decisions
+   * Check global permission based on server-provided permission summary.
+   *
+   * Accepts both `can_*` format (e.g. 'can_manage_permissions') and the backend's
+   * `all_permissions` list format (e.g. 'manage_permissions'). Both are tried so
+   * callers don't need to worry about which format to use.
+   *
+   * SECURITY: Only uses data from permissionSummary (fetched from server).
+   * Does NOT trust client-side user object for permission decisions.
    */
   const hasGlobalPermission = useCallback(
     (permission: PermissionAction): boolean => {
-      // SECURITY: Only trust server-validated permission summary
       if (!permissionSummary) {
-        return false // No permissions if summary not loaded
+        return false
       }
 
-      // Check if user is superuser (from server-validated summary)
       if (permissionSummary.is_superuser) {
         return true
       }
 
-      // Check in server-provided permission list
       if (permissionSummary.all_permissions) {
-        return permissionSummary.all_permissions.includes(permission)
+        // Direct match (works for new module perms like 'create_procedure')
+        if (permissionSummary.all_permissions.includes(permission)) {
+          return true
+        }
+        // Strip 'can_' prefix and retry (handles 'can_view' → 'view_document' pattern)
+        if (permission.startsWith('can_')) {
+          const stripped = permission.slice(4) // 'can_manage_permissions' → 'manage_permissions'
+          return permissionSummary.all_permissions.includes(stripped)
+        }
       }
 
       return false
@@ -497,9 +546,9 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
     // Check if user has manager-level permissions from server
     const hasManagerPermission =
       permissionSummary.is_superuser ||
-      permissionSummary.all_permissions?.includes('can_manage_permissions') ||
+      permissionSummary.all_permissions?.includes('manage_permissions') ||
       permissionSummary.global_roles?.some(
-        (role) => role.role_name === 'ADMIN' || role.role_name === 'MANAGER'
+        (role) => role.role_name === 'Administrator' || role.role_name === 'Manager'
       )
     return hasManagerPermission || false
   }, [permissionSummary])

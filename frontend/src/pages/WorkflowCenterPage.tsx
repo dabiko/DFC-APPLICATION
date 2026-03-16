@@ -41,6 +41,7 @@ import { DashboardHeader } from '@/components/Dashboard/DashboardHeader'
 import { DashboardSidebar } from '@/components/Dashboard/DashboardSidebar'
 import { cn } from '@/utils/cn'
 import { authService } from '@/services/auth.service'
+import { usePermissions } from '@/contexts/PermissionContext'
 import { WorkflowAnalyticsDashboard } from '@/components/WorkflowAnalytics'
 import { ProceduresTab } from '@/components/procedures/ProceduresTab'
 import {
@@ -87,6 +88,8 @@ export function WorkflowCenterPage() {
   const [searchParams] = useSearchParams()
   const initialTab = (searchParams.get('tab') as TabId) || 'tasks'
   const [activeTab, setActiveTab] = useState<TabId>(initialTab)
+  const { hasGlobalPermission } = usePermissions()
+  const canCreateTemplate = hasGlobalPermission('create_workflow_template')
 
   // Data state
   const [tasks, setTasks] = useState<WorkflowTask[]>([])
@@ -947,13 +950,15 @@ export function WorkflowCenterPage() {
               className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
             />
           </div>
-          <button
-            onClick={() => navigate('/workflows/designer')}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Create Template
-          </button>
+          {canCreateTemplate && (
+            <button
+              onClick={() => navigate('/workflows/designer')}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Create Template
+            </button>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

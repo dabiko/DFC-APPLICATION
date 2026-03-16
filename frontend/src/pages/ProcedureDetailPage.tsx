@@ -52,6 +52,7 @@ import { waiveAssignment } from '@/services/assignmentService'
 import { cn } from '@/utils/cn'
 import { DatePicker } from '@/components/DatePicker'
 import { authService } from '@/services/auth.service'
+import { usePermissions } from '@/contexts/PermissionContext'
 import {
   getProcedure,
   publishProcedure,
@@ -112,6 +113,13 @@ export function ProcedureDetailPage() {
     is_staff: userData?.is_staff || false,
     is_superuser: userData?.is_superuser || false,
   }
+
+  const { hasGlobalPermission, isAdmin } = usePermissions()
+  const isCreator = procedure ? String(userData?.id) === String(procedure.created_by) : false
+  const canEdit = isAdmin || isCreator || hasGlobalPermission('edit_procedure')
+  const canDelete = isAdmin || isCreator || hasGlobalPermission('delete_procedure')
+  const canPublish = isAdmin || isCreator || hasGlobalPermission('publish_procedure')
+  const canAssign = hasGlobalPermission('manage_assignments')
 
   useEffect(() => {
     if (!id) return
@@ -268,17 +276,15 @@ export function ProcedureDetailPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {versions.some((v) => v.is_active) &&
-                    (user.is_superuser ||
-                      String(userData?.id) === String(procedure?.created_by)) && (
-                      <button
-                        onClick={() => setShowAssignModal(true)}
-                        className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-                      >
-                        <Users className="h-4 w-4" />
-                        Assign
-                      </button>
-                    )}
+                  {versions.some((v) => v.is_active) && canAssign && (
+                    <button
+                      onClick={() => setShowAssignModal(true)}
+                      className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                    >
+                      <Users className="h-4 w-4" />
+                      Assign
+                    </button>
+                  )}
                   {procedure?.state === 'in_review' && (
                     <button
                       onClick={() => navigate(`/procedures/${procedure.id}/review`)}
@@ -299,31 +305,26 @@ export function ProcedureDetailPage() {
                         Revert to Draft
                       </button>
                     )}
-                  {procedure?.state === 'approved' &&
-                    (user.is_superuser ||
-                      String(userData?.id) === String(procedure.created_by)) && (
-                      <button
-                        onClick={() => setShowPublishForm(true)}
-                        className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
-                      >
-                        <Rocket className="h-4 w-4" />
-                        Publish
-                      </button>
-                    )}
+                  {procedure?.state === 'approved' && canPublish && (
+                    <button
+                      onClick={() => setShowPublishForm(true)}
+                      className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+                    >
+                      <Rocket className="h-4 w-4" />
+                      Publish
+                    </button>
+                  )}
+                  {procedure?.state === 'draft' && canEdit && (
+                    <button
+                      onClick={() => navigate(`/procedures/${procedure.id}/edit`)}
+                      className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                    >
+                      <Edit className="h-4 w-4" />
+                      Edit
+                    </button>
+                  )}
                   {procedure?.state === 'draft' &&
-                    (user.is_superuser ||
-                      String(userData?.id) === String(procedure.created_by)) && (
-                      <button
-                        onClick={() => navigate(`/procedures/${procedure.id}/edit`)}
-                        className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-                      >
-                        <Edit className="h-4 w-4" />
-                        Edit
-                      </button>
-                    )}
-                  {procedure?.state === 'draft' &&
-                    !user.is_superuser &&
-                    String(userData?.id) !== String(procedure.created_by) &&
+                    !canEdit &&
                     procedure.steps?.some((s) => String(s.step_owner) === String(userData?.id)) && (
                       <button
                         onClick={() => navigate(`/procedures/${procedure.id}/edit`)}
@@ -333,18 +334,15 @@ export function ProcedureDetailPage() {
                         Contribute to My Steps
                       </button>
                     )}
-                  {procedure &&
-                    ['draft', 'in_review'].includes(procedure.state) &&
-                    (user.is_superuser ||
-                      String(userData?.id) === String(procedure.created_by)) && (
-                      <button
-                        onClick={() => setShowDeleteModal(true)}
-                        className="flex items-center gap-2 rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        Delete
-                      </button>
-                    )}
+                  {procedure && ['draft', 'in_review'].includes(procedure.state) && canDelete && (
+                    <button
+                      onClick={() => setShowDeleteModal(true)}
+                      className="flex items-center gap-2 rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
