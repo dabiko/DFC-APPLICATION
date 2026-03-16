@@ -44,6 +44,17 @@ from .permissions import (
     CanCreateProcedure, IsAssignedReviewer, IsComplianceAuditor,
     IsStepOwner,
 )
+from apps.permissions.decorators import (
+    CanEditProcedure,
+    CanDeleteProcedure,
+    CanPublishProcedure,
+    CanManageAssignments,
+    CanViewTrainingDashboard,
+    CanViewTraineeDetails,
+    CanViewTrainingEvidence,
+    CanAuditTraining,
+)
+from apps.permissions.utils import PermissionChecker
 from apps.workflows.models import (
     WorkflowInstance, WorkflowTask, WorkflowTemplate,
     WorkflowInstanceStatus, WorkflowTaskStatus, WorkflowStepType, WorkflowAuditLog,
@@ -107,14 +118,18 @@ class ProcedureViewSet(viewsets.ModelViewSet):
         return ProcedureDetailSerializer
 
     def get_permissions(self):
-        if self.action in ['create']:
+        if self.action == 'create':
             return [permissions.IsAuthenticated(), CanCreateProcedure()]
         if self.action in ['update', 'partial_update']:
-            return [permissions.IsAuthenticated(), (IsProcedureCreator | IsProcedureAdmin)()]
-        if self.action in ['destroy']:
-            return [permissions.IsAuthenticated(), (IsProcedureCreator | IsProcedureAdmin)()]
+            return [permissions.IsAuthenticated(), (IsProcedureCreator | CanEditProcedure)()]
+        if self.action == 'destroy':
+            return [permissions.IsAuthenticated(), (IsProcedureCreator | CanDeleteProcedure)()]
         if self.action in ['publish', 'retire_version']:
-            return [permissions.IsAuthenticated(), (IsProcedureCreator | IsProcedureAdmin | IsProcedureManager)()]
+            return [permissions.IsAuthenticated(), (IsProcedureCreator | CanPublishProcedure)()]
+        if self.action == 'submit_for_review':
+            return [permissions.IsAuthenticated(), (IsProcedureCreator | CanEditProcedure)()]
+        if self.action == 'revert_to_draft':
+            return [permissions.IsAuthenticated(), (IsProcedureCreator | CanEditProcedure | CanPublishProcedure)()]
         return [permissions.IsAuthenticated()]
 
     def perform_create(self, serializer):
@@ -329,20 +344,15 @@ class ProcedureViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Permission check
+        # Permission check: creator, or user with can_edit_procedure or can_publish_procedure
         user = request.user
-        allowed = False
-        if user.is_superuser:
-            allowed = True
-        elif procedure.created_by == user:
-            allowed = True
-        else:
-            from apps.permissions.models import UserRole
-            allowed = UserRole.objects.filter(
-                user=user,
-                role__name__iregex=r'^(admin|manager)$',
-                is_active=True,
-            ).exists()
+        allowed = user.is_superuser or procedure.created_by == user
+        if not allowed:
+            checker = PermissionChecker(user)
+            allowed = (
+                checker.has_global_permission('can_edit_procedure')
+                or checker.has_global_permission('can_publish_procedure')
+            )
 
         if not allowed:
             return Response(
@@ -857,9 +867,8 @@ class ProcedureStepViewSet(viewsets.ModelViewSet):
         ).prefetch_related('attachments')
 
     def get_permissions(self):
-        if self.action in ['update', 'partial_update']:
-            # Step owners can edit their assigned steps (draft only),
-            # plus procedure creator and admins
+        if self.action in ['create', 'update', 'partial_update', 'destroy', 'reorder']:
+            # Fine-grained check happens in check_step_edit_permission / perform_create
             return [permissions.IsAuthenticated()]
         return [permissions.IsAuthenticated()]
 
@@ -873,11 +882,8 @@ class ProcedureStepViewSet(viewsets.ModelViewSet):
             return
         if step.step_owner_id == user.id and procedure.state == 'draft':
             return
-        from apps.permissions.models import UserRole
-        is_admin = UserRole.objects.filter(
-            user=user, role__name__iregex=r'^(admin|manager)$', is_active=True
-        ).exists()
-        if is_admin:
+        checker = PermissionChecker(user)
+        if checker.has_global_permission('can_edit_procedure'):
             return
         from rest_framework.exceptions import PermissionDenied
         raise PermissionDenied('You do not have permission to edit this step.')
@@ -1167,10 +1173,11 @@ class ProcedureAssignmentViewSet(viewsets.ModelViewSet):
         ).select_related('assignee', 'procedure_version', 'assigned_by').prefetch_related('attempts')
 
         # Non-admins see only their own assignments
-        from apps.permissions.models import UserRole
-        is_admin = self.request.user.is_superuser or UserRole.objects.filter(
-            user=self.request.user, role__name__iregex=r'^(admin|manager)$', is_active=True
-        ).exists()
+        user = self.request.user
+        is_admin = user.is_superuser
+        if not is_admin:
+            checker = PermissionChecker(user)
+            is_admin = checker.has_global_permission('can_manage_assignments')
         if not is_admin:
             qs = qs.filter(assignee=self.request.user)
 
@@ -1206,10 +1213,12 @@ class ProcedureAssignmentViewSet(viewsets.ModelViewSet):
         return ProcedureAssignmentSerializer
 
     def get_permissions(self):
-        if self.action in ['create']:
-            return [permissions.IsAuthenticated(), (IsProcedureAdmin | IsProcedureManager)()]
-        if self.action in ['waive', 'dashboard', 'analytics', 'trainee_detail']:
-            return [permissions.IsAuthenticated(), (IsProcedureAdmin | IsProcedureManager)()]
+        if self.action in ['create', 'waive']:
+            return [permissions.IsAuthenticated(), CanManageAssignments()]
+        if self.action in ['dashboard', 'analytics']:
+            return [permissions.IsAuthenticated(), CanViewTrainingDashboard()]
+        if self.action == 'trainee_detail':
+            return [permissions.IsAuthenticated(), CanViewTraineeDetails()]
         return [permissions.IsAuthenticated()]
 
     def create(self, request, *args, **kwargs):
@@ -2375,7 +2384,7 @@ class EvidenceViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ProcedureAssignmentSerializer
 
     def get_permissions(self):
-        return [permissions.IsAuthenticated(), (IsProcedureAdmin | IsComplianceAuditor)()]
+        return [permissions.IsAuthenticated(), (CanViewTrainingEvidence | CanAuditTraining)()]
 
     def get_queryset(self):
         qs = ProcedureAssignment.objects.filter(
@@ -2580,7 +2589,7 @@ class ProcedureAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ProcedureAuditLogSerializer
 
     def get_permissions(self):
-        return [permissions.IsAuthenticated(), (IsProcedureAdmin | IsComplianceAuditor)()]
+        return [permissions.IsAuthenticated(), (CanViewTrainingEvidence | CanAuditTraining)()]
 
     def get_queryset(self):
         qs = ProcedureAuditLog.objects.filter(
