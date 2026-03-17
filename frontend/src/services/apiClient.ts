@@ -226,7 +226,7 @@ apiClient.interceptors.response.use(
           return Promise.reject(refreshError)
         }
 
-        // Refresh failed for other reasons
+        // Refresh failed for other reasons (session expired)
         console.error('❌ Token refresh failed:', {
           status: refreshError?.response?.status,
           data: refreshError?.response?.data,
@@ -235,6 +235,23 @@ apiClient.interceptors.response.use(
 
         isRefreshing = false
         processQueue(refreshError, null)
+
+        // Fire-and-forget: log session expiry to audit trail
+        try {
+          const accessToken =
+            localStorage.getItem('access_token') || sessionStorage.getItem('access_token')
+          if (accessToken && refreshToken) {
+            axios
+              .post(
+                `${API_BASE_URL}/auth/logout/`,
+                { refresh: refreshToken, reason: 'session_expired' },
+                { headers: { Authorization: `Bearer ${accessToken}` } }
+              )
+              .catch(() => {}) // best-effort, don't block redirect
+          }
+        } catch {
+          // ignore
+        }
 
         clearAllTokens()
 

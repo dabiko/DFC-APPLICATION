@@ -34,6 +34,7 @@ import { authService } from '@/services/auth.service'
 import organizationSettingsService, {
   type AllOrganizationSettings,
 } from '@/services/organizationSettingsService'
+import { ErrorState } from '@/components/common'
 import { cn } from '@/utils/cn'
 
 // Tab definitions
@@ -211,23 +212,7 @@ export function OrganizationSettingsPage() {
     }
 
     if (error) {
-      return (
-        <div className="flex flex-col items-center justify-center h-full p-8">
-          <AlertTriangle className="w-12 h-12 text-red-500 mb-4" />
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-            Access Denied
-          </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 text-center max-w-md mb-4">
-            {error}
-          </p>
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Return to Dashboard
-          </button>
-        </div>
-      )
+      return <ErrorState error={error} onRetry={loadSettings} />
     }
 
     return (

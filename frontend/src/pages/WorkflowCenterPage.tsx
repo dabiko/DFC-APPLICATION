@@ -39,6 +39,7 @@ import {
 import { ThreePanelLayout } from '@/components/Layout/ThreePanelLayout'
 import { DashboardHeader } from '@/components/Dashboard/DashboardHeader'
 import { DashboardSidebar } from '@/components/Dashboard/DashboardSidebar'
+import { ErrorState } from '@/components/common'
 import { cn } from '@/utils/cn'
 import { authService } from '@/services/auth.service'
 import { usePermissions } from '@/contexts/PermissionContext'
@@ -1102,23 +1103,7 @@ export function WorkflowCenterPage() {
   const renderContent = () => {
     // Show error state
     if (error) {
-      return (
-        <div className="flex flex-col items-center justify-center h-64">
-          <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800 max-w-md text-center">
-            <AlertTriangle className="h-8 w-8 text-red-500 mx-auto mb-3" />
-            <h3 className="text-lg font-medium text-red-800 dark:text-red-300 mb-2">
-              Error Loading Data
-            </h3>
-            <p className="text-sm text-red-600 dark:text-red-400 mb-4">{error}</p>
-            <button
-              onClick={handleRefresh}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
-            >
-              Try Again
-            </button>
-          </div>
-        </div>
-      )
+      return <ErrorState error={error} onRetry={handleRefresh} />
     }
 
     // Show initial loading

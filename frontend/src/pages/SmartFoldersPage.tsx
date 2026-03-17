@@ -24,6 +24,7 @@ import { SmartFolderCard } from '@/components/SmartFolder/SmartFolderCard'
 import { SmartFolderModal, DeleteSmartFolderModal } from '@/components/SmartFolder'
 import { authService } from '@/services/auth.service'
 import { getSmartFolders, updateSmartFolder, type SmartFolder } from '@/services/smartFolderService'
+import { ErrorState } from '@/components/common'
 import { cn } from '@/utils/cn'
 import { toast } from '@/utils/toast'
 
@@ -189,22 +190,7 @@ export function SmartFoldersPage() {
   )
 
   // Render error state
-  const renderErrorState = () => (
-    <div className="flex flex-col items-center justify-center py-20">
-      <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-        Failed to load smart folders
-      </h3>
-      <p className="text-gray-600 dark:text-gray-400 text-center max-w-md mb-6">{error}</p>
-      <button
-        onClick={fetchSmartFolders}
-        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-      >
-        <RefreshCw className="w-4 h-4" />
-        Try Again
-      </button>
-    </div>
-  )
+  const renderErrorState = () => <ErrorState error={error} onRetry={fetchSmartFolders} />
 
   // Render loading state
   if (loading) {

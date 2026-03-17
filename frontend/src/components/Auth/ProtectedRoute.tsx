@@ -61,7 +61,7 @@ export function ProtectedRoute({
     try {
       const refreshToken = authService.getRefreshToken()
       if (refreshToken) {
-        await authService.logout(refreshToken)
+        await authService.logout(refreshToken, 'inactivity_timeout')
       }
     } catch (error) {
       console.error('Session timeout logout error:', error)

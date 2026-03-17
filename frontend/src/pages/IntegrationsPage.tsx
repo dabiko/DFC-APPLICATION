@@ -28,6 +28,7 @@ import {
 } from '@/components/Integrations'
 import { authService } from '@/services/auth.service'
 import { getIntegrationStats, type IntegrationStats } from '@/services/integrationsService'
+import { ErrorState } from '@/components/common'
 import { cn } from '@/utils/cn'
 
 // Tab definitions
@@ -182,23 +183,7 @@ export function IntegrationsPage() {
     }
 
     if (error) {
-      return (
-        <div className="flex flex-col items-center justify-center h-full p-8 bg-gray-50 dark:bg-gray-900">
-          <AlertTriangle className="w-12 h-12 text-red-500 mb-4" />
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-            Access Denied
-          </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 text-center max-w-md mb-4">
-            {error}
-          </p>
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors"
-          >
-            Return to Dashboard
-          </button>
-        </div>
-      )
+      return <ErrorState error={error} onRetry={handleRefresh} />
     }
 
     return (

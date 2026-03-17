@@ -139,7 +139,14 @@ class AuthService {
    * Logout user by blacklisting refresh token
    * @param refreshToken - Optional refresh token. If not provided, will be retrieved from storage.
    */
-  async logout(refreshToken?: string): Promise<void> {
+  async logout(
+    refreshToken?: string,
+    reason:
+      | 'user_initiated'
+      | 'session_expired'
+      | 'account_deactivated'
+      | 'inactivity_timeout' = 'user_initiated'
+  ): Promise<void> {
     // Get refresh token from parameter or storage
     const token = refreshToken || this.getRefreshToken()
 
@@ -158,6 +165,7 @@ class AuthService {
             },
             body: JSON.stringify({
               refresh: token,
+              reason,
             }),
           })
 

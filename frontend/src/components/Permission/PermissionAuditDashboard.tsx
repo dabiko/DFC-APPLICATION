@@ -27,6 +27,7 @@ import {
   CalendarIcon,
   MagnifyingGlassIcon,
 } from '@heroicons/react/24/outline'
+import { ErrorState } from '@/components/common'
 import { cn } from '@/utils/cn'
 import {
   getPermissionAuditLogs,
@@ -567,16 +568,7 @@ export const PermissionAuditDashboard: FC<PermissionAuditDashboardProps> = ({ cl
       {/* Content */}
       <div className="flex-1 overflow-auto p-6 bg-gray-50 dark:bg-gray-900">
         {error ? (
-          <div className="flex flex-col items-center justify-center h-64">
-            <ExclamationTriangleIcon className="w-12 h-12 text-red-500 mb-4" />
-            <p className="text-gray-500 dark:text-gray-400">{error}</p>
-            <button
-              onClick={fetchData}
-              className="mt-4 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              Try Again
-            </button>
-          </div>
+          <ErrorState error={error} onRetry={fetchData} />
         ) : (
           <>
             {/* Stats Cards */}

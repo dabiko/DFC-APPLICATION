@@ -48,6 +48,18 @@ class MFAJWTAuthentication(JWTAuthentication):
 
         # Check is_active with a specific error code instead of SimpleJWT's generic one
         if not user.is_active:
+            # Audit log: forced logout due to account deactivation
+            try:
+                from apps.audit.utils import log_user_action
+                log_user_action(
+                    action='LOGOUT',
+                    target_user=user,
+                    user=user,
+                    metadata={'reason': 'account_deactivated'},
+                )
+            except Exception:
+                pass
+
             raise AuthenticationFailed({
                 'detail': 'Your account has been deactivated. Please contact your administrator.',
                 'code': 'account_deactivated',
@@ -122,6 +134,18 @@ class MFAOptionalJWTAuthentication(JWTAuthentication):
             )
 
         if not user.is_active:
+            # Audit log: forced logout due to account deactivation
+            try:
+                from apps.audit.utils import log_user_action
+                log_user_action(
+                    action='LOGOUT',
+                    target_user=user,
+                    user=user,
+                    metadata={'reason': 'account_deactivated'},
+                )
+            except Exception:
+                pass
+
             raise AuthenticationFailed({
                 'detail': 'Your account has been deactivated. Please contact your administrator.',
                 'code': 'account_deactivated',

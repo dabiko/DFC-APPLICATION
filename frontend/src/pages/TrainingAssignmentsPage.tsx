@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Users, RefreshCw, Search, Loader2, BarChart3, ChevronDown, Check } from 'lucide-react'
 import { cn } from '@/utils/cn'
+import { ErrorState } from '@/components/common'
 import { useLogout } from '@/hooks/useLogout'
 import { ThreePanelLayout } from '@/components/Layout/ThreePanelLayout'
 import { DashboardHeader } from '@/components/Dashboard/DashboardHeader'
@@ -167,73 +168,77 @@ export function TrainingAssignmentsPage() {
 
           {/* Content */}
           <div className="flex-1 overflow-auto p-6">
-            <div className="max-w-5xl mx-auto space-y-6">
-              {/* Dashboard Metrics (always visible) */}
-              {dashboard && <AssignmentDashboard dashboard={dashboard} />}
+            {error && !loading ? (
+              <ErrorState error={error} onRetry={loadData} />
+            ) : (
+              <div className="max-w-5xl mx-auto space-y-6">
+                {/* Dashboard Metrics (always visible) */}
+                {dashboard && <AssignmentDashboard dashboard={dashboard} />}
 
-              {activeTab === 'assignments' && (
-                <>
-                  {/* Alert Lists */}
-                  <OverdueAlertList assignments={assignments} />
-                  <ExpirationWarningList assignments={assignments} />
+                {activeTab === 'assignments' && (
+                  <>
+                    {/* Alert Lists */}
+                    <OverdueAlertList assignments={assignments} />
+                    <ExpirationWarningList assignments={assignments} />
 
-                  {/* Search + Filter */}
-                  <div className="flex gap-3">
-                    <div className="flex-1 relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <input
-                        type="text"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Search by trainee name or procedure..."
-                        className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-                      />
+                    {/* Search + Filter */}
+                    <div className="flex gap-3">
+                      <div className="flex-1 relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <input
+                          type="text"
+                          value={search}
+                          onChange={(e) => setSearch(e.target.value)}
+                          placeholder="Search by trainee name or procedure..."
+                          className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                        />
+                      </div>
+                      <StatusFilterDropdown value={filter} onChange={setFilter} />
                     </div>
-                    <StatusFilterDropdown value={filter} onChange={setFilter} />
+
+                    {/* Assignments Table */}
+                    <AssignmentList
+                      assignments={assignments}
+                      loading={loading}
+                      error={error}
+                      onWaive={(id) => {
+                        setShowWaiveModal(id)
+                        setWaiveReason('')
+                      }}
+                    />
+                  </>
+                )}
+
+                {activeTab === 'analytics' && analytics && (
+                  <>
+                    {/* Overall KPIs */}
+                    <AnalyticsOverviewCards data={analytics.overall} />
+
+                    {/* Step Bottlenecks + Quiz Performance side by side on wide screens */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <StepBottlenecksChart data={analytics.step_bottlenecks} />
+                      <QuizPerformanceChart data={analytics.quiz_performance} />
+                    </div>
+
+                    {/* Question Difficulty (full width) */}
+                    <QuestionDifficultyTable data={analytics.question_difficulty} />
+
+                    {/* Procedure Comparison (full width) */}
+                    <ProcedureComparisonChart data={analytics.procedure_comparison} />
+                  </>
+                )}
+
+                {activeTab === 'analytics' && !analytics && !loading && (
+                  <div className="rounded-lg border border-gray-200 bg-white p-8 text-center dark:border-gray-700 dark:bg-gray-800">
+                    <BarChart3 className="h-10 w-10 text-gray-400 mx-auto mb-3" />
+                    <p className="text-gray-500">No analytics data available yet.</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Analytics will appear once trainees start completing procedures.
+                    </p>
                   </div>
-
-                  {/* Assignments Table */}
-                  <AssignmentList
-                    assignments={assignments}
-                    loading={loading}
-                    error={error}
-                    onWaive={(id) => {
-                      setShowWaiveModal(id)
-                      setWaiveReason('')
-                    }}
-                  />
-                </>
-              )}
-
-              {activeTab === 'analytics' && analytics && (
-                <>
-                  {/* Overall KPIs */}
-                  <AnalyticsOverviewCards data={analytics.overall} />
-
-                  {/* Step Bottlenecks + Quiz Performance side by side on wide screens */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <StepBottlenecksChart data={analytics.step_bottlenecks} />
-                    <QuizPerformanceChart data={analytics.quiz_performance} />
-                  </div>
-
-                  {/* Question Difficulty (full width) */}
-                  <QuestionDifficultyTable data={analytics.question_difficulty} />
-
-                  {/* Procedure Comparison (full width) */}
-                  <ProcedureComparisonChart data={analytics.procedure_comparison} />
-                </>
-              )}
-
-              {activeTab === 'analytics' && !analytics && !loading && (
-                <div className="rounded-lg border border-gray-200 bg-white p-8 text-center dark:border-gray-700 dark:bg-gray-800">
-                  <BarChart3 className="h-10 w-10 text-gray-400 mx-auto mb-3" />
-                  <p className="text-gray-500">No analytics data available yet.</p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Analytics will appear once trainees start completing procedures.
-                  </p>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Waive Modal */}

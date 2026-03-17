@@ -57,6 +57,7 @@ import {
   type PlatformAnnouncement,
   type OrganizationSummary,
 } from '@/services/systemService'
+import { ErrorState } from '@/components/common'
 import { cn } from '@/utils/cn'
 
 type TabId = 'overview' | 'settings' | 'security' | 'organizations' | 'announcements' | 'health'
@@ -349,17 +350,7 @@ export function SystemSettingsPage() {
         {/* Content Area */}
         <div className="flex-1 overflow-auto p-6">
           {/* Error State */}
-          {loadError && (
-            <div className="mb-6 p-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-                <div>
-                  <h3 className="font-semibold text-red-900 dark:text-red-300">Access Denied</h3>
-                  <p className="text-sm text-red-800 dark:text-red-400 mt-1">{loadError}</p>
-                </div>
-              </div>
-            </div>
-          )}
+          {loadError && <ErrorState error={loadError} onRetry={handleRefresh} />}
 
           {/* Overview Tab */}
           {activeTab === 'overview' && !stats && !loadError && (

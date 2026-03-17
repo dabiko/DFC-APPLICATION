@@ -125,8 +125,15 @@ class LogoutView(APIView):
 
     def post(self, request):
         """
-        Blacklist the provided refresh token
+        Blacklist the provided refresh token.
+
+        Accepts optional 'reason' in request body:
+        - 'user_initiated' (default) — user clicked logout
+        - 'session_expired' — token refresh failed
+        - 'account_deactivated' — account was deactivated while logged in
         """
+        logout_reason = request.data.get('reason', 'user_initiated')
+
         try:
             refresh_token = request.data.get('refresh')
             if not refresh_token:
@@ -138,7 +145,7 @@ class LogoutView(APIView):
             token = RefreshToken(refresh_token)
             token.blacklist()
 
-            # Audit log: logout
+            # Audit log: logout with reason
             try:
                 from apps.audit.utils import log_user_action, get_client_ip, get_user_agent, set_audit_context
                 set_audit_context(
@@ -150,6 +157,7 @@ class LogoutView(APIView):
                     action='LOGOUT',
                     target_user=request.user,
                     user=request.user,
+                    metadata={'reason': logout_reason},
                 )
             except Exception:
                 pass

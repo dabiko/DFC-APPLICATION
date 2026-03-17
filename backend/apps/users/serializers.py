@@ -272,6 +272,14 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
         # Check if account is deactivated BEFORE authentication attempt
         if user and not user.is_active:
+            self._log_auth_event(
+                'FAILED_LOGIN', user,
+                outcome='FAILURE',
+                metadata={
+                    'reason': 'account_deactivated',
+                    'attempted_username': username_or_email,
+                }
+            )
             raise serializers.ValidationError(
                 {
                     "detail": "Your account has been deactivated. Please contact your administrator.",
@@ -281,6 +289,14 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
         # Check if account is locked BEFORE authentication attempt
         if user and user.is_account_locked:
+            self._log_auth_event(
+                'FAILED_LOGIN', user,
+                outcome='FAILURE',
+                metadata={
+                    'reason': 'account_locked',
+                    'locked_until': user.account_locked_until.isoformat() if user.account_locked_until else None,
+                }
+            )
             raise serializers.ValidationError(
                 {
                     "detail": f"Account locked due to too many failed login attempts. "
