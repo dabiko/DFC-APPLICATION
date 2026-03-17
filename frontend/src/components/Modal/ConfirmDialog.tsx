@@ -1,5 +1,5 @@
-import { ReactNode } from 'react'
-import { Modal } from './Modal'
+import { Fragment, ReactNode } from 'react'
+import { Dialog, Transition } from '@headlessui/react'
 import { Button } from '@components/Button'
 import { ExclamationTriangleIcon, InformationCircleIcon } from '@heroicons/react/24/outline'
 import { cn } from '@utils/cn'
@@ -57,6 +57,7 @@ const variantConfig: Record<
  *
  * A specialized modal for confirmation dialogs.
  * Commonly used for destructive actions or important decisions.
+ * Renders at z-[60] to appear above side panels and other z-50 elements.
  *
  * @example
  * ```tsx
@@ -87,50 +88,83 @@ export function ConfirmDialog({
 
   const handleConfirm = () => {
     onConfirm()
-    if (!loading) {
-      onClose()
-    }
   }
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      size="sm"
-      showCloseButton={false}
-      closeOnOverlayClick={!loading}
-    >
-      <div className="flex gap-4">
-        <div
-          className={cn(
-            'flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
-            variant === 'danger' && 'bg-error-100 dark:bg-error-900/20',
-            variant === 'warning' && 'bg-warning-100 dark:bg-warning-900/20',
-            variant === 'info' && 'bg-primary-100 dark:bg-primary-900/20'
-          )}
+    <Transition appear show={open} as={Fragment}>
+      <Dialog as="div" className="relative z-[60]" onClose={loading ? () => {} : onClose}>
+        {/* Backdrop */}
+        <Transition.Child
+          as={Fragment}
+          enter="ease-out duration-300"
+          enterFrom="opacity-0"
+          enterTo="opacity-100"
+          leave="ease-in duration-200"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
         >
-          <Icon className={cn('h-6 w-6', config.iconColor)} />
-        </div>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" aria-hidden="true" />
+        </Transition.Child>
 
-        <div className="flex-1">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
-          <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">{message}</div>
-
-          <div className="mt-6 flex gap-3 justify-end">
-            <Button variant="ghost" onClick={onClose} disabled={loading}>
-              {cancelText}
-            </Button>
-            <Button
-              variant={config.confirmVariant}
-              onClick={handleConfirm}
-              loading={loading}
-              disabled={loading}
+        {/* Full-screen container */}
+        <div className="fixed inset-0 overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4">
+            <Transition.Child
+              as={Fragment}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0 scale-95"
+              enterTo="opacity-100 scale-100"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100 scale-100"
+              leaveTo="opacity-0 scale-95"
             >
-              {confirmText}
-            </Button>
+              <Dialog.Panel
+                className={cn(
+                  'w-full max-w-sm transform overflow-hidden rounded-lg',
+                  'bg-white dark:bg-gray-900',
+                  'shadow-xl transition-all',
+                  'border border-gray-200 dark:border-gray-800',
+                  'px-6 py-4'
+                )}
+              >
+                <div className="flex gap-4">
+                  <div
+                    className={cn(
+                      'flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
+                      variant === 'danger' && 'bg-error-100 dark:bg-error-900/20',
+                      variant === 'warning' && 'bg-warning-100 dark:bg-warning-900/20',
+                      variant === 'info' && 'bg-primary-100 dark:bg-primary-900/20'
+                    )}
+                  >
+                    <Icon className={cn('h-6 w-6', config.iconColor)} />
+                  </div>
+
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                      {title}
+                    </h3>
+                    <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">{message}</div>
+
+                    <div className="mt-6 flex gap-3 justify-end">
+                      <Button variant="ghost" onClick={onClose} disabled={loading}>
+                        {cancelText}
+                      </Button>
+                      <Button
+                        variant={config.confirmVariant}
+                        onClick={handleConfirm}
+                        loading={loading}
+                        disabled={loading}
+                      >
+                        {confirmText}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </Dialog.Panel>
+            </Transition.Child>
           </div>
         </div>
-      </div>
-    </Modal>
+      </Dialog>
+    </Transition>
   )
 }

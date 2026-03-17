@@ -51,6 +51,7 @@ import {
 import { InviteUserModal } from './InviteUserModal'
 import { EditUserModal } from './EditUserModal'
 import { UserDetailPanel } from './UserDetailPanel'
+import { ConfirmDialog } from '@/components/Modal/ConfirmDialog'
 import { cn } from '@/utils/cn'
 
 interface UsersTabProps {
@@ -160,34 +161,67 @@ function UserActionMenu({
   onViewDetails,
 }: UserActionMenuProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 })
   const menuRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(event.target as Node) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false)
       }
     }
+    function handleScroll() {
+      if (isOpen) setIsOpen(false)
+    }
     document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+    window.addEventListener('scroll', handleScroll, true)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      window.removeEventListener('scroll', handleScroll, true)
+    }
+  }, [isOpen])
 
   const status = getUserStatus(user)
   const isLocked = status === 'locked'
 
+  const handleToggle = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect()
+      const menuWidth = 192 // w-48 = 12rem = 192px
+      const menuHeight = 220 // approximate max menu height
+      const spaceBelow = window.innerHeight - rect.bottom
+      const openUp = spaceBelow < menuHeight
+
+      setMenuPos({
+        top: openUp ? rect.top - menuHeight : rect.bottom + 4,
+        left: Math.max(8, rect.right - menuWidth),
+      })
+    }
+    setIsOpen(!isOpen)
+  }
+
   return (
-    <div ref={menuRef} className="relative">
+    <div className="relative">
       <button
-        onClick={(e) => {
-          e.stopPropagation()
-          setIsOpen(!isOpen)
-        }}
+        ref={buttonRef}
+        onClick={handleToggle}
         className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
       >
         <MoreVertical className="w-4 h-4 text-gray-500" />
       </button>
       {isOpen && (
-        <div className="absolute right-0 z-50 mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1">
+        <div
+          ref={menuRef}
+          style={{ top: menuPos.top, left: menuPos.left }}
+          className="fixed z-[70] w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1"
+        >
           <button
             onClick={() => {
               onViewDetails()
@@ -529,6 +563,13 @@ export function UsersTab({ onRefresh }: UsersTabProps) {
   const [selectedUser, setSelectedUser] = useState<UserType | null>(null)
   const [showDetailPanel, setShowDetailPanel] = useState(false)
 
+  // Confirmation modal state
+  const [confirmAction, setConfirmAction] = useState<{
+    type: 'activate' | 'deactivate' | 'resetPassword'
+    user: UserType
+  } | null>(null)
+  const [confirmLoading, setConfirmLoading] = useState(false)
+
   const PAGE_SIZE = 20
 
   // Build filters
@@ -616,25 +657,17 @@ export function UsersTab({ onRefresh }: UsersTabProps) {
     return () => clearTimeout(debounceTimer)
   }, [searchQuery, fetchUsers])
 
-  // User actions
-  const handleActivateUser = async (user: UserType) => {
-    try {
-      await activateUser(user.id)
-      fetchUsers()
-      onRefresh?.()
-    } catch (error) {
-      console.error('Failed to activate user:', error)
-    }
+  // User actions — show confirmation modal first
+  const handleActivateUser = (user: UserType) => {
+    setConfirmAction({ type: 'activate', user })
   }
 
-  const handleDeactivateUser = async (user: UserType) => {
-    try {
-      await deactivateUser(user.id)
-      fetchUsers()
-      onRefresh?.()
-    } catch (error) {
-      console.error('Failed to deactivate user:', error)
-    }
+  const handleDeactivateUser = (user: UserType) => {
+    setConfirmAction({ type: 'deactivate', user })
+  }
+
+  const handleResetPassword = (user: UserType) => {
+    setConfirmAction({ type: 'resetPassword', user })
   }
 
   const handleUnlockUser = async (user: UserType) => {
@@ -647,12 +680,37 @@ export function UsersTab({ onRefresh }: UsersTabProps) {
     }
   }
 
-  const handleResetPassword = async (user: UserType) => {
+  // Execute confirmed action
+  const handleConfirmAction = async () => {
+    if (!confirmAction) return
+    setConfirmLoading(true)
     try {
-      await resetUserPassword(user.id)
-      // Show success notification
+      switch (confirmAction.type) {
+        case 'activate':
+          await activateUser(confirmAction.user.id)
+          break
+        case 'deactivate':
+          await deactivateUser(confirmAction.user.id)
+          break
+        case 'resetPassword':
+          await resetUserPassword(confirmAction.user.id)
+          break
+      }
+      fetchUsers()
+      onRefresh?.()
+      // Update selected user in detail panel if it's the same user
+      if (selectedUser && selectedUser.id === confirmAction.user.id) {
+        if (confirmAction.type === 'activate') {
+          setSelectedUser({ ...selectedUser, is_active: true })
+        } else if (confirmAction.type === 'deactivate') {
+          setSelectedUser({ ...selectedUser, is_active: false })
+        }
+      }
     } catch (error) {
-      console.error('Failed to reset password:', error)
+      console.error(`Failed to ${confirmAction.type} user:`, error)
+    } finally {
+      setConfirmLoading(false)
+      setConfirmAction(null)
     }
   }
 
@@ -1027,6 +1085,80 @@ export function UsersTab({ onRefresh }: UsersTabProps) {
             setEditingUser(selectedUser)
           }
         }}
+        onActivate={async (userId) => {
+          const user = users.find((u) => u.id === userId)
+          if (user) handleActivateUser(user)
+        }}
+        onDeactivate={async (userId) => {
+          const user = users.find((u) => u.id === userId)
+          if (user) handleDeactivateUser(user)
+        }}
+        onUnlock={async (userId) => {
+          const user = users.find((u) => u.id === userId)
+          if (user) await handleUnlockUser(user)
+        }}
+        onResetPassword={async (userId) => {
+          const user = users.find((u) => u.id === userId)
+          if (user) handleResetPassword(user)
+        }}
+      />
+
+      {/* Confirmation Modals */}
+      <ConfirmDialog
+        open={confirmAction?.type === 'deactivate'}
+        onClose={() => !confirmLoading && setConfirmAction(null)}
+        onConfirm={handleConfirmAction}
+        title="Deactivate User"
+        message={
+          <>
+            Are you sure you want to deactivate{' '}
+            <strong>
+              {confirmAction?.user.first_name} {confirmAction?.user.last_name}
+            </strong>
+            ? They will no longer be able to log in or access the system.
+          </>
+        }
+        variant="danger"
+        confirmText="Deactivate"
+        loading={confirmLoading}
+      />
+
+      <ConfirmDialog
+        open={confirmAction?.type === 'activate'}
+        onClose={() => !confirmLoading && setConfirmAction(null)}
+        onConfirm={handleConfirmAction}
+        title="Activate User"
+        message={
+          <>
+            Are you sure you want to activate{' '}
+            <strong>
+              {confirmAction?.user.first_name} {confirmAction?.user.last_name}
+            </strong>
+            ? They will regain access to the system.
+          </>
+        }
+        variant="info"
+        confirmText="Activate"
+        loading={confirmLoading}
+      />
+
+      <ConfirmDialog
+        open={confirmAction?.type === 'resetPassword'}
+        onClose={() => !confirmLoading && setConfirmAction(null)}
+        onConfirm={handleConfirmAction}
+        title="Reset Password"
+        message={
+          <>
+            Are you sure you want to reset the password for{' '}
+            <strong>
+              {confirmAction?.user.first_name} {confirmAction?.user.last_name}
+            </strong>
+            ? A password reset email will be sent to <strong>{confirmAction?.user.email}</strong>.
+          </>
+        }
+        variant="warning"
+        confirmText="Reset Password"
+        loading={confirmLoading}
       />
     </div>
   )

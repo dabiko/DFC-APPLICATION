@@ -47,6 +47,7 @@ export interface PasswordResetConfirm {
 
 export interface AuthError {
   detail?: string
+  code?: string
   username?: string[]
   password?: string[]
   non_field_errors?: string[]
@@ -123,6 +124,7 @@ class AuthService {
       const error: AuthError = await response.json()
       // Throw the full error object so Login page can access all fields
       const customError: any = new Error(this.getErrorMessage(error))
+      customError.code = error.code
       customError.locked = error.locked
       customError.locked_until = error.locked_until
       customError.remaining_attempts = error.remaining_attempts

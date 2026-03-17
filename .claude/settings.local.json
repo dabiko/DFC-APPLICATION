@@ -60,7 +60,9 @@
       "Bash(find \"C:/Users/dabik/PycharmProjects/DFC-APPLICATION/frontend/src/components\" -type f -name \"*[Pp]rotect*\" -o -name \"*[Pp]ermission*\" -o -name \"*[Rr]ole*\" 2>/dev/null | head -20)",
       "Bash(find /c/Users/dabik/PycharmProjects/DFC-APPLICATION/frontend/src/components -type f -name \"*user*\" -o -name \"*User*\" 2>/dev/null | head -20)",
       "Bash(cd:*)",
-      "Bash(DJANGO_SETTINGS_MODULE=config.settings.development python -c \"\nimport django; django.setup\\(\\)\nfrom django.urls import reverse\nprint\\(reverse\\('documents:document_dashboard_stats'\\)\\)\n\" 2>&1)"
+      "Bash(DJANGO_SETTINGS_MODULE=config.settings.development python -c \"\nimport django; django.setup\\(\\)\nfrom django.urls import reverse\nprint\\(reverse\\('documents:document_dashboard_stats'\\)\\)\n\" 2>&1)",
+      "Bash(find:*)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []

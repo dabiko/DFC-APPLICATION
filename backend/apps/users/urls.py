@@ -2,9 +2,8 @@
 URL configuration for users app.
 """
 from django.urls import path
-from rest_framework_simplejwt.views import TokenRefreshView
-
 from apps.users.views import (
+    SafeTokenRefreshView,
     LoginView,
     LogoutView,
     RegisterView,
@@ -73,7 +72,7 @@ urlpatterns = [
     path('logout/', LogoutView.as_view(), name='logout'),
     path('register/', RegisterView.as_view(), name='register'),
     path('register/comprehensive/', ComprehensiveRegisterView.as_view(), name='comprehensive_register'),
-    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('token/refresh/', SafeTokenRefreshView.as_view(), name='token_refresh'),
 
     # Enterprise Password reset endpoints
     path('password/reset/request/', EnterprisePasswordResetRequestView.as_view(), name='password_reset_request'),

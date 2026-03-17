@@ -38,6 +38,7 @@ import { SettingsPage } from './pages/SettingsPage'
 import { OrganizationSettingsPage } from './pages/OrganizationSettingsPage'
 import { IntegrationsPage } from './pages/IntegrationsPage'
 import { SystemSettingsPage } from './pages/SystemSettingsPage'
+import { AccountDeactivatedModal } from './components/Auth/AccountDeactivatedModal'
 import { ProceduresListPage } from './pages/ProceduresListPage'
 import { MyTrainingPage } from './pages/MyTrainingPage'
 import { TrainingPlayerPage } from './pages/TrainingPlayerPage'
@@ -506,6 +507,7 @@ function App() {
               {/* 404 - Catch all undefined routes */}
               <Route path="*" element={<NotFoundRouter />} />
             </Routes>
+            <AccountDeactivatedModal />
           </Router>
           <ToastContainer />
         </PermissionProvider>

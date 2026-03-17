@@ -9,6 +9,9 @@ let failedQueue: Array<{
   reject: (error: any) => void
 }> = []
 
+// Account deactivation state - prevents multiple modals
+let deactivationHandled = false
+
 // Reset refresh state on module load (handles page navigation/reload)
 console.log('🔧 apiClient initialized, isRefreshing reset to false')
 
@@ -29,6 +32,30 @@ export const resetRefreshState = () => {
   isRefreshing = false
   failedQueue = []
   console.log('🔧 Refresh state manually reset')
+}
+
+/**
+ * Dispatch a custom event when an account is deactivated.
+ * React components can listen for this to show a modal.
+ */
+function dispatchAccountDeactivated() {
+  if (deactivationHandled) return
+  deactivationHandled = true
+
+  window.dispatchEvent(new CustomEvent('account-deactivated'))
+}
+
+/**
+ * Clear all auth tokens from both storages.
+ */
+function clearAllTokens() {
+  localStorage.removeItem('access_token')
+  localStorage.removeItem('refresh_token')
+  localStorage.removeItem('user')
+  localStorage.removeItem('remember_me')
+  sessionStorage.removeItem('access_token')
+  sessionStorage.removeItem('refresh_token')
+  sessionStorage.removeItem('user')
 }
 
 // Create axios instance with default config
@@ -87,20 +114,26 @@ apiClient.interceptors.response.use(
       })
     }
 
+    // Check for account deactivated error (can come from any authenticated endpoint or token refresh)
+    const errorData = error.response?.data as { code?: string; detail?: string; user_id?: string }
+    if (errorData?.code === 'account_deactivated') {
+      console.log('🚫 Account deactivated - showing modal and clearing session')
+
+      clearAllTokens()
+
+      // Dispatch event so the React app can show a modal
+      dispatchAccountDeactivated()
+
+      return Promise.reject(error)
+    }
+
     // If error is 401 and we haven't retried yet, try to refresh token
     if (error.response?.status === 401 && !originalRequest._retry) {
       // Check if this is an MFA required error - user needs to re-authenticate with MFA
-      const errorData = error.response?.data as { code?: string; user_id?: string }
       if (errorData?.code === 'mfa_required') {
         console.log('🔐 MFA verification required - redirecting to login')
 
-        // Clear all tokens - user needs to re-authenticate with MFA
-        localStorage.removeItem('access_token')
-        localStorage.removeItem('refresh_token')
-        localStorage.removeItem('user')
-        sessionStorage.removeItem('access_token')
-        sessionStorage.removeItem('refresh_token')
-        sessionStorage.removeItem('user')
+        clearAllTokens()
 
         // Redirect to login with a message
         if (!window.location.pathname.includes('/login')) {
@@ -182,7 +215,18 @@ apiClient.interceptors.response.use(
         }
         return apiClient(originalRequest)
       } catch (refreshError: any) {
-        // Refresh failed
+        // Refresh failed - check if it's because account was deactivated
+        const refreshErrorData = refreshError?.response?.data as { code?: string }
+        if (refreshErrorData?.code === 'account_deactivated') {
+          console.log('🚫 Account deactivated (detected during token refresh)')
+          isRefreshing = false
+          processQueue(refreshError, null)
+          clearAllTokens()
+          dispatchAccountDeactivated()
+          return Promise.reject(refreshError)
+        }
+
+        // Refresh failed for other reasons
         console.error('❌ Token refresh failed:', {
           status: refreshError?.response?.status,
           data: refreshError?.response?.data,
@@ -192,14 +236,7 @@ apiClient.interceptors.response.use(
         isRefreshing = false
         processQueue(refreshError, null)
 
-        // Clear all tokens from both storages
-        localStorage.removeItem('access_token')
-        localStorage.removeItem('refresh_token')
-        localStorage.removeItem('user')
-        localStorage.removeItem('remember_me')
-        sessionStorage.removeItem('access_token')
-        sessionStorage.removeItem('refresh_token')
-        sessionStorage.removeItem('user')
+        clearAllTokens()
 
         // Only redirect if we're not already on the login page
         if (!window.location.pathname.includes('/login')) {

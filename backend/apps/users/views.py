@@ -76,6 +76,43 @@ class LoginView(TokenObtainPairView):
 @extend_schema(
     tags=['Authentication'],
     responses={
+        200: OpenApiResponse(description='Token refreshed'),
+        401: OpenApiResponse(description='Account deactivated or invalid token'),
+    }
+)
+class SafeTokenRefreshView(TokenRefreshView):
+    """
+    Custom token refresh that checks if the user is still active.
+    Prevents deactivated users from refreshing their tokens.
+    """
+
+    def post(self, request, *args, **kwargs):
+        from rest_framework_simplejwt.tokens import UntypedToken
+        from rest_framework_simplejwt.settings import api_settings
+
+        try:
+            refresh_token = request.data.get('refresh', '')
+            token = UntypedToken(refresh_token)
+            user_id = token.get(api_settings.USER_ID_CLAIM)
+            user = CustomUser.objects.get(**{api_settings.USER_ID_FIELD: user_id})
+
+            if not user.is_active:
+                return Response(
+                    {
+                        'detail': 'Your account has been deactivated. Please contact your administrator.',
+                        'code': 'account_deactivated',
+                    },
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
+        except (TokenError, CustomUser.DoesNotExist):
+            pass  # Let the parent handle invalid tokens
+
+        return super().post(request, *args, **kwargs)
+
+
+@extend_schema(
+    tags=['Authentication'],
+    responses={
         200: OpenApiResponse(description='Logout successful'),
         400: OpenApiResponse(description='Invalid token'),
     }

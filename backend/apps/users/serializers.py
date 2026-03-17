@@ -270,6 +270,15 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             except CustomUser.DoesNotExist:
                 pass
 
+        # Check if account is deactivated BEFORE authentication attempt
+        if user and not user.is_active:
+            raise serializers.ValidationError(
+                {
+                    "detail": "Your account has been deactivated. Please contact your administrator.",
+                    "code": "account_deactivated",
+                }
+            )
+
         # Check if account is locked BEFORE authentication attempt
         if user and user.is_account_locked:
             raise serializers.ValidationError(

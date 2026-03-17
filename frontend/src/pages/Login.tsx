@@ -83,6 +83,14 @@ export function Login() {
       // Clear the session flag
       sessionStorage.removeItem('mfa_reverification_required')
     }
+
+    // Check if user was redirected due to account deactivation
+    if (searchParams.get('reason') === 'account_deactivated') {
+      setErrors({
+        submit:
+          'Your account has been deactivated. Please contact your administrator to restore access.',
+      })
+    }
   }, [searchParams])
 
   // Background Animation (identical to landing page and signup)
@@ -310,8 +318,15 @@ export function Login() {
       const errorMessage =
         error instanceof Error ? error.message : 'Login failed. Please try again.'
 
+      // Check if account is deactivated
+      if (error.code === 'account_deactivated' || errorMessage.includes('deactivated')) {
+        setErrors({
+          submit:
+            'Your account has been deactivated. Please contact your administrator to restore access.',
+        })
+      }
       // Check if account is locked
-      if (error.locked === true || errorMessage.includes('Account locked')) {
+      else if (error.locked === true || errorMessage.includes('Account locked')) {
         const lockedUntil = error.locked_until
           ? new Date(error.locked_until).toLocaleString()
           : 'unknown time'
