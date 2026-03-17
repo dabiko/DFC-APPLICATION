@@ -77,11 +77,10 @@ export function ProcedureBuilderPage() {
     is_superuser: userData?.is_superuser || false,
   }
 
-  // Determine if current user is a step owner (not the creator/admin)
-  const isFullEditor =
-    user.is_superuser ||
-    (procedure && String(userData?.id) === String(procedure.created_by)) ||
-    hasRole(['admin', 'manager'])
+  // Determine if current user can edit the procedure itself (metadata, submit for review, etc.)
+  // Step owners can only edit their assigned steps, NOT the procedure metadata
+  const isProcedureCreator = procedure && String(userData?.id) === String(procedure.created_by)
+  const isFullEditor = user.is_superuser || isProcedureCreator || hasRole(['admin'])
   const isStepOwnerMode = !isNew && procedure && !isFullEditor
 
   // Load existing procedure

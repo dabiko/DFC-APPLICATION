@@ -202,7 +202,9 @@ export const deleteAttachment = async (
 
 export const listQuizzes = async (procedureId: string): Promise<Quiz[]> => {
   const response = await apiClient.get(`${BASE}/procedures/${procedureId}/quizzes/`)
-  return response.data
+  // Handle both paginated {results: [...]} and flat array responses
+  const data = response.data
+  return Array.isArray(data) ? data : (data.results ?? [])
 }
 
 export const createQuiz = async (procedureId: string, data: Partial<Quiz>): Promise<Quiz> => {

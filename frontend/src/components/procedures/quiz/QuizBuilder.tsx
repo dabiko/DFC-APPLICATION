@@ -56,13 +56,23 @@ export function QuizBuilder({ quiz, procedureId, stepId, onSave, onCancel }: Qui
   const handleSave = async () => {
     setSaving(true)
     try {
+      // Strip temp IDs before sending — backend generates real UUIDs
+      const cleanQuestions = questions.map(({ id, ...q }) => ({
+        ...q,
+        ...(id && !id.startsWith('temp-') ? { id } : {}),
+        options: (q.options || []).map(({ id: optId, question, ...opt }) => ({
+          ...opt,
+          ...(optId && !optId.startsWith('temp-') ? { id: optId } : {}),
+        })),
+      }))
+
       await onSave({
         title,
         description,
         quiz_type: quizType,
         step: stepId || null,
         procedure: procedureId,
-        questions,
+        questions: cleanQuestions as any,
         ...settings,
       })
     } finally {

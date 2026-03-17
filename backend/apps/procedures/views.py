@@ -1135,8 +1135,6 @@ class QuizViewSet(viewsets.ModelViewSet):
         ).prefetch_related('questions__options')
 
     def get_serializer_class(self):
-        if self.action == 'create':
-            return QuizCreateSerializer
         return QuizSerializer
 
     def perform_create(self, serializer):

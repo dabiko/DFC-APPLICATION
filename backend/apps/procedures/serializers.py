@@ -291,21 +291,54 @@ class QuestionSerializer(serializers.ModelSerializer):
 
 
 class QuizSerializer(serializers.ModelSerializer):
-    questions = QuestionSerializer(many=True, read_only=True)
+    questions = QuestionSerializer(many=True, required=False)
 
     class Meta:
         model = Quiz
         fields = '__all__'
         read_only_fields = ['id', 'created_at', 'updated_at']
 
+    def create(self, validated_data):
+        questions_data = validated_data.pop('questions', [])
+        quiz = Quiz.objects.create(**validated_data)
+        for q_data in questions_data:
+            options_data = q_data.pop('options', [])
+            # Remove temp IDs from frontend
+            q_data.pop('id', None)
+            question = Question.objects.create(quiz=quiz, **q_data)
+            for opt_data in options_data:
+                opt_data.pop('id', None)
+                opt_data.pop('question', None)
+                AnswerOption.objects.create(question=question, **opt_data)
+        return quiz
 
-class QuizCreateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Quiz
-        fields = ['id', 'quiz_type', 'step', 'title', 'description',
-                  'passing_score_percent', 'max_attempts', 'time_limit_minutes',
-                  'shuffle_questions', 'shuffle_answers', 'show_correct_answers_after']
-        read_only_fields = ['id']
+    def update(self, instance, validated_data):
+        questions_data = validated_data.pop('questions', None)
+
+        # Update quiz fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        # Replace questions if provided
+        if questions_data is not None:
+            # Delete existing questions (cascades to options)
+            instance.questions.all().delete()
+            for q_data in questions_data:
+                options_data = q_data.pop('options', [])
+                q_data.pop('id', None)
+                question = Question.objects.create(quiz=instance, **q_data)
+                for opt_data in options_data:
+                    opt_data.pop('id', None)
+                    opt_data.pop('question', None)
+                    AnswerOption.objects.create(question=question, **opt_data)
+
+        return instance
+
+
+class QuizCreateSerializer(QuizSerializer):
+    """Alias for backward compatibility — uses QuizSerializer with nested write support."""
+    pass
 
 
 # ---------------------------------------------------------------------------

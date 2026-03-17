@@ -39,6 +39,7 @@ import {
   updateQuiz,
   deleteQuiz,
 } from '@/services/procedureService'
+import { ConfirmDialog } from '@/components/Modal/ConfirmDialog'
 import { BranchConditionEditor } from '../branching/BranchConditionEditor'
 import { QuizBuilder } from '../quiz/QuizBuilder'
 import { UserSelectDropdown } from './UserSelectDropdown'
@@ -68,6 +69,8 @@ export function StepEditor({
   const [stepQuizzes, setStepQuizzes] = useState<Quiz[]>([])
   const [showQuizBuilder, setShowQuizBuilder] = useState(false)
   const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null)
+  const [deletingQuiz, setDeletingQuiz] = useState<Quiz | null>(null)
+  const [isDeletingQuiz, setIsDeletingQuiz] = useState(false)
 
   // Load quizzes for this step
   useEffect(() => {
@@ -436,12 +439,7 @@ export function StepEditor({
                         Edit
                       </button>
                       <button
-                        onClick={async () => {
-                          if (confirm('Delete this quiz?')) {
-                            await deleteQuiz(procedureId, quiz.id)
-                            setStepQuizzes((prev) => prev.filter((q) => q.id !== quiz.id))
-                          }
-                        }}
+                        onClick={() => setDeletingQuiz(quiz)}
                         className="rounded px-2 py-1 text-xs text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
                       >
                         Delete
@@ -789,6 +787,40 @@ export function StepEditor({
           />
         </div>
       )}
+      <ConfirmDialog
+        open={!!deletingQuiz}
+        onClose={() => !isDeletingQuiz && setDeletingQuiz(null)}
+        onConfirm={async () => {
+          if (!deletingQuiz) return
+          setIsDeletingQuiz(true)
+          try {
+            await deleteQuiz(procedureId, deletingQuiz.id)
+            setStepQuizzes((prev) => prev.filter((q) => q.id !== deletingQuiz.id))
+          } catch (err) {
+            console.error('Failed to delete quiz:', err)
+          } finally {
+            setIsDeletingQuiz(false)
+            setDeletingQuiz(null)
+          }
+        }}
+        title="Delete Quiz"
+        message={
+          <>
+            Are you sure you want to delete <strong>{deletingQuiz?.title || 'this quiz'}</strong>?
+            {(deletingQuiz?.questions?.length ?? 0) > 0 && (
+              <>
+                {' '}
+                This will permanently remove {deletingQuiz!.questions!.length} question
+                {deletingQuiz!.questions!.length > 1 ? 's' : ''} and all associated answer options.
+              </>
+            )}{' '}
+            This action cannot be undone.
+          </>
+        }
+        variant="danger"
+        confirmText="Delete Quiz"
+        loading={isDeletingQuiz}
+      />
     </div>
   )
 }

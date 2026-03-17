@@ -119,7 +119,7 @@ export function ProcedureDetailPage() {
   const canEdit = isAdmin || isCreator || hasGlobalPermission('edit_procedure')
   const canDelete = isAdmin || isCreator || hasGlobalPermission('delete_procedure')
   const canPublish = isAdmin || isCreator || hasGlobalPermission('publish_procedure')
-  const canAssign = hasGlobalPermission('manage_assignments')
+  const canAssign = isAdmin || isCreator || hasGlobalPermission('manage_assignments')
 
   useEffect(() => {
     if (!id) return
