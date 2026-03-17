@@ -28,6 +28,7 @@ export interface LoginResponse {
     organization_id?: string | null
     organization_name?: string | null
     organization_domain?: string | null
+    organization_logo_url?: string | null
   }
   // MFA required response
   mfa_required?: boolean

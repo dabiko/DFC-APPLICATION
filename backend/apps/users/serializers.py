@@ -505,6 +505,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'organization_id': str(user.organization.id) if user.organization else None,
             'organization_name': user.organization.name if user.organization else None,
             'organization_domain': user.organization.domain if user.organization else None,
+            'organization_logo_url': self._get_org_logo_url(user),
         }
 
         return data
@@ -538,6 +539,26 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             token['subscription_status'] = None
 
         return token
+
+    def _get_org_logo_url(self, user):
+        """Get the organization logo URL if available."""
+        try:
+            if user.organization:
+                from apps.organizations.settings_models import OrganizationSettings
+                settings = OrganizationSettings.objects.filter(
+                    organization=user.organization
+                ).first()
+                if settings and settings.logo:
+                    url = settings.logo.url
+                    if url.startswith('http'):
+                        return url
+                    request = self.context.get('request')
+                    if request:
+                        return request.build_absolute_uri(url)
+                    return url
+        except Exception:
+            pass
+        return None
 
     def _log_auth_event(self, action, target_user, outcome='SUCCESS', metadata=None):
         """Log an authentication event to the audit trail."""

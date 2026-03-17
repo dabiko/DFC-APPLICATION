@@ -51,10 +51,15 @@ class OrganizationSettingsSerializer(serializers.ModelSerializer):
 
     def get_logo_url(self, obj):
         if obj.logo:
+            url = obj.logo.url
+            # S3/MinIO storage returns a full URL (presigned); don't wrap with build_absolute_uri
+            if url.startswith('http'):
+                return url
+            # Local storage returns a relative path; build full URL
             request = self.context.get('request')
             if request:
-                return request.build_absolute_uri(obj.logo.url)
-            return obj.logo.url
+                return request.build_absolute_uri(url)
+            return url
         return None
 
 

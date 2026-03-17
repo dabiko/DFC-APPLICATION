@@ -151,6 +151,8 @@ export function OrganizationSettingsPage() {
   const handleUploadLogo = async (file: File) => {
     const updated = await organizationSettingsService.uploadLogo(file)
     setAllSettings((prev) => (prev ? { ...prev, settings: updated } : null))
+    // Update stored user data so sidebar logo refreshes
+    _syncLogoToUserData(updated.logo_url)
   }
 
   const handleDeleteLogo = async () => {
@@ -163,6 +165,17 @@ export function OrganizationSettingsPage() {
           }
         : null
     )
+    // Update stored user data so sidebar logo refreshes
+    _syncLogoToUserData(null)
+  }
+
+  const _syncLogoToUserData = (logoUrl: string | null) => {
+    const user = authService.getUser()
+    if (user) {
+      const updated = { ...user, organization_logo_url: logoUrl }
+      const rememberMe = !!localStorage.getItem('access_token')
+      authService.storeUser(updated, rememberMe)
+    }
   }
 
   // Render the active tab content

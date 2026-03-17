@@ -2,9 +2,10 @@
  * InviteUserModal Component
  *
  * Modal for inviting new users to the organization with role and department selection.
+ * Supports bulk CSV upload, duplicate detection, domain validation, and existing user checks.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   X,
   Mail,
@@ -22,11 +23,15 @@ import {
   Edit3,
   Eye,
   Sparkles,
+  Upload,
+  Download,
+  FileSpreadsheet,
 } from 'lucide-react'
 import {
   createInvitation,
   getDepartments,
   getRoles,
+  getUsers,
   type Department,
   type Role,
   type CreateInvitationRequest,
@@ -37,6 +42,39 @@ import { CustomSelect, type SelectOption } from './CustomSelect'
 import { cn } from '@/utils/cn'
 
 // ============================================================================
+// CONSTANTS
+// ============================================================================
+
+const BLOCKED_EMAIL_DOMAINS = [
+  'gmail.com',
+  'yahoo.com',
+  'hotmail.com',
+  'outlook.com',
+  'live.com',
+  'msn.com',
+  'aol.com',
+  'mail.com',
+  'icloud.com',
+  'me.com',
+  'mac.com',
+  'protonmail.com',
+  'proton.me',
+  'pm.me',
+  'yandex.com',
+  'yandex.ru',
+  'mail.ru',
+  'zoho.com',
+  'gmx.com',
+  'gmx.net',
+  'tempmail.com',
+  '10minutemail.com',
+  'guerrillamail.com',
+  'mailinator.com',
+  'maildrop.cc',
+  'throwaway.email',
+]
+
+// ============================================================================
 // TYPES
 // ============================================================================
 
@@ -44,12 +82,61 @@ interface InviteUserModalProps {
   isOpen: boolean
   onClose: () => void
   onSuccess: () => void
+  departments?: Department[]
 }
 
 interface InviteeForm {
   email: string
   first_name: string
   last_name: string
+  error?: string
+}
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+function getEmailDomain(email: string): string {
+  return email.toLowerCase().trim().split('@')[1] || ''
+}
+
+function isBlockedDomain(email: string): boolean {
+  const domain = getEmailDomain(email)
+  if (!domain) return false
+  return (
+    BLOCKED_EMAIL_DOMAINS.includes(domain) ||
+    ['temp', 'disposable', 'trash', 'fake', 'throwaway'].some((k) => domain.includes(k))
+  )
+}
+
+function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+}
+
+function generateCSVTemplate(): string {
+  return [
+    'email,first_name,last_name',
+    'john.doe@cccplc.net,John,Doe',
+    'jane.smith@cccplc.net,Jane,Smith',
+  ].join('\n')
+}
+
+function parseCSV(text: string): InviteeForm[] {
+  const lines = text.trim().split('\n')
+  if (lines.length < 2) return []
+
+  // Skip header row
+  return lines
+    .slice(1)
+    .map((line) => {
+      const cols = line.split(',').map((c) => c.trim().replace(/^["']|["']$/g, ''))
+      return {
+        email: cols[0] || '',
+        first_name: cols[1] || '',
+        last_name: cols[2] || '',
+      }
+    })
+    .filter((row) => row.email)
 }
 
 // ============================================================================
@@ -159,16 +246,21 @@ export function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUserModalP
   // Data
   const [departments, setDepartments] = useState<Department[]>([])
   const [roles, setRoles] = useState<Role[]>([])
+  const [existingEmails, setExistingEmails] = useState<Set<string>>(new Set())
 
   // Error state
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
 
-  // Fetch departments and roles on mount
+  // CSV upload ref
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Fetch departments, roles, and existing users on mount
   useEffect(() => {
     if (isOpen) {
       fetchDepartments()
       fetchRoles()
+      fetchExistingUsers()
     }
   }, [isOpen])
 
@@ -196,6 +288,16 @@ export function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUserModalP
     }
   }
 
+  const fetchExistingUsers = async () => {
+    try {
+      const response = await getUsers({ page_size: 1000 })
+      const emails = new Set(response.results.map((u) => u.email.toLowerCase()))
+      setExistingEmails(emails)
+    } catch (err) {
+      console.error('Failed to fetch existing users:', err)
+    }
+  }
+
   // Reset form when modal closes
   useEffect(() => {
     if (!isOpen) {
@@ -208,8 +310,26 @@ export function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUserModalP
     }
   }, [isOpen])
 
+  // ── Invitee row validation (runs on each email change) ──
+
+  const validateInvitee = (email: string, index: number): string | undefined => {
+    if (!email) return undefined
+    if (!isValidEmail(email)) return 'Invalid email format'
+    if (isBlockedDomain(email)) {
+      const domain = getEmailDomain(email)
+      return `@${domain} is not allowed. Use a company email.`
+    }
+    if (existingEmails.has(email.toLowerCase())) return 'This user already exists'
+    // Check for duplicates within the invitee list
+    const isDuplicate = invitees.some(
+      (inv, i) => i !== index && inv.email.toLowerCase() === email.toLowerCase() && inv.email !== ''
+    )
+    if (isDuplicate) return 'Duplicate email'
+    return undefined
+  }
+
   const handleAddInvitee = () => {
-    if (invitees.length < 10) {
+    if (invitees.length < 50) {
       setInvitees([...invitees, { email: '', first_name: '', last_name: '' }])
     }
   }
@@ -222,20 +342,109 @@ export function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUserModalP
 
   const handleInviteeChange = (index: number, field: keyof InviteeForm, value: string) => {
     const updated = [...invitees]
-    updated[index][field] = value
+    updated[index] = { ...updated[index], [field]: value }
+    // Re-validate email on change
+    if (field === 'email') {
+      updated[index].error = validateInvitee(value, index)
+      // Also revalidate other rows for duplicate detection
+      updated.forEach((inv, i) => {
+        if (i !== index && inv.email) {
+          inv.error = validateInvitee(inv.email, i)
+        }
+      })
+    }
     setInvitees(updated)
   }
 
-  const validateForm = (): boolean => {
-    // Check all invitees have valid emails
-    for (const invitee of invitees) {
-      if (!invitee.email || !invitee.email.includes('@')) {
-        setError('Please enter valid email addresses for all invitees')
-        return false
+  // ── CSV Template download ──
+
+  const handleDownloadTemplate = () => {
+    const csv = generateCSVTemplate()
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'invite-users-template.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // ── CSV Upload ──
+
+  const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const text = event.target?.result as string
+      const parsed = parseCSV(text)
+      if (parsed.length === 0) {
+        setError(
+          'No valid rows found in CSV. Make sure the first row is a header (email,first_name,last_name).'
+        )
+        return
+      }
+      // Validate and merge with existing invitees (replace empty first row)
+      const hasOnlyEmptyRow = invitees.length === 1 && !invitees[0].email
+      const base = hasOnlyEmptyRow ? [] : invitees
+      const merged = [...base, ...parsed].slice(0, 50)
+
+      // Validate each row
+      const validated = merged.map((inv, i) => ({
+        ...inv,
+        error: validateInvitee(inv.email, i),
+      }))
+
+      // Re-run duplicate check across all
+      const seen = new Map<string, number>()
+      validated.forEach((inv, i) => {
+        if (!inv.email) return
+        const key = inv.email.toLowerCase()
+        if (seen.has(key)) {
+          inv.error = 'Duplicate email'
+          const prevIdx = seen.get(key)!
+          if (!validated[prevIdx].error) validated[prevIdx].error = undefined // keep first valid
+        } else {
+          seen.set(key, i)
+        }
+      })
+
+      setInvitees(validated)
+
+      const errorCount = validated.filter((v) => v.error).length
+      if (errorCount > 0) {
+        setError(`Imported ${validated.length} users. ${errorCount} have issues that need fixing.`)
+      } else {
+        setError(null)
       }
     }
+    reader.readAsText(file)
 
-    // Check role is selected
+    // Reset file input so same file can be re-uploaded
+    e.target.value = ''
+  }
+
+  // ── Form validation ──
+
+  const validateForm = (): boolean => {
+    let hasError = false
+    const updated = invitees.map((inv, i) => {
+      if (!inv.email) {
+        hasError = true
+        return { ...inv, error: 'Email is required' }
+      }
+      const err = validateInvitee(inv.email, i)
+      if (err) hasError = true
+      return { ...inv, error: err }
+    })
+    setInvitees(updated)
+
+    if (hasError) {
+      setError('Please fix the highlighted errors before sending invitations.')
+      return false
+    }
+
     if (!selectedRole) {
       setError('Please select a role')
       return false
@@ -243,6 +452,8 @@ export function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUserModalP
 
     return true
   }
+
+  // ── Submit ──
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -253,10 +464,9 @@ export function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUserModalP
     setIsLoading(true)
 
     try {
-      // Send invitations for each invitee
       const promises = invitees.map((invitee) => {
         const request: CreateInvitationRequest = {
-          email: invitee.email,
+          email: invitee.email.trim(),
           role: selectedRole as OrganizationRole,
           department: selectedDepartment ? parseInt(selectedDepartment) : undefined,
           message: customMessage || undefined,
@@ -267,17 +477,14 @@ export function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUserModalP
       await Promise.all(promises)
       setSuccess(true)
 
-      // Close modal after short delay
       setTimeout(() => {
         onSuccess()
         onClose()
       }, 1500)
     } catch (err: any) {
-      // Handle API error response format
       if (err.response?.data) {
         const errorData = err.response.data
         if (errorData.email) {
-          // Email validation errors from backend
           setError(Array.isArray(errorData.email) ? errorData.email[0] : errorData.email)
         } else if (errorData.error) {
           setError(errorData.error)
@@ -286,7 +493,6 @@ export function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUserModalP
         } else if (typeof errorData === 'string') {
           setError(errorData)
         } else {
-          // Try to extract first error message
           const firstKey = Object.keys(errorData)[0]
           if (firstKey) {
             const firstError = errorData[firstKey]
@@ -304,6 +510,8 @@ export function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUserModalP
   }
 
   if (!isOpen) return null
+
+  const validCount = invitees.filter((inv) => inv.email && !inv.error).length
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -349,7 +557,7 @@ export function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUserModalP
             {/* Error Message */}
             {error && (
               <div className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-lg">
-                <AlertCircle className="w-5 h-5" />
+                <AlertCircle className="w-5 h-5 flex-shrink-0" />
                 <span>{error}</span>
               </div>
             )}
@@ -363,73 +571,130 @@ export function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUserModalP
               </p>
             </div>
 
-            {/* Invitees */}
+            {/* Invitees Header with Actions */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Invite Users
-                </label>
-                <button
-                  type="button"
-                  onClick={handleAddInvitee}
-                  disabled={invitees.length >= 10}
-                  className={cn(
-                    'flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300',
-                    invitees.length >= 10 && 'opacity-50 cursor-not-allowed'
+                  {invitees.length > 1 && (
+                    <span className="ml-2 text-xs font-normal text-gray-500">
+                      ({validCount} of {invitees.length} valid)
+                    </span>
                   )}
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Another
-                </button>
+                </label>
+                <div className="flex items-center gap-2">
+                  {/* CSV Template Download */}
+                  <button
+                    type="button"
+                    onClick={handleDownloadTemplate}
+                    className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
+                    title="Download CSV template"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Template
+                  </button>
+
+                  {/* CSV Upload */}
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                    title="Upload CSV file"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    Import CSV
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".csv"
+                    onChange={handleCSVUpload}
+                    className="hidden"
+                  />
+
+                  <div className="w-px h-4 bg-gray-300 dark:bg-gray-600" />
+
+                  {/* Add Another */}
+                  <button
+                    type="button"
+                    onClick={handleAddInvitee}
+                    disabled={invitees.length >= 50}
+                    className={cn(
+                      'flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300',
+                      invitees.length >= 50 && 'opacity-50 cursor-not-allowed'
+                    )}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add
+                  </button>
+                </div>
               </div>
 
+              {/* Invitee Rows */}
               {invitees.map((invitee, index) => (
-                <div
-                  key={index}
-                  className="grid grid-cols-12 gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
-                >
-                  <div className="col-span-5">
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <div key={index}>
+                  <div
+                    className={cn(
+                      'grid grid-cols-12 gap-3 p-3 rounded-lg',
+                      invitee.error
+                        ? 'bg-red-50/50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/50'
+                        : 'bg-gray-50 dark:bg-gray-700/50'
+                    )}
+                  >
+                    <div className="col-span-5">
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                          type="email"
+                          placeholder="Email address *"
+                          value={invitee.email}
+                          onChange={(e) => handleInviteeChange(index, 'email', e.target.value)}
+                          className={cn(
+                            'w-full pl-10 pr-3 py-2 text-sm border rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:border-transparent',
+                            invitee.error
+                              ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                              : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'
+                          )}
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="col-span-3">
                       <input
-                        type="email"
-                        placeholder="Email address *"
-                        value={invitee.email}
-                        onChange={(e) => handleInviteeChange(index, 'email', e.target.value)}
-                        className="w-full pl-10 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        required
+                        type="text"
+                        placeholder="First name"
+                        value={invitee.first_name}
+                        onChange={(e) => handleInviteeChange(index, 'first_name', e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     </div>
+                    <div className="col-span-3">
+                      <input
+                        type="text"
+                        placeholder="Last name"
+                        value={invitee.last_name}
+                        onChange={(e) => handleInviteeChange(index, 'last_name', e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div className="col-span-1 flex items-center justify-center">
+                      {invitees.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveInvitee(index)}
+                          className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div className="col-span-3">
-                    <input
-                      type="text"
-                      placeholder="First name"
-                      value={invitee.first_name}
-                      onChange={(e) => handleInviteeChange(index, 'first_name', e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                  <div className="col-span-3">
-                    <input
-                      type="text"
-                      placeholder="Last name"
-                      value={invitee.last_name}
-                      onChange={(e) => handleInviteeChange(index, 'last_name', e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                  <div className="col-span-1 flex items-center justify-center">
-                    {invitees.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveInvitee(index)}
-                        className="p-2 text-gray-400 hover:text-red-500 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
+                  {/* Inline error message */}
+                  {invitee.error && (
+                    <p className="mt-1 ml-3 text-xs text-red-600 dark:text-red-400">
+                      {invitee.error}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>
@@ -503,10 +768,12 @@ export function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUserModalP
             </button>
             <button
               type="submit"
-              disabled={isLoading || success}
+              disabled={isLoading || success || validCount === 0}
               className={cn(
                 'flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg transition-colors',
-                isLoading || success ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'
+                isLoading || success || validCount === 0
+                  ? 'opacity-50 cursor-not-allowed'
+                  : 'hover:bg-blue-700'
               )}
             >
               {isLoading ? (
@@ -522,7 +789,7 @@ export function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUserModalP
               ) : (
                 <>
                   <Send className="w-4 h-4" />
-                  Send Invitations
+                  Send {validCount > 1 ? `${validCount} Invitations` : 'Invitation'}
                 </>
               )}
             </button>

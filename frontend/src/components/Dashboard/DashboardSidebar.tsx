@@ -20,6 +20,7 @@ import {
   GraduationCap,
   BarChart3,
 } from 'lucide-react'
+import { authService } from '@/services/auth.service'
 import { SmartFolderItem } from '@components/Folder'
 import {
   DepartmentSidebar,
@@ -74,6 +75,11 @@ export function DashboardSidebar({
 
   // State for create department modal
   const [createDepartmentModalOpen, setCreateDepartmentModalOpen] = useState(false)
+
+  // Organization branding
+  const userData = authService.getUser()
+  const orgLogoUrl = userData?.organization_logo_url
+  const orgName = userData?.organization_name || 'Digital Filing Cabinet'
 
   // Get smart folders (My Documents, Shared with Me, Recent, Favorites, Trash)
   const smartFolders = useMemo(() => getSmartFolders(), [])
@@ -143,23 +149,48 @@ export function DashboardSidebar({
       >
         {/* Logo */}
         <div className={cn('flex items-center gap-3', isCollapsed && 'hidden')}>
-          <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center flex-shrink-0">
-            <span className="text-white font-bold text-sm">DFC</span>
-          </div>
+          {orgLogoUrl ? (
+            <img
+              src={orgLogoUrl}
+              alt={orgName}
+              className="w-8 h-8 rounded-lg object-contain flex-shrink-0"
+            />
+          ) : (
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center flex-shrink-0">
+              <span className="text-white font-bold text-sm">
+                {orgName
+                  .split(' ')
+                  .map((w) => w[0])
+                  .join('')
+                  .slice(0, 3)
+                  .toUpperCase()}
+              </span>
+            </div>
+          )}
           <div className="min-w-0">
             <h1 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
-              Digital Filing Cabinet
+              {orgName}
             </h1>
             <p className="text-xs text-gray-500 dark:text-gray-400 truncate">Document Management</p>
           </div>
         </div>
 
         {/* Collapsed Logo */}
-        {isCollapsed && (
-          <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">DFC</span>
-          </div>
-        )}
+        {isCollapsed &&
+          (orgLogoUrl ? (
+            <img src={orgLogoUrl} alt={orgName} className="w-8 h-8 rounded-lg object-contain" />
+          ) : (
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-sm">
+                {orgName
+                  .split(' ')
+                  .map((w) => w[0])
+                  .join('')
+                  .slice(0, 3)
+                  .toUpperCase()}
+              </span>
+            </div>
+          ))}
 
         {/* Toggle Button - only visible when expanded */}
         {!isCollapsed && (
