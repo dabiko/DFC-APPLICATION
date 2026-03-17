@@ -13,7 +13,14 @@ import apiClient from './apiClient'
 
 export type UserStatus = 'active' | 'inactive' | 'locked' | 'pending'
 
-export type OrganizationRole = 'owner' | 'admin' | 'manager' | 'member' | 'viewer' | (string & {})
+export type OrganizationRole =
+  | 'owner'
+  | 'admin'
+  | 'manager'
+  | 'editor'
+  | 'member'
+  | 'viewer'
+  | (string & {})
 
 export interface Department {
   id: string
@@ -322,27 +329,32 @@ export const ROLE_OPTIONS: { value: OrganizationRole; label: string; description
   {
     value: 'owner',
     label: 'Owner',
-    description: 'Full control including billing and organization deletion',
+    description: 'Full organization control including billing and settings',
   },
   {
     value: 'admin',
     label: 'Administrator',
-    description: 'Manage users, settings, and view audit logs',
+    description: 'Full system access — users, audit logs, compliance, and configuration',
   },
   {
     value: 'manager',
     label: 'Manager',
-    description: 'Invite users, manage content, and view reports',
+    description: 'Manage documents, procedures, workflows, and training assignments',
+  },
+  {
+    value: 'editor',
+    label: 'Editor',
+    description: 'Create and edit documents, procedures, and start workflows',
   },
   {
     value: 'member',
     label: 'Member',
-    description: 'Standard access to create and edit own documents',
+    description: 'Standard access to create and edit own documents and complete training',
   },
   {
     value: 'viewer',
     label: 'Viewer',
-    description: 'Read-only access to shared documents',
+    description: 'Read-only access to view and download documents',
   },
 ]
 
@@ -461,14 +473,15 @@ export const ROLE_PERMISSIONS: Record<OrganizationRole, string[]> = {
     'view_trainee_details',
     'view_training_evidence',
   ],
-  member: [
+  editor: [
     'view_users',
-    'create_documents',
-    'edit_own_documents',
     'view_documents',
+    'download_document',
+    'upload_document',
+    'edit_document',
     'share_documents',
-    'create_folders',
     'view_folders',
+    'create_folders',
     // Procedures
     'create_procedure',
     'edit_procedure',
@@ -476,7 +489,16 @@ export const ROLE_PERMISSIONS: Record<OrganizationRole, string[]> = {
     // Workflows
     'start_workflow',
   ],
-  viewer: ['view_users', 'view_documents', 'view_folders'],
+  member: [
+    'view_users',
+    'view_documents',
+    'download_document',
+    'upload_document',
+    'edit_own_documents',
+    'view_folders',
+    'create_folders',
+  ],
+  viewer: ['view_users', 'view_documents', 'download_document', 'view_folders'],
 }
 
 // ============================================================================

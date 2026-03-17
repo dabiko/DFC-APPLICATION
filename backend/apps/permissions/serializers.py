@@ -63,9 +63,14 @@ class RoleSerializer(serializers.ModelSerializer):
         return obj.get_permissions_list()
 
     def get_user_count(self, obj):
-        """Count of users currently assigned this role"""
-        from apps.permissions.models import UserRole
-        return UserRole.objects.filter(role=obj, is_active=True).count()
+        """Count of users currently assigned this role via organization membership"""
+        try:
+            from apps.organizations.models import OrganizationMember
+            return OrganizationMember.objects.filter(role__iexact=obj.name).count()
+        except Exception:
+            # Fallback to UserRole table
+            from apps.permissions.models import UserRole
+            return UserRole.objects.filter(role=obj, is_active=True).count()
 
 
 class RoleCreateSerializer(serializers.ModelSerializer):
@@ -158,8 +163,13 @@ class RoleListSerializer(serializers.ModelSerializer):
         return len(obj.get_permissions_list())
 
     def get_user_count(self, obj):
-        from apps.permissions.models import UserRole
-        return UserRole.objects.filter(role=obj, is_active=True).count()
+        """Count of users currently assigned this role via organization membership"""
+        try:
+            from apps.organizations.models import OrganizationMember
+            return OrganizationMember.objects.filter(role__iexact=obj.name).count()
+        except Exception:
+            from apps.permissions.models import UserRole
+            return UserRole.objects.filter(role=obj, is_active=True).count()
 
 
 class UserRoleSerializer(serializers.ModelSerializer):

@@ -20,11 +20,16 @@ import {
   ChevronRight,
   Info,
   AlertTriangle,
+  Mail,
+  Building2,
 } from 'lucide-react'
 import {
   getRoles,
+  getUsers,
   deleteCustomRole,
+  getUserInitials,
   type Role,
+  type User as UserType,
   ROLE_PERMISSIONS,
 } from '@/services/userManagementService'
 import { CreateRoleModal } from './CreateRoleModal'
@@ -102,6 +107,23 @@ interface RoleCardProps {
 
 function RoleCard({ role, isExpanded, onToggle, onEdit, onDelete }: RoleCardProps) {
   const permissions = role.permissions || ROLE_PERMISSIONS[role.name] || []
+  const [roleUsers, setRoleUsers] = useState<UserType[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(false)
+
+  useEffect(() => {
+    if (isExpanded && (role.user_count || 0) > 0) {
+      setLoadingUsers(true)
+      const roleName = role.name.toLowerCase()
+      getUsers({ role: roleName as any, page_size: 100 })
+        .then((res) => {
+          // Double-filter client-side to guarantee correctness
+          const filtered = res.results.filter((u) => u.role && u.role.toLowerCase() === roleName)
+          setRoleUsers(filtered)
+        })
+        .catch(() => setRoleUsers([]))
+        .finally(() => setLoadingUsers(false))
+    }
+  }, [isExpanded, role.name, role.user_count])
 
   const getRoleColorClasses = (roleName: string) => {
     const colors: Record<string, string> = {
@@ -208,6 +230,53 @@ function RoleCard({ role, isExpanded, onToggle, onEdit, onDelete }: RoleCardProp
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Users with this role */}
+          <div className="px-4 pb-4">
+            <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+              <Users className="w-3.5 h-3.5" />
+              Users with this role ({role.user_count || 0})
+            </h4>
+            {loadingUsers ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+              </div>
+            ) : roleUsers.length > 0 ? (
+              <div className="space-y-2">
+                {roleUsers.map((user) => (
+                  <div
+                    key={user.id}
+                    className="flex items-center gap-3 p-2.5 rounded-lg bg-gray-50 dark:bg-gray-700/50"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                      {getUserInitials(user)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                        {user.first_name} {user.last_name}
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+                        <span className="flex items-center gap-1 truncate">
+                          <Mail className="w-3 h-3" />
+                          {user.email}
+                        </span>
+                        {user.department_name && (
+                          <span className="flex items-center gap-1 truncate">
+                            <Building2 className="w-3 h-3" />
+                            {user.department_name}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400 dark:text-gray-500 py-2">
+                No users assigned to this role yet.
+              </p>
+            )}
           </div>
 
           {/* Actions */}

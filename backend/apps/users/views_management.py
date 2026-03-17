@@ -118,6 +118,17 @@ class UserManagementListView(APIView):
             elif status_filter == 'locked':
                 queryset = queryset.filter(account_locked_until__gt=now)
 
+        role_filter = request.query_params.get('role')
+        if role_filter:
+            try:
+                from apps.organizations.models import OrganizationMember
+                member_user_ids = list(OrganizationMember.objects.filter(
+                    role__iexact=role_filter
+                ).values_list('user_id', flat=True))
+                queryset = queryset.filter(id__in=member_user_ids)
+            except Exception as e:
+                logger.warning(f"Role filter failed: {e}", exc_info=True)
+
         department = request.query_params.get('department')
         if department:
             queryset = queryset.filter(department_id=department)

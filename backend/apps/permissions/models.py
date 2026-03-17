@@ -34,11 +34,13 @@ class Role(models.Model):
 
     # Well-known system role names (used as constants, not DB constraints)
     VIEWER = 'VIEWER'
+    MEMBER = 'MEMBER'
     EDITOR = 'EDITOR'
     MANAGER = 'MANAGER'
     ADMIN = 'ADMIN'
+    OWNER = 'OWNER'
 
-    SYSTEM_ROLE_NAMES = [VIEWER, EDITOR, MANAGER, ADMIN]
+    SYSTEM_ROLE_NAMES = [VIEWER, MEMBER, EDITOR, MANAGER, ADMIN, OWNER]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(
