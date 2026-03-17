@@ -41,6 +41,7 @@ import {
 } from '@/services/procedureService'
 import { BranchConditionEditor } from '../branching/BranchConditionEditor'
 import { QuizBuilder } from '../quiz/QuizBuilder'
+import { UserSelectDropdown } from './UserSelectDropdown'
 import DocumentSearchModal from './DocumentSearchModal'
 
 interface StepEditorProps {
@@ -580,69 +581,24 @@ export function StepEditor({
 
           {/* Step Owner & Reviewer */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Step Owner */}
-            <div>
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                <span className="flex items-center gap-1">
-                  <UserCheck className="h-3.5 w-3.5 text-indigo-500" />
-                  Step Owner
-                </span>
-              </label>
-              <p className="text-[11px] text-gray-400 mb-1">
-                Subject-matter expert who can edit this step.
-              </p>
-              <select
-                value={step.step_owner ?? ''}
-                onChange={(e) =>
-                  onUpdate(step.id, {
-                    step_owner: e.target.value ? Number(e.target.value) : null,
-                  })
-                }
-                className="w-full appearance-none rounded-lg border-2 border-gray-200 bg-gray-50/50 px-3 py-2 text-sm transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700/50 dark:text-gray-100 dark:focus:border-blue-400 dark:focus:bg-gray-700 bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22%236b7280%22%3E%3Cpath%20fill-rule%3D%22evenodd%22%20d%3D%22M5.23%207.21a.75.75%200%20011.06.02L10%2011.168l3.71-3.938a.75.75%200%20111.08%201.04l-4.25%204.5a.75.75%200%2001-1.08%200l-4.25-4.5a.75.75%200%2001.02-1.06z%22%20clip-rule%3D%22evenodd%22%2F%3E%3C%2Fsvg%3E')] bg-[length:20px_20px] bg-[position:right_8px_center] bg-no-repeat pr-9"
-              >
-                <option value="">No owner assigned</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.full_name || `${u.first_name} ${u.last_name}`.trim() || u.username}
-                  </option>
-                ))}
-              </select>
-              {step.step_owner_name && (
-                <p className="mt-1 text-xs text-gray-400">Currently: {step.step_owner_name}</p>
-              )}
-            </div>
-
-            {/* Step Reviewer */}
-            <div>
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                <span className="flex items-center gap-1">
-                  <UserCheck className="h-3.5 w-3.5" />
-                  Step Reviewer
-                </span>
-              </label>
-              <p className="text-[11px] text-gray-400 mb-1">
-                Reviewer who approves this step during review.
-              </p>
-              <select
-                value={step.reviewer ?? ''}
-                onChange={(e) =>
-                  onUpdate(step.id, {
-                    reviewer: e.target.value ? Number(e.target.value) : null,
-                  })
-                }
-                className="w-full appearance-none rounded-lg border-2 border-gray-200 bg-gray-50/50 px-3 py-2 text-sm transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700/50 dark:text-gray-100 dark:focus:border-blue-400 dark:focus:bg-gray-700 bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22%236b7280%22%3E%3Cpath%20fill-rule%3D%22evenodd%22%20d%3D%22M5.23%207.21a.75.75%200%20011.06.02L10%2011.168l3.71-3.938a.75.75%200%20111.08%201.04l-4.25%204.5a.75.75%200%2001-1.08%200l-4.25-4.5a.75.75%200%2001.02-1.06z%22%20clip-rule%3D%22evenodd%22%2F%3E%3C%2Fsvg%3E')] bg-[length:20px_20px] bg-[position:right_8px_center] bg-no-repeat pr-9"
-              >
-                <option value="">No reviewer assigned</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.full_name || `${u.first_name} ${u.last_name}`.trim() || u.username}
-                  </option>
-                ))}
-              </select>
-              {step.reviewer_name && (
-                <p className="mt-1 text-xs text-gray-400">Currently: {step.reviewer_name}</p>
-              )}
-            </div>
+            <UserSelectDropdown
+              value={step.step_owner}
+              onChange={(userId) => onUpdate(step.id, { step_owner: userId })}
+              users={users}
+              icon={<UserCheck className="h-3.5 w-3.5 text-indigo-500" />}
+              label="Step Owner"
+              description="Subject-matter expert who can edit this step"
+              placeholder="Assign an owner..."
+            />
+            <UserSelectDropdown
+              value={step.reviewer}
+              onChange={(userId) => onUpdate(step.id, { reviewer: userId })}
+              users={users}
+              icon={<UserCheck className="h-3.5 w-3.5 text-green-500" />}
+              label="Step Reviewer"
+              description="Reviewer who approves this step during review"
+              placeholder="Assign a reviewer..."
+            />
           </div>
 
           {/* Attachments */}

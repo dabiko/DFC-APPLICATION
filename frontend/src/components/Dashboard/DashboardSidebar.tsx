@@ -34,7 +34,6 @@ import { cn } from '@utils/cn'
 const navLinks = [
   { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { path: '/smart-folders', icon: FolderSearch, label: 'Smart Folders' },
-  { path: '/workflows?tab=procedures', icon: ClipboardList, label: 'Procedures' },
 ]
 
 interface DashboardSidebarProps {

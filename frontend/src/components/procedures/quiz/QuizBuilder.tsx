@@ -3,8 +3,19 @@
  * Combines quiz settings, question list, and preview.
  */
 
-import { useState } from 'react'
-import { Plus, Eye, Save, Loader2, Settings, HelpCircle } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import {
+  Plus,
+  Eye,
+  Save,
+  Loader2,
+  Settings,
+  HelpCircle,
+  ChevronDown,
+  Check,
+  ListChecks,
+  ClipboardCheck,
+} from 'lucide-react'
 import { QuizSettingsPanel } from './QuizSettingsPanel'
 import { QuestionList } from './QuestionList'
 import { QuizPreviewModal } from './QuizPreviewModal'
@@ -24,11 +35,12 @@ type TabId = 'settings' | 'questions'
 
 export function QuizBuilder({ quiz, procedureId, stepId, onSave, onCancel }: QuizBuilderProps) {
   const [activeTab, setActiveTab] = useState<TabId>('settings')
-  const [title, setTitle] = useState(quiz?.title || '')
-  const [description, setDescription] = useState(quiz?.description || '')
-  const [quizType, setQuizType] = useState(
-    quiz?.quiz_type || (stepId ? QuizType.STEP_LEVEL : QuizType.END_OF_PROCEDURE)
+  const defaultType = quiz?.quiz_type || (stepId ? QuizType.STEP_LEVEL : QuizType.END_OF_PROCEDURE)
+  const [title, setTitle] = useState(
+    quiz?.title || (defaultType === QuizType.STEP_LEVEL ? 'Step Quiz' : 'End-of-Procedure Quiz')
   )
+  const [description, setDescription] = useState(quiz?.description || '')
+  const [quizType, setQuizType] = useState(defaultType)
   const [settings, setSettings] = useState({
     passing_score_percent: quiz?.passing_score_percent ?? 70,
     max_attempts: quiz?.max_attempts ?? 3,
@@ -83,7 +95,7 @@ export function QuizBuilder({ quiz, procedureId, stepId, onSave, onCancel }: Qui
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Quiz title..."
-              className="text-sm font-semibold text-gray-900 dark:text-gray-100 border-0 bg-transparent p-0 focus:outline-none focus:ring-0"
+              className="text-sm font-semibold text-gray-900 dark:text-gray-100 bg-transparent p-1 -ml-1 border border-transparent rounded hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
             <input
               type="text"
@@ -95,14 +107,7 @@ export function QuizBuilder({ quiz, procedureId, stepId, onSave, onCancel }: Qui
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <select
-            value={quizType}
-            onChange={(e) => setQuizType(e.target.value as Quiz['quiz_type'])}
-            className="rounded-md border border-gray-300 px-2 py-1 text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-          >
-            <option value={QuizType.STEP_LEVEL}>Step-Level Quiz</option>
-            <option value={QuizType.END_OF_PROCEDURE}>End-of-Procedure Quiz</option>
-          </select>
+          <QuizTypeDropdown value={quizType} onChange={(val) => setQuizType(val)} />
           <button
             onClick={() => setShowPreview(true)}
             className="flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
@@ -175,6 +180,125 @@ export function QuizBuilder({ quiz, procedureId, stepId, onSave, onCancel }: Qui
       </div>
 
       {showPreview && <QuizPreviewModal quiz={previewQuiz} onClose={() => setShowPreview(false)} />}
+    </div>
+  )
+}
+
+// ============================================================================
+// QUIZ TYPE DROPDOWN
+// ============================================================================
+
+const QUIZ_TYPE_OPTIONS = [
+  {
+    value: QuizType.STEP_LEVEL,
+    label: 'Step-Level Quiz',
+    description: 'Assess understanding after a specific step',
+    icon: ListChecks,
+    color: 'text-blue-600 dark:text-blue-400',
+    bg: 'bg-blue-50 dark:bg-blue-900/20',
+  },
+  {
+    value: QuizType.END_OF_PROCEDURE,
+    label: 'End-of-Procedure Quiz',
+    description: 'Final assessment covering the entire procedure',
+    icon: ClipboardCheck,
+    color: 'text-purple-600 dark:text-purple-400',
+    bg: 'bg-purple-50 dark:bg-purple-900/20',
+  },
+]
+
+function QuizTypeDropdown({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (val: Quiz['quiz_type']) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const selected = QUIZ_TYPE_OPTIONS.find((o) => o.value === value) || QUIZ_TYPE_OPTIONS[0]
+  const SelectedIcon = selected.icon
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className={cn(
+          'flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
+          open
+            ? 'border-blue-400 ring-2 ring-blue-500/20 bg-white dark:bg-gray-800'
+            : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-gray-400 dark:hover:border-gray-500'
+        )}
+      >
+        <SelectedIcon className={cn('h-3.5 w-3.5', selected.color)} />
+        <span className="text-gray-800 dark:text-gray-200">{selected.label}</span>
+        <ChevronDown
+          className={cn('h-3.5 w-3.5 text-gray-400 transition-transform', open && 'rotate-180')}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 z-50 mt-1.5 w-72 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg overflow-hidden">
+          <div className="p-1.5">
+            {QUIZ_TYPE_OPTIONS.map((option) => {
+              const Icon = option.icon
+              const isSelected = option.value === value
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(option.value as Quiz['quiz_type'])
+                    setOpen(false)
+                  }}
+                  className={cn(
+                    'w-full flex items-start gap-3 rounded-lg p-3 text-left transition-colors',
+                    isSelected
+                      ? 'bg-blue-50 dark:bg-blue-900/20'
+                      : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                  )}
+                >
+                  <div className={cn('mt-0.5 rounded-lg p-1.5', option.bg)}>
+                    <Icon className={cn('h-4 w-4', option.color)} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={cn(
+                          'text-sm font-medium',
+                          isSelected
+                            ? 'text-blue-700 dark:text-blue-300'
+                            : 'text-gray-900 dark:text-gray-100'
+                        )}
+                      >
+                        {option.label}
+                      </span>
+                      {isSelected && (
+                        <Check className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      {option.description}
+                    </p>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
