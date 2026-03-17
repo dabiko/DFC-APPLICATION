@@ -9,7 +9,9 @@ Provides enterprise user administration endpoints including:
 - Security statistics
 - User management dashboard stats
 """
+import csv
 from datetime import timedelta
+from django.http import HttpResponse
 from django.utils import timezone
 from django.db.models import Count, Q
 from rest_framework import status, permissions
@@ -20,6 +22,36 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiRespon
 
 from apps.users.models import CustomUser, Department
 from apps.users.serializers import UserSerializer
+
+import logging
+logger = logging.getLogger(__name__)
+
+
+def _log_admin_user_action(request, action, target_user, outcome='SUCCESS', metadata=None):
+    """Helper to log admin user management actions to the audit trail."""
+    try:
+        from apps.audit.utils import log_user_action, get_client_ip, get_user_agent, set_audit_context
+        set_audit_context(
+            user=request.user,
+            ip_address=get_client_ip(request),
+            user_agent=get_user_agent(request),
+        )
+        log_user_action(
+            action=action,
+            target_user=target_user,
+            user=request.user,
+            outcome=outcome,
+            metadata={
+                'performed_by': request.user.get_full_name(),
+                'performed_by_id': request.user.id,
+                **(metadata or {}),
+            },
+        )
+    except Exception:
+        logger.warning(
+            f"Failed to log audit event: {action} on user {target_user.id}",
+            exc_info=True
+        )
 
 
 class UserPagination(PageNumberPagination):
@@ -116,6 +148,112 @@ class UserManagementListView(APIView):
 
 @extend_schema(
     tags=['User Management'],
+    parameters=[
+        OpenApiParameter(name='search', description='Search by name or email', type=str),
+        OpenApiParameter(name='status', description='Filter by status (active, inactive, locked)', type=str),
+        OpenApiParameter(name='role', description='Filter by role', type=str),
+        OpenApiParameter(name='department', description='Filter by department ID', type=int),
+    ],
+    responses={200: OpenApiResponse(description='CSV file download')}
+)
+class UserExportView(APIView):
+    """Export users to CSV with the same filters as the user list."""
+    permission_classes = [IsAdminOrManager]
+
+    def get(self, request):
+        queryset = CustomUser.objects.select_related('department', 'organization').all()
+        now = timezone.now()
+
+        # Apply same filters as UserManagementListView
+        search = request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(first_name__icontains=search) |
+                Q(last_name__icontains=search) |
+                Q(email__icontains=search) |
+                Q(username__icontains=search)
+            )
+
+        status_filter = request.query_params.get('status')
+        if status_filter:
+            if status_filter == 'active':
+                queryset = queryset.filter(is_active=True).exclude(
+                    account_locked_until__gt=now
+                )
+            elif status_filter == 'inactive':
+                queryset = queryset.filter(is_active=False)
+            elif status_filter == 'locked':
+                queryset = queryset.filter(account_locked_until__gt=now)
+
+        department = request.query_params.get('department')
+        if department:
+            queryset = queryset.filter(department_id=department)
+
+        queryset = queryset.order_by('last_name', 'first_name')
+
+        # Build CSV response
+        response = HttpResponse(content_type='text/csv')
+        timestamp = now.strftime('%Y-%m-%d')
+        response['Content-Disposition'] = f'attachment; filename="users-export-{timestamp}.csv"'
+
+        writer = csv.writer(response)
+        writer.writerow([
+            'First Name', 'Last Name', 'Email', 'Username', 'Employee ID',
+            'Department', 'Role', 'Status', 'MFA Enabled',
+            'Phone Number', 'Job Title',
+            'Last Login', 'Date Joined',
+        ])
+
+        for user in queryset:
+            # Compute status
+            if user.account_locked_until and user.account_locked_until > now:
+                user_status = 'Locked'
+            elif not user.is_active:
+                user_status = 'Inactive'
+            else:
+                user_status = 'Active'
+
+            # Get role (same logic as UserManagementSerializer.get_role)
+            role = 'member'
+            try:
+                from apps.organizations.models import OrganizationMember
+                membership = OrganizationMember.objects.filter(
+                    user=user,
+                    organization=user.organization
+                ).first()
+                if membership:
+                    role = membership.role
+                elif user.is_superuser:
+                    role = 'admin'
+                elif user.is_staff:
+                    role = 'manager'
+            except Exception:
+                if user.is_superuser:
+                    role = 'admin'
+                elif user.is_staff:
+                    role = 'manager'
+
+            writer.writerow([
+                user.first_name,
+                user.last_name,
+                user.email,
+                user.username,
+                user.employee_id or '',
+                user.department.name if user.department else '',
+                role.replace('_', ' ').title(),
+                user_status,
+                'Yes' if user.mfa_enabled else 'No',
+                user.phone_number or '',
+                user.job_title or '',
+                user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else 'Never',
+                user.date_joined.strftime('%Y-%m-%d'),
+            ])
+
+        return response
+
+
+@extend_schema(
+    tags=['User Management'],
     responses={
         200: OpenApiResponse(description='User activated successfully'),
         404: OpenApiResponse(description='User not found'),
@@ -130,6 +268,10 @@ class UserActivateView(APIView):
             user = CustomUser.objects.get(pk=pk)
             user.is_active = True
             user.save(update_fields=['is_active', 'updated_at'])
+            _log_admin_user_action(request, 'EDIT', user, metadata={
+                'admin_action': 'activate',
+                'change': 'is_active: False → True',
+            })
             return Response(UserManagementSerializer(user).data)
         except CustomUser.DoesNotExist:
             return Response(
@@ -154,6 +296,10 @@ class UserDeactivateView(APIView):
             user = CustomUser.objects.get(pk=pk)
             user.is_active = False
             user.save(update_fields=['is_active', 'updated_at'])
+            _log_admin_user_action(request, 'EDIT', user, metadata={
+                'admin_action': 'deactivate',
+                'change': 'is_active: True → False',
+            })
             return Response(UserManagementSerializer(user).data)
         except CustomUser.DoesNotExist:
             return Response(
@@ -176,7 +322,13 @@ class UserUnlockView(APIView):
     def post(self, request, pk):
         try:
             user = CustomUser.objects.get(pk=pk)
+            failed_attempts = user.failed_login_attempts
             user.unlock_account()
+            user.save()
+            _log_admin_user_action(request, 'ACCOUNT_UNLOCKED', user, metadata={
+                'admin_action': 'unlock',
+                'previous_failed_attempts': failed_attempts,
+            })
             return Response(UserManagementSerializer(user).data)
         except CustomUser.DoesNotExist:
             return Response(
@@ -199,6 +351,10 @@ class UserResetPasswordView(APIView):
     def post(self, request, pk):
         try:
             user = CustomUser.objects.get(pk=pk)
+            _log_admin_user_action(request, 'PASSWORD_RESET', user, metadata={
+                'admin_action': 'password_reset',
+                'initiated_by': request.user.get_full_name(),
+            })
             # In production, this would send a password reset email
             # For now, just return success
             return Response({

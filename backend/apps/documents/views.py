@@ -615,6 +615,24 @@ class DocumentDownloadView(APIView):
                     from apps.documents.signals import log_document_download_activity
                     log_document_download_activity(user, document)
 
+                    # Audit log: document download/preview
+                    try:
+                        from apps.audit.utils import log_document_action, get_client_ip, get_user_agent, set_audit_context
+                        set_audit_context(user=user, ip_address=get_client_ip(request), user_agent=get_user_agent(request))
+                        log_document_action(
+                            action='VIEW' if inline else 'DOWNLOAD',
+                            document=document,
+                            user=user,
+                            metadata={
+                                'mode': 'stream',
+                                'inline': inline,
+                                'file_name': document.file_name,
+                                'file_size': document.file_size,
+                            }
+                        )
+                    except Exception:
+                        pass
+
                     return response
 
                 except Exception as e:
@@ -641,6 +659,25 @@ class DocumentDownloadView(APIView):
                 # Log recent activity for download
                 from apps.documents.signals import log_document_download_activity
                 log_document_download_activity(user, document)
+
+                # Audit log: document download/preview via presigned URL
+                try:
+                    from apps.audit.utils import log_document_action, get_client_ip, get_user_agent, set_audit_context
+                    set_audit_context(user=user, ip_address=get_client_ip(request), user_agent=get_user_agent(request))
+                    log_document_action(
+                        action='VIEW' if inline else 'DOWNLOAD',
+                        document=document,
+                        user=user,
+                        metadata={
+                            'mode': 'presigned_url',
+                            'inline': inline,
+                            'file_name': document.file_name,
+                            'file_size': document.file_size,
+                            'expiration': expiration,
+                        }
+                    )
+                except Exception:
+                    pass
 
                 return Response({
                     'download_url': download_url,

@@ -298,7 +298,27 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             if user:
                 lockout_info = user.record_failed_login()
 
+                # Audit log: failed login
+                self._log_auth_event(
+                    'FAILED_LOGIN', user,
+                    outcome='FAILURE',
+                    metadata={
+                        'reason': 'invalid_credentials',
+                        'remaining_attempts': lockout_info['remaining_attempts'],
+                        'locked': lockout_info['locked'],
+                    }
+                )
+
                 if lockout_info['locked']:
+                    # Audit log: account locked
+                    self._log_auth_event(
+                        'ACCOUNT_LOCKED', user,
+                        metadata={
+                            'reason': 'max_failed_attempts',
+                            'failed_attempts': user.failed_login_attempts,
+                            'locked_until': lockout_info['locked_until'].isoformat() if lockout_info['locked_until'] else None,
+                        }
+                    )
                     # Account just got locked
                     raise serializers.ValidationError(
                         {
@@ -429,6 +449,15 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         if not data.get('device_trusted'):
             user.record_successful_login()
 
+            # Audit log: successful login
+            self._log_auth_event(
+                'LOGIN', user,
+                metadata={
+                    'mfa_required': False,
+                    'remember_me': remember_me,
+                }
+            )
+
             # If remember_me is True, generate longer-lived refresh token
             if remember_me:
                 from datetime import timedelta
@@ -493,6 +522,31 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             token['subscription_status'] = None
 
         return token
+
+    def _log_auth_event(self, action, target_user, outcome='SUCCESS', metadata=None):
+        """Log an authentication event to the audit trail."""
+        try:
+            from apps.audit.utils import log_user_action, get_client_ip, get_user_agent
+            request = self.context.get('request')
+            ip = get_client_ip(request) if request else None
+            ua = get_user_agent(request) if request else None
+
+            from apps.audit.utils import set_audit_context
+            set_audit_context(user=target_user, ip_address=ip, user_agent=ua)
+
+            log_user_action(
+                action=action,
+                target_user=target_user,
+                user=target_user,
+                outcome=outcome,
+                metadata=metadata or {},
+            )
+        except Exception:
+            import logging
+            logging.getLogger(__name__).warning(
+                f"Failed to log audit event: {action} for user {target_user.id}",
+                exc_info=True
+            )
 
 
 class ComprehensiveRegistrationSerializer(serializers.Serializer):

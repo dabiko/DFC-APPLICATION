@@ -138,6 +138,22 @@ class LogoutView(APIView):
             token = RefreshToken(refresh_token)
             token.blacklist()
 
+            # Audit log: logout
+            try:
+                from apps.audit.utils import log_user_action, get_client_ip, get_user_agent, set_audit_context
+                set_audit_context(
+                    user=request.user,
+                    ip_address=get_client_ip(request),
+                    user_agent=get_user_agent(request),
+                )
+                log_user_action(
+                    action='LOGOUT',
+                    target_user=request.user,
+                    user=request.user,
+                )
+            except Exception:
+                pass
+
             return Response(
                 {'detail': 'Logout successful'},
                 status=status.HTTP_200_OK

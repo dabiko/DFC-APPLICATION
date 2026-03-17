@@ -55,6 +55,7 @@ from apps.users.views_collections import (
 )
 from apps.users.views_management import (
     UserManagementListView,
+    UserExportView,
     UserActivateView,
     UserDeactivateView,
     UserUnlockView,
@@ -129,6 +130,7 @@ urlpatterns = [
     path('favorites/export/', ExportFavoritesView.as_view(), name='favorites_export'),
 
     # User Management endpoints (admin)
+    path('users/export/', UserExportView.as_view(), name='user_export'),
     path('users/<int:pk>/activate/', UserActivateView.as_view(), name='user_activate'),
     path('users/<int:pk>/deactivate/', UserDeactivateView.as_view(), name='user_deactivate'),
     path('users/<int:pk>/unlock/', UserUnlockView.as_view(), name='user_unlock'),
