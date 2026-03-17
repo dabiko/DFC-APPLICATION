@@ -410,6 +410,24 @@ def create_assignments(data, assigned_by, org):
         )
         assignments.append(assignment)
 
+    # Send notifications to all assignees
+    try:
+        from apps.sharing.models import Notification
+        for assignment in assignments:
+            if assignment.assignee_id != assigned_by.id:
+                Notification.objects.create(
+                    recipient=assignment.assignee,
+                    notification_type=Notification.NotificationType.TRAINING_ASSIGNED,
+                    title=f'Training assigned: {version.title}',
+                    message=f'{assigned_by.get_full_name()} assigned you to complete "{version.title}". Due by {due_date.strftime("%B %d, %Y") if due_date else "no deadline"}.',
+                    actor=assigned_by,
+                    resource_type='PROCEDURE',
+                    resource_id=version.procedure_id,
+                    action_url='/my-training',
+                )
+    except Exception:
+        pass  # Don't fail the assignment if notification fails
+
     return assignments
 
 

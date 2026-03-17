@@ -32,6 +32,7 @@ import { useGlobalSearch } from '@hooks/useGlobalSearch'
 import { cn } from '@utils/cn'
 import {
   getNotifications,
+  markAsRead,
   markNotificationsRead,
   type Notification as ApiNotification,
 } from '@/services/notificationService'
@@ -148,6 +149,36 @@ export function DashboardHeader({
     user?.is_superuser === true
 
   const unreadCount = displayNotifications.filter((n) => !n.read).length
+
+  // Play notification sound ONLY when a genuinely new notification arrives during the session.
+  // We persist the last known count in sessionStorage so component remounts (page navigation)
+  // don't trigger the sound.
+  useEffect(() => {
+    if (unreadCount === 0) return
+
+    const storedStr = sessionStorage.getItem('notif_last_unread')
+    const lastKnown = storedStr !== null ? parseInt(storedStr, 10) : null
+
+    if (lastKnown !== null && unreadCount > lastKnown) {
+      try {
+        const ctx = new AudioContext()
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.frequency.value = 880
+        osc.type = 'sine'
+        gain.gain.setValueAtTime(0.15, ctx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3)
+        osc.start(ctx.currentTime)
+        osc.stop(ctx.currentTime + 0.3)
+      } catch {
+        // Audio not available
+      }
+    }
+
+    sessionStorage.setItem('notif_last_unread', String(unreadCount))
+  }, [unreadCount])
 
   // Get user initials
   const initials =
@@ -443,9 +474,15 @@ export function DashboardHeader({
             title="Notifications"
           >
             <Bell className="w-5 h-5 text-gray-600 dark:text-gray-300" />
-            {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-            )}
+            {unreadCount > 0 ? (
+              <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full leading-none animate-pulse">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            ) : displayNotifications.length > 0 ? (
+              <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-gray-400 dark:bg-gray-500 text-white text-[10px] font-bold rounded-full leading-none">
+                {displayNotifications.length > 99 ? '99+' : displayNotifications.length}
+              </span>
+            ) : null}
           </button>
 
           {showNotifications && (
@@ -477,7 +514,18 @@ export function DashboardHeader({
                   displayNotifications.map((notification) => (
                     <div
                       key={notification.id}
-                      onClick={() => {
+                      onClick={async () => {
+                        // Mark as read on click
+                        if (!notification.read) {
+                          try {
+                            await markAsRead(notification.id)
+                            setLiveNotifications((prev) =>
+                              prev.map((n) => (n.id === notification.id ? { ...n, read: true } : n))
+                            )
+                          } catch {
+                            // ignore
+                          }
+                        }
                         if (notification.action_url) {
                           setShowNotifications(false)
                           navigate(notification.action_url)
@@ -519,7 +567,7 @@ export function DashboardHeader({
               setShowAdminMenu(false)
               setShowNotifications(false)
             }}
-            className="flex items-center gap-3 p-1 pr-3 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+            className="flex items-center p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
             aria-label="Profile menu"
           >
             <div className="relative">
@@ -547,9 +595,6 @@ export function DashboardHeader({
                 title={isOnline ? (isSlow ? 'Slow connection' : 'Active') : 'Offline'}
               />
             </div>
-            <span className="hidden md:block text-sm font-medium text-gray-700 dark:text-gray-300">
-              {user.firstName} {user.lastName}
-            </span>
           </button>
 
           {showProfileMenu && (

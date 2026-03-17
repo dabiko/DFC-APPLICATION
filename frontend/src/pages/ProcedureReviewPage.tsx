@@ -11,17 +11,17 @@ import { ThreePanelLayout } from '@/components/Layout/ThreePanelLayout'
 import { DashboardHeader } from '@/components/Dashboard/DashboardHeader'
 import { DashboardSidebar } from '@/components/Dashboard/DashboardSidebar'
 import { ProcedureReviewPanel } from '@/components/procedures/review/ProcedureReviewPanel'
-import { useAuth } from '@/hooks/useAuth'
+import { authService } from '@/services/auth.service'
 
 export function ProcedureReviewPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const handleLogout = useLogout()
-  const { user: userData } = useAuth()
 
+  const userData = authService.getUser()
   const user = {
-    id: userData?.id || 0,
-    name: userData?.full_name || userData?.username || '',
+    firstName: userData?.first_name || 'User',
+    lastName: userData?.last_name || '',
     email: userData?.email || '',
     is_staff: userData?.is_staff || false,
     is_superuser: userData?.is_superuser || false,

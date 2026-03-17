@@ -1258,7 +1258,7 @@ class ProcedureAssignmentViewSet(viewsets.ModelViewSet):
                     actor=request.user,
                     resource_type='procedure',
                     resource_id=assignment.procedure_version.procedure_id,
-                    action_url=f'/procedures/{assignment.procedure_version.procedure_id}',
+                    action_url='/my-training',
                 )
             except Exception as e:
                 import logging
@@ -1312,7 +1312,7 @@ class ProcedureAssignmentViewSet(viewsets.ModelViewSet):
                 actor=request.user,
                 resource_type='procedure',
                 resource_id=assignment.procedure_version.procedure_id,
-                action_url=f'/procedures/{assignment.procedure_version.procedure_id}',
+                action_url='/my-training',
             )
         except Exception:
             pass
