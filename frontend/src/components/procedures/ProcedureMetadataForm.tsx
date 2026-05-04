@@ -10,6 +10,7 @@ import { fetchDepartments } from '@/store/slices/departmentSlice'
 import type { ProcedureDetail, Procedure } from '@/types/procedure'
 import { listProcedures } from '@/services/procedureService'
 import { RichTextEditor } from '@/components/RichText'
+import { Select } from '@/components/Select'
 
 interface ProcedureMetadataFormProps {
   initialData?: Partial<ProcedureDetail>
@@ -136,50 +137,36 @@ export function ProcedureMetadataForm({
       </div>
 
       {/* Department */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Department <span className="text-red-500">*</span>
-        </label>
-        <select
-          value={department}
-          onChange={(e) => setDepartment(e.target.value)}
-          className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 dark:bg-gray-800 dark:text-gray-100 ${
-            errors.department
-              ? 'border-red-400 focus:border-red-500 focus:ring-red-500'
-              : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600'
-          }`}
-        >
-          <option value="">Select department...</option>
-          {departments.map((dept: { id: number | string; name: string }) => (
-            <option key={dept.id} value={dept.id}>
-              {dept.name}
-            </option>
-          ))}
-        </select>
-        {errors.department && <p className="mt-1 text-xs text-red-500">{errors.department}</p>}
-      </div>
+      <Select
+        label="Department *"
+        placeholder="Select department..."
+        value={department}
+        onChange={(val) => setDepartment(String(val))}
+        error={errors.department}
+        searchable={departments.length > 6}
+        fullWidth
+        options={departments.map((dept: { id: number | string; name: string }) => ({
+          value: String(dept.id),
+          label: dept.name,
+        }))}
+      />
 
       {/* Parent Procedure */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Parent Procedure
-        </label>
-        <select
-          value={parentProcedure || ''}
-          onChange={(e) => setParentProcedure(e.target.value || null)}
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-        >
-          <option value="">None (top-level procedure)</option>
-          {parentOptions
+      <Select
+        label="Parent Procedure"
+        placeholder="None (top-level procedure)"
+        value={parentProcedure || ''}
+        onChange={(val) => setParentProcedure(val ? String(val) : null)}
+        helperText="Optional. Use this to create sub-procedures."
+        searchable={parentOptions.length > 6}
+        fullWidth
+        options={[
+          { value: '', label: 'None (top-level procedure)' },
+          ...parentOptions
             .filter((p) => p.id !== initialData?.id)
-            .map((proc) => (
-              <option key={proc.id} value={proc.id}>
-                {proc.title}
-              </option>
-            ))}
-        </select>
-        <p className="mt-1 text-xs text-gray-400">Optional. Use this to create sub-procedures.</p>
-      </div>
+            .map((proc) => ({ value: String(proc.id), label: proc.title })),
+        ]}
+      />
 
       {/* Tags */}
       <div>
