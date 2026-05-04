@@ -1,313 +1,399 @@
-# Getting Started - Digital Filing Cabinet (DFC)
+# Getting Started — Digital Filing Cabinet (DFC)
 
-A complete guide to clone, setup, and run the DFC application locally on your machine.
+A complete guide for developers joining the DFC project. Covers two scenarios:
+
+- **A. First-time setup** — you just cloned the repo and need a working stack.
+- **B. Update workflow** — somebody pushed changes to GitHub and you need to sync (new dependencies, new migrations, new seed data, new infra).
+
+Helper scripts under `scripts/` automate both flows on Windows (PowerShell) and Linux/macOS (bash). The manual steps are documented below for transparency and troubleshooting.
+
+> **Sources** — Scripts and commands in this guide are derived directly from:
+> `docker-compose.yml`, `backend/.env.example`, `backend/requirements.txt`, `frontend/.env.example`, `backend/apps/*/management/commands/`, and the architecture documented in `CLAUDE.md`.
 
 ---
 
 ## Table of Contents
 
-1. [Prerequisites](#prerequisites)
-2. [Clone the Repository](#clone-the-repository)
-3. [Quick Start (TL;DR)](#quick-start-tldr)
-4. [Detailed Setup](#detailed-setup)
-   - [Step 1: Start Infrastructure Services](#step-1-start-infrastructure-services)
-   - [Step 2: Setup PostgreSQL Database](#step-2-setup-postgresql-database)
-   - [Step 3: Setup Backend (Django)](#step-3-setup-backend-django)
-   - [Step 4: Setup Frontend (React)](#step-4-setup-frontend-react)
-5. [Service URLs & Credentials](#service-urls--credentials)
-6. [Daily Development Workflow](#daily-development-workflow)
-7. [Useful Commands Reference](#useful-commands-reference)
-8. [Troubleshooting](#troubleshooting)
+1. [Prerequisites](#1-prerequisites)
+2. [Clone the Repository](#2-clone-the-repository)
+3. [Helper Scripts (TL;DR)](#3-helper-scripts-tldr)
+4. [A. First-Time Setup (Manual Walkthrough)](#a-first-time-setup-manual-walkthrough)
+   - [A1. Start Infrastructure (Docker)](#a1-start-infrastructure-docker)
+   - [A2. Provision PostgreSQL](#a2-provision-postgresql)
+   - [A3. Backend (Django)](#a3-backend-django)
+   - [A4. Frontend (React + Vite)](#a4-frontend-react--vite)
+   - [A5. MinIO Bucket](#a5-minio-bucket)
+   - [A6. Verify Everything Works](#a6-verify-everything-works)
+5. [B. Updating After git pull (Manual Walkthrough)](#b-updating-after-git-pull-manual-walkthrough)
+6. [C. Daily Development Workflow](#c-daily-development-workflow)
+7. [Service URLs & Credentials](#service-urls--credentials)
+8. [Useful Commands Reference](#useful-commands-reference)
+9. [Troubleshooting](#troubleshooting)
+10. [Project Structure](#project-structure)
 
 ---
 
-## Prerequisites
+## 1. Prerequisites
 
-Before you begin, ensure you have the following installed on your machine:
+| Software | Required Version | Where to get it |
+|----------|------------------|-----------------|
+| Git | 2.30+ | <https://git-scm.com/downloads> |
+| Docker Desktop (with Compose v2) | 4.0+ | <https://www.docker.com/products/docker-desktop/> |
+| Python | 3.11+ (3.13 recommended — matches CLAUDE.md) | <https://www.python.org/downloads/> |
+| Node.js + npm | Node 18 LTS+ | <https://nodejs.org/> |
+| PostgreSQL client (`psql`) | 15+ | <https://www.postgresql.org/download/> |
+| PowerShell 7 (Windows only) | 7.0+ | `winget install Microsoft.PowerShell` |
 
-| Software | Minimum Version | Download Link |
-|----------|-----------------|---------------|
-| **Git** | 2.30+ | [git-scm.com](https://git-scm.com/downloads) |
-| **Docker Desktop** | 4.0+ | [docker.com](https://www.docker.com/products/docker-desktop/) |
-| **Python** | 3.11+ (3.13 recommended) | [python.org](https://www.python.org/downloads/) |
-| **Node.js** | 18+ (LTS recommended) | [nodejs.org](https://nodejs.org/) |
-| **PostgreSQL** | 15+ | [postgresql.org](https://www.postgresql.org/download/) |
+A local PostgreSQL **server** is also required because `docker-compose.yml` ships Postgres commented out (the project connects to a host-installed Postgres at `localhost:5432`). See [`docker-compose.yml:3-23`](docker-compose.yml). If you would rather run Postgres in Docker, see [Option C in section A2](#option-c-run-postgresql-in-docker).
 
-### Verify Prerequisites
-
-Run these commands to verify your installations:
+### Verify
 
 ```bash
-# Check Git
 git --version
-
-# Check Docker
-docker --version
-docker-compose --version
-
-# Check Python
+docker --version && docker compose version
 python --version
-
-# Check Node.js and npm
-node --version
-npm --version
-
-# Check PostgreSQL
+node --version && npm --version
 psql --version
 ```
 
 ---
 
-## Clone the Repository
+## 2. Clone the Repository
 
 ```bash
-# Clone the repository
 git clone <repository-url> DFC-APPLICATION
-
-# Navigate to project directory
 cd DFC-APPLICATION
 ```
 
 ---
 
-## Quick Start (TL;DR)
+## 3. Helper Scripts (TL;DR)
 
-For experienced developers who want to get started quickly:
+The `scripts/` folder ships four idempotent helpers. They cover 95% of day-to-day setup and update needs.
 
-```bash
-# 1. Start Docker infrastructure services
-docker-compose up -d
+| Script | Purpose | When to use |
+|--------|---------|-------------|
+| `scripts/setup.{ps1,sh}` | One-shot first-time setup | After cloning the repo |
+| `scripts/update.{ps1,sh}` | `git pull` + reinstall deps + migrate + (optional) reseed / re-index | Whenever the team pushes new code |
+| `scripts/start.{ps1,sh}` | Boot Docker, backend, frontend | Beginning of each dev session |
+| `scripts/reset-db.{ps1,sh}` | Drop + recreate the database, re-migrate, re-seed | When migrations get tangled in dev |
 
-# 2. Setup PostgreSQL database (create database and user)
-# Open pgAdmin or psql and create:
-#   - Database: dfc_database
-#   - User: postgres with password: dabiko
+**Windows:**
+```powershell
+# First-time setup
+pwsh -ExecutionPolicy Bypass -File scripts\setup.ps1
 
-# 3. Setup Backend
-cd backend
-python -m venv venv
-# Windows: venv\Scripts\activate
-# Linux/Mac: source venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-python manage.py migrate
-python manage.py createsuperuser
-python manage.py runserver
+# Pull updates from GitHub and resync everything
+pwsh -ExecutionPolicy Bypass -File scripts\update.ps1
+# Reload demo data as well:
+pwsh -ExecutionPolicy Bypass -File scripts\update.ps1 -Reseed
+# Also rebuild the Elasticsearch index (search-related changes):
+pwsh -ExecutionPolicy Bypass -File scripts\update.ps1 -RebuildIndex
 
-# 4. Setup Frontend (new terminal)
-cd frontend
-npm install
-cp .env.example .env
-npm run dev
+# Daily start
+pwsh -ExecutionPolicy Bypass -File scripts\start.ps1
 ```
 
-**Access the application:**
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:8000
-- API Docs: http://localhost:8000/api/schema/swagger-ui/
+**Linux / macOS:**
+```bash
+chmod +x scripts/*.sh                # one-time
+
+bash scripts/setup.sh                # first-time setup
+bash scripts/update.sh               # sync after git pull
+bash scripts/update.sh --reseed      # also reload demo data
+bash scripts/update.sh --rebuild-index
+bash scripts/start.sh                # daily start
+```
+
+If a script fails partway through, scroll to [Troubleshooting](#troubleshooting) — the manual steps below are exactly what each script runs.
 
 ---
 
-## Detailed Setup
+## A. First-Time Setup (Manual Walkthrough)
 
-### Step 1: Start Infrastructure Services
-
-The project uses Docker for infrastructure services (MinIO, Redis, Elasticsearch, RabbitMQ).
+### A1. Start Infrastructure (Docker)
 
 ```bash
-# From project root directory
-docker-compose up -d
+docker compose up -d
+docker compose ps      # wait until services are "healthy" (~60s)
 ```
 
-Wait for all containers to become healthy (about 60 seconds):
+Reference: [`docker-compose.yml:44-124`](docker-compose.yml). The compose file starts:
+
+| Service | Container | Ports | Source |
+|---------|-----------|-------|--------|
+| MinIO (S3-compatible storage) | `dfc_minio` | `9000`, `9001` | `docker-compose.yml:44-66` |
+| Redis (cache + Celery results) | `dfc_redis` | `6379` | `docker-compose.yml:68-82` |
+| Elasticsearch (search) | `dfc_elasticsearch` | `9200`, `9300` | `docker-compose.yml:84-104` |
+| RabbitMQ (Celery broker) | `dfc_rabbitmq` | `5672`, `15672` | `docker-compose.yml:106-124` |
+
+### A2. Provision PostgreSQL
+
+The expected connection string (from [`backend/.env.example:9`](backend/.env.example)) is:
+
+```
+postgres://postgres:dabiko@localhost:5432/dfc_database
+```
+
+#### Option A — `psql` one-liner (fastest)
 
 ```bash
-# Check container status
-docker-compose ps
+# Set the password the project expects
+psql -U postgres -c "ALTER USER postgres WITH PASSWORD 'dabiko';"
+
+# Create the database
+psql -U postgres -c "CREATE DATABASE dfc_database;"
 ```
 
-All services should show "healthy" status.
+#### Option B — pgAdmin (GUI)
 
-#### What Gets Started:
+1. Connect to your local Postgres server.
+2. Right-click **Databases → Create → Database…**, name it `dfc_database`.
+3. Confirm the `postgres` user password is `dabiko` (or update `backend/.env` to your value).
 
-| Service | Port(s) | Purpose |
-|---------|---------|---------|
-| **MinIO** | 9000, 9001 | S3-compatible file storage |
-| **Redis** | 6379 | Caching & Celery result backend |
-| **Elasticsearch** | 9200, 9300 | Full-text search engine |
-| **RabbitMQ** | 5672, 15672 | Message broker for Celery |
+#### Option C — Run PostgreSQL in Docker
 
----
+If you do not want a host install, uncomment the `postgres` block in [`docker-compose.yml:3-23`](docker-compose.yml) (note: change `POSTGRES_USER` from `progress` → `postgres` to match the existing typo), then `docker compose up -d postgres`.
 
-### Step 2: Setup PostgreSQL Database
-
-The application uses PostgreSQL for the main database. You need to install PostgreSQL locally and create a database.
-
-#### Option A: Using pgAdmin (GUI)
-
-1. Open pgAdmin
-2. Connect to your local PostgreSQL server
-3. Create a new database:
-   - Name: `dfc_database`
-4. Ensure the postgres user has access (default password: `dabiko` or set your own)
-
-#### Option B: Using psql (Command Line)
-
-```bash
-# Connect to PostgreSQL
-psql -U postgres
-
-# Create database
-CREATE DATABASE dfc_database;
-
-# Set password (if not already set)
-ALTER USER postgres WITH PASSWORD 'dabiko';
-
-# Exit
-\q
-```
-
-#### Option C: Using Docker PostgreSQL (Alternative)
-
-If you prefer Docker for PostgreSQL, uncomment the postgres service in `docker-compose.yml`:
-
-```yaml
-services:
-  postgres:
-    image: postgres:latest
-    container_name: dfc_postgres
-    restart: always
-    environment:
-      POSTGRES_DB: dfc_database
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: dabiko
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql
-```
-
-Then run:
-```bash
-docker-compose up -d postgres
-```
-
----
-
-### Step 3: Setup Backend (Django)
-
-#### 3.1 Create and Activate Virtual Environment
+### A3. Backend (Django)
 
 ```bash
 cd backend
+```
 
-# Create virtual environment
+**3.1 Create + activate a virtualenv**
+
+```bash
 python -m venv venv
 
-# Activate virtual environment
-# Windows (Command Prompt):
-venv\Scripts\activate
-
-# Windows (PowerShell):
+# Windows PowerShell
 .\venv\Scripts\Activate.ps1
-
-# Linux/Mac:
+# Windows cmd
+venv\Scripts\activate.bat
+# Linux / macOS
 source venv/bin/activate
 ```
 
-You should see `(venv)` in your terminal prompt.
-
-#### 3.2 Install Python Dependencies
+**3.2 Install Python dependencies**
 
 ```bash
+pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-#### 3.3 Configure Environment Variables
+**3.3 Create `.env`**
 
 ```bash
-# Copy the example environment file
+# Windows
+copy .env.example .env
+# Linux / macOS
 cp .env.example .env
 ```
 
-Edit `.env` if needed. Default values work for local development:
+Defaults match the Docker compose file and the local Postgres conventions (see [`backend/.env.example`](backend/.env.example)). Only edit if your Postgres password differs or you are pointing at remote services.
 
-```env
-# Key settings (defaults should work)
-DEBUG=True
-SECRET_KEY=your-secret-key-here-change-in-production
-DATABASE_URL=postgres://postgres:dabiko@localhost:5432/dfc_database
-MINIO_ENDPOINT=localhost:9000
-REDIS_URL=redis://localhost:6379/0
-ELASTICSEARCH_HOST=localhost
-```
-
-#### 3.4 Run Database Migrations
+**3.4 Run migrations**
 
 ```bash
 python manage.py migrate
 ```
 
-#### 3.5 Create Admin User
+**3.5 Initialize roles + seed demo data**
 
 ```bash
-python manage.py createsuperuser
+python manage.py init_roles    # source: apps/permissions/management/commands/init_roles.py
+python manage.py seed_data     # source: apps/users/management/commands/seed_data.py
 ```
 
-Follow the prompts to create your admin account.
+`seed_data` creates three accounts you can immediately log in with:
 
-#### 3.6 Create MinIO Bucket (First Time Only)
+| Username | Email | Password | Role |
+|----------|-------|----------|------|
+| `admin` | `admin@cccplc.net` | `admin123` | superuser |
+| `john.doe` | `john.doe@cccplc.net` | `manager123` | manager |
+| `jane.smith` | `jane.smith@cccplc.net` | `staff123` | staff |
 
-1. Open MinIO Console: http://localhost:9001
-2. Login with:
-   - Username: `dfc_minio_admin`
-   - Password: `dfc_minio_password_2025`
-3. Click "Create Bucket"
-4. Name: `dfc-documents`
-5. Click "Create Bucket"
+If you want a custom superuser as well, run `python manage.py createsuperuser`.
 
-#### 3.7 Start Django Development Server
+**3.6 Start the dev server**
 
 ```bash
-python manage.py runserver
+python manage.py runserver         # http://localhost:8000
 ```
 
-Backend is now running at: **http://localhost:8000**
+### A4. Frontend (React + Vite)
 
----
-
-### Step 4: Setup Frontend (React)
-
-Open a **new terminal** (keep the backend running).
-
-#### 4.1 Install Node Dependencies
+In a **second terminal**:
 
 ```bash
 cd frontend
 npm install
+cp .env.example .env       # Windows: copy .env.example .env
+npm run dev                # http://localhost:5173
 ```
 
-#### 4.2 Configure Environment Variables
+### A5. MinIO Bucket
+
+Done **once per environment**.
+
+1. Open the MinIO console: <http://localhost:9001>
+2. Login: `dfc_minio_admin` / `dfc_minio_password_2025` (from [`docker-compose.yml:50-51`](docker-compose.yml))
+3. **Create Bucket** → name `dfc-documents` (matches `MINIO_BUCKET_NAME` in [`backend/.env.example:21`](backend/.env.example))
+
+### A6. Verify Everything Works
+
+| Check | URL / command | Expected |
+|-------|---------------|----------|
+| Frontend loads | <http://localhost:5173> | Login page |
+| Backend health | <http://localhost:8000/api/schema/swagger-ui/> | Swagger UI |
+| Django admin | <http://localhost:8000/admin/> | Login → admin |
+| MinIO console | <http://localhost:9001> | Bucket list with `dfc-documents` |
+| Elasticsearch | <http://localhost:9200> | JSON cluster info |
+| RabbitMQ | <http://localhost:15672> | Management UI |
+| Login flow | Use `admin` / `admin123` on frontend | Successful login |
+
+---
+
+## B. Updating After `git pull` (Manual Walkthrough)
+
+Whenever a teammate pushes changes you need to:
+
+1. Pull the latest code.
+2. Reinstall dependencies (in case `requirements.txt` or `package.json` changed).
+3. Apply any new database migrations.
+4. Optionally re-run seed data or rebuild the search index.
+5. Restart the dev servers.
+
+### One-shot script
+
+```powershell
+# Windows — most common
+pwsh -ExecutionPolicy Bypass -File scripts\update.ps1
+
+# Pull + reload demo data
+pwsh -ExecutionPolicy Bypass -File scripts\update.ps1 -Reseed
+
+# Pull + rebuild search index
+pwsh -ExecutionPolicy Bypass -File scripts\update.ps1 -RebuildIndex
+```
 
 ```bash
-# Copy the example environment file
-cp .env.example .env
+# Linux / macOS
+bash scripts/update.sh
+bash scripts/update.sh --reseed
+bash scripts/update.sh --rebuild-index
 ```
 
-Default values should work:
-
-```env
-VITE_API_URL=http://localhost:8000/api/v1
-VITE_API_BASE_URL=http://localhost:8000
-```
-
-#### 4.3 Start Development Server
+### What the update script does (manual equivalent)
 
 ```bash
-npm run dev
+# 1. Pull
+git pull --rebase --autostash
+
+# 2. Refresh containers in case docker-compose.yml changed
+docker compose pull
+docker compose up -d
+
+# 3. Backend deps + migrations
+cd backend
+# Activate venv (see A3.1)
+pip install -r requirements.txt
+python manage.py showmigrations --plan | grep "\[ \]"   # preview pending
+python manage.py migrate
+python manage.py init_roles                              # idempotent
+python manage.py collectstatic --noinput                 # safe no-op in dev
+
+# 4. Frontend deps
+cd ../frontend
+npm ci          # use `npm install` if package-lock.json changed locally
 ```
 
-Frontend is now running at: **http://localhost:5173**
+### Optional — reload demo data when seed schemas change
+
+```bash
+cd backend && source venv/bin/activate   # adjust for OS
+python manage.py seed_data --clear
+```
+
+`--clear` wipes the seed tables before repopulating (see `apps/users/management/commands/seed_data.py:18-22`).
+
+### Optional — rebuild Elasticsearch index when search-mapped models change
+
+```bash
+python manage.py rebuild_index --noinput        # source: apps/search/management/commands/rebuild_index.py
+# Fallback if rebuild_index isn't available:
+python manage.py search_index --rebuild -f
+```
+
+### Tangled migrations? Nuclear reset
+
+When migrations conflict in dev (e.g. you switched branches and the schema diverged), use:
+
+```powershell
+pwsh -ExecutionPolicy Bypass -File scripts\reset-db.ps1
+```
+
+```bash
+bash scripts/reset-db.sh
+```
+
+It drops `dfc_database`, recreates it, re-migrates, and re-seeds. **Destructive — local dev only.**
+
+### Other update scenarios
+
+| Change pushed | What to run | Why |
+|---------------|-------------|-----|
+| `requirements.txt` updated | `pip install -r requirements.txt` | New Python deps |
+| `package.json` updated | `npm ci` (or `npm install`) | New Node deps |
+| New migration file in `apps/*/migrations/` | `python manage.py migrate` | Apply schema change |
+| New seed records | `python manage.py seed_data --clear` | Refresh demo data |
+| Search-mapped model changed | `python manage.py rebuild_index --noinput` | Sync ES mapping |
+| New role/permission | `python manage.py init_roles` | Idempotent role bootstrap |
+| `docker-compose.yml` changed | `docker compose pull && docker compose up -d` | Rebuild infra services |
+| `.env.example` changed | Diff against your `.env` and copy missing keys | New env vars introduced |
+| New management commands under `apps/*/management/commands/` | `python manage.py help` to discover them | Run as needed |
+
+---
+
+## C. Daily Development Workflow
+
+### Start a session
+
+```powershell
+# Windows — opens 3 windows: Docker, Django, Vite
+pwsh -ExecutionPolicy Bypass -File scripts\start.ps1
+```
+
+```bash
+# Linux / macOS — backend + frontend run interleaved; Ctrl+C stops both
+bash scripts/start.sh
+```
+
+### Manual three-terminal layout
+
+| Terminal | Command |
+|----------|---------|
+| 1 (infra) | `docker compose up -d && docker compose logs -f` |
+| 2 (backend) | `cd backend && .\venv\Scripts\Activate.ps1 && python manage.py runserver` |
+| 3 (frontend) | `cd frontend && npm run dev` |
+
+### Optional Celery workers
+
+```bash
+cd backend
+# Worker (Windows requires -P solo because of asyncio + Win sockets)
+celery -A config worker --loglevel=info -P solo
+# Scheduler (separate terminal)
+celery -A config beat --loglevel=info
+```
+
+### Stop
+
+```bash
+# Ctrl+C in each dev-server terminal
+docker compose down                  # stop containers, keep data
+docker compose down -v               # also delete volumes (DESTRUCTIVE)
+```
 
 ---
 
@@ -315,307 +401,210 @@ Frontend is now running at: **http://localhost:5173**
 
 ### Application
 
-| Service | URL | Notes |
-|---------|-----|-------|
-| **Frontend** | http://localhost:5173 | React application |
-| **Backend API** | http://localhost:8000 | Django REST API |
-| **Swagger API Docs** | http://localhost:8000/api/schema/swagger-ui/ | Interactive API docs |
-| **ReDoc API Docs** | http://localhost:8000/api/schema/redoc/ | Alternative API docs |
-| **Django Admin** | http://localhost:8000/admin/ | Admin panel |
+| Service | URL |
+|---------|-----|
+| Frontend | <http://localhost:5173> |
+| Backend API | <http://localhost:8000> |
+| Swagger | <http://localhost:8000/api/schema/swagger-ui/> |
+| ReDoc | <http://localhost:8000/api/schema/redoc/> |
+| Django Admin | <http://localhost:8000/admin/> |
 
-### Infrastructure Services
+### Infrastructure
 
-| Service | URL | Username | Password |
-|---------|-----|----------|----------|
-| **MinIO Console** | http://localhost:9001 | `dfc_minio_admin` | `dfc_minio_password_2025` |
-| **RabbitMQ Management** | http://localhost:15672 | `dfc_rabbit` | `dfc_rabbit_password_2025` |
-| **Elasticsearch** | http://localhost:9200 | - | - |
+| Service | URL | Username | Password | Source |
+|---------|-----|----------|----------|--------|
+| MinIO Console | <http://localhost:9001> | `dfc_minio_admin` | `dfc_minio_password_2025` | `docker-compose.yml:50-51` |
+| RabbitMQ Mgmt | <http://localhost:15672> | `dfc_rabbit` | `dfc_rabbit_password_2025` | `docker-compose.yml:111-112` |
+| Elasticsearch | <http://localhost:9200> | — | — | `docker-compose.yml:84-104` |
 
-### Database Connection
+### Database (host-installed Postgres)
 
-| Parameter | Value |
-|-----------|-------|
-| Host | `localhost` |
-| Port | `5432` |
-| Database | `dfc_database` |
-| Username | `postgres` |
-| Password | `dabiko` |
+| Field | Value | Source |
+|-------|-------|--------|
+| Host | `localhost` | `backend/.env.example:14` |
+| Port | `5432` | `backend/.env.example:15` |
+| Database | `dfc_database` | `backend/.env.example:11` |
+| Username | `postgres` | `backend/.env.example:12` |
+| Password | `dabiko` | `backend/.env.example:13` |
 
----
+### Seed accounts (after `seed_data`)
 
-## Daily Development Workflow
+| Username | Password | Role |
+|----------|----------|------|
+| `admin` | `admin123` | superuser |
+| `john.doe` | `manager123` | manager |
+| `jane.smith` | `staff123` | staff |
 
-### Starting Your Development Session
-
-```bash
-# Terminal 1: Start Docker services (if not already running)
-docker-compose up -d
-
-# Terminal 2: Start Backend
-cd backend
-venv\Scripts\activate  # Windows
-# source venv/bin/activate  # Linux/Mac
-python manage.py runserver
-
-# Terminal 3: Start Frontend
-cd frontend
-npm run dev
-```
-
-### Optional: Start Celery Worker (for background tasks)
-
-```bash
-# Terminal 4: Celery Worker
-cd backend
-venv\Scripts\activate
-celery -A config worker --loglevel=info
-
-# Terminal 5: Celery Beat (scheduled tasks)
-cd backend
-venv\Scripts\activate
-celery -A config beat --loglevel=info
-```
-
-### Stopping Development
-
-```bash
-# Stop Django/Frontend: Press Ctrl+C in each terminal
-
-# Stop Docker services
-docker-compose down
-
-# Stop Docker and delete all data (use with caution!)
-docker-compose down -v
-```
+The login form accepts username **or** email (the `CustomTokenObtainPairSerializer` detects `@` and resolves by email).
 
 ---
 
 ## Useful Commands Reference
 
-### Docker Commands
+### Backend management commands (project-specific)
+
+Discover all of them with `python manage.py help`. The most useful for daily work:
+
+| Command | Purpose | Source |
+|---------|---------|--------|
+| `migrate` | Apply schema migrations | Django built-in |
+| `makemigrations` | Generate migrations from model changes | Django built-in |
+| `createsuperuser` | Create an admin user interactively | Django built-in |
+| `seed_data [--clear]` | Populate demo users, departments, folders, tags | `apps/users/management/commands/seed_data.py` |
+| `init_roles` | Create default RBAC roles | `apps/permissions/management/commands/init_roles.py` |
+| `rebuild_index` | Rebuild Elasticsearch index | `apps/search/management/commands/rebuild_index.py` |
+| `search_index --rebuild` | Alternative ES rebuild (django-elasticsearch-dsl) | django-elasticsearch-dsl |
+| `make_superuser` | Promote an existing user to superuser | `apps/users/management/commands/make_superuser.py` |
+| `create_default_plans` | Seed billing plans | `apps/billing/management/commands/create_default_plans.py` |
+| `seed_billing_data` | Seed billing demo data | `apps/billing/management/commands/seed_billing_data.py` |
+| `create_demo_procedure` | Create a demo procedure | `apps/procedures/management/commands/create_demo_procedure.py` |
+| `generate_procedure_seed_data` | Bulk procedure seed | `apps/procedures/management/commands/generate_procedure_seed_data.py` |
+| `setup_rabbitmq` | Declare exchanges/queues for events | `apps/events/management/commands/setup_rabbitmq.py` |
+| `run_consumers` | Run event consumers | `apps/events/management/commands/run_consumers.py` |
+| `apply_retention_policies` | Walk documents and apply retention | `apps/retention/management/commands/apply_retention_policies.py` |
+| `cleanup_audit_logs` | Trim old audit entries | `apps/audit/management/commands/cleanup_audit_logs.py` |
+| `verify_storage_integrity` | Re-checksum stored documents | `apps/documents/management/commands/verify_storage_integrity.py` |
+
+### Frontend (`frontend/package.json`)
 
 ```bash
-# Start all services
-docker-compose up -d
-
-# Stop all services
-docker-compose down
-
-# View running containers
-docker-compose ps
-
-# View logs (all services)
-docker-compose logs -f
-
-# View logs (specific service)
-docker-compose logs -f elasticsearch
-
-# Restart a service
-docker-compose restart minio
+npm run dev        # Vite dev server
+npm run build      # Production build
+npm run lint       # ESLint
+npm run lint:fix   # ESLint with auto-fix
+npm run format     # Prettier
+npm test           # Jest
+npm run cypress    # E2E
+npm run storybook  # Component library
 ```
 
-### Backend Commands
+### Docker
 
 ```bash
-# Activate virtual environment
-venv\Scripts\activate  # Windows
-source venv/bin/activate  # Linux/Mac
-
-# Run development server
-python manage.py runserver
-
-# Create migrations
-python manage.py makemigrations
-
-# Apply migrations
-python manage.py migrate
-
-# Create superuser
-python manage.py createsuperuser
-
-# Run tests
-python manage.py test
-
-# Open Django shell
-python manage.py shell
-
-# Rebuild search index
-python manage.py search_index --rebuild
+docker compose up -d                   # start all
+docker compose ps                      # status
+docker compose logs -f elasticsearch   # follow logs of one service
+docker compose restart minio
+docker compose down                    # stop, keep data
+docker compose down -v                 # stop AND delete volumes (DESTRUCTIVE)
 ```
 
-### Frontend Commands
+### Git update workflow
 
 ```bash
-# Start development server
-npm run dev
-
-# Build for production
-npm run build
-
-# Run tests
-npm test
-
-# Run linting
-npm run lint
-
-# Fix linting issues
-npm run lint:fix
-
-# Format code
-npm run format
-
-# Run Storybook (component library)
-npm run storybook
-
-# Run E2E tests
-npm run cypress
+git fetch origin
+git status
+git pull --rebase --autostash       # what scripts/update.* uses
 ```
 
 ---
 
 ## Troubleshooting
 
-### Docker Issues
+### Docker
 
-**Problem: Containers won't start**
+**Containers won't start / port already in use**
+
 ```bash
-# Check Docker is running
-docker ps
-
-# Check for port conflicts
-netstat -ano | findstr :9000  # Windows
-lsof -i :9000  # Linux/Mac
-
-# Remove old containers and start fresh
-docker-compose down -v
-docker-compose up -d
+docker compose ps
+docker compose logs <service>
+# Windows: find what owns the port
+netstat -ano | findstr :9000
+# Linux/macOS
+lsof -i :9000
 ```
 
-**Problem: Elasticsearch keeps crashing**
-```bash
-# Elasticsearch needs more memory. Edit docker-compose.yml:
-environment:
-  - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+**Elasticsearch keeps crashing (OOM)**
+
+Increase its heap in `docker-compose.yml:91`:
+
+```yaml
+- "ES_JAVA_OPTS=-Xms1g -Xmx1g"
 ```
 
-### Backend Issues
+### Backend
 
-**Problem: ModuleNotFoundError**
+**`ModuleNotFoundError`** — venv not active. Re-activate (`A3.1`) then `pip install -r requirements.txt`.
+
+**Database connection refused** — confirm Postgres is up (`pg_isready -h localhost -p 5432`) and the password in `backend/.env` matches your local user.
+
+**Migrations conflict after pulling** — try `python manage.py migrate --fake-initial` first; if that fails, run `scripts/reset-db.ps1` (or `.sh`).
+
+**MinIO connection error** — bucket missing. Visit <http://localhost:9001> and create `dfc-documents`.
+
+**ES kwarg error mentioning `timeout` / `http_auth`** — known incompatibility with `elasticsearch-py 9.x`; pin the client per project conventions.
+
+### Frontend
+
+**`npm install` fails**
+
 ```bash
-# Ensure virtual environment is activated
-venv\Scripts\activate  # Windows
-
-# Reinstall dependencies
-pip install -r requirements.txt
-```
-
-**Problem: Database connection error**
-```bash
-# Check PostgreSQL is running
-psql -U postgres -h localhost -p 5432 -d dfc_database
-
-# Verify .env settings match your PostgreSQL configuration
-```
-
-**Problem: MinIO connection error**
-```bash
-# Check MinIO is running
-docker-compose ps minio
-
-# Verify bucket exists at http://localhost:9001
-```
-
-### Frontend Issues
-
-**Problem: npm install fails**
-```bash
-# Clear npm cache
 npm cache clean --force
-
-# Delete node_modules and reinstall
-rm -rf node_modules package-lock.json
+rm -rf node_modules package-lock.json   # PowerShell: Remove-Item -Recurse -Force ...
 npm install
 ```
 
-**Problem: API connection error**
-```bash
-# Verify backend is running at http://localhost:8000
-# Check .env has correct API URL:
-VITE_API_URL=http://localhost:8000/api/v1
-```
+**API calls fail with CORS** — ensure `backend/.env`'s `CORS_ALLOWED_ORIGINS` includes `http://localhost:5173` (the Vite default).
 
-**Problem: CORS error in browser**
-```bash
-# Ensure backend CORS settings include frontend URL
-# In backend .env:
-CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
-```
+### Port conflicts
 
-### Port Conflicts
+| Service | Default | Where to change |
+|---------|---------|-----------------|
+| Backend | 8000 | `python manage.py runserver 8080` |
+| Frontend | 5173 | `frontend/vite.config.ts` |
+| Postgres | 5432 | Local Postgres config or `docker-compose.yml` |
+| MinIO | 9000 / 9001 | `docker-compose.yml:54-56` |
+| Redis | 6379 | `docker-compose.yml:72-73` |
+| Elasticsearch | 9200 / 9300 | `docker-compose.yml:92-94` |
+| RabbitMQ | 5672 / 15672 | `docker-compose.yml:113-115` |
 
-If default ports are in use, you can modify them:
+### Windows-specific
 
-| Service | Default Port | Config File |
-|---------|-------------|-------------|
-| Backend | 8000 | Run with `python manage.py runserver 8080` |
-| Frontend | 5173 | Edit `frontend/vite.config.ts` |
-| PostgreSQL | 5432 | Local PostgreSQL config |
-| MinIO | 9000, 9001 | `docker-compose.yml` |
-| Redis | 6379 | `docker-compose.yml` |
-| Elasticsearch | 9200 | `docker-compose.yml` |
-| RabbitMQ | 5672, 15672 | `docker-compose.yml` |
+- **PowerShell execution policy** — scripts ship unsigned. Run with `pwsh -ExecutionPolicy Bypass -File <script>` or set `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once.
+- **Celery on Windows** — use `-P solo` (`celery -A config worker -P solo --loglevel=info`); the default prefork pool does not work on Windows.
+- **`psql` not found** — add `C:\Program Files\PostgreSQL\<version>\bin` to PATH.
 
 ---
 
-## Project Structure Overview
+## Project Structure
 
 ```
 DFC-APPLICATION/
-├── backend/               # Django backend
-│   ├── apps/             # Django applications
-│   │   ├── users/        # Authentication & user management
-│   │   ├── documents/    # Document & folder management
-│   │   ├── search/       # Elasticsearch integration
-│   │   ├── audit/        # Audit logging
-│   │   └── workflows/    # Celery tasks
-│   ├── config/           # Django settings
-│   ├── requirements.txt  # Python dependencies
-│   └── manage.py         # Django CLI
-│
-├── frontend/             # React frontend
-│   ├── src/
-│   │   ├── components/   # Reusable UI components
-│   │   ├── pages/        # Page components
-│   │   ├── services/     # API client
-│   │   └── store/        # Redux state management
-│   ├── package.json      # Node dependencies
-│   └── vite.config.ts    # Vite configuration
-│
-├── docker-compose.yml    # Docker services configuration
-├── CLAUDE.md            # Project documentation
-└── GETTING_STARTED.md   # This file
+├── backend/                       # Django backend (apps, config, requirements)
+│   ├── apps/                      # Domain apps (users, documents, search, ...)
+│   ├── config/settings/           # base.py, development.py, production.py, testing.py
+│   ├── requirements.txt           # Pinned Python deps
+│   └── manage.py
+├── frontend/                      # React + Vite + TypeScript
+│   ├── src/                       # components, pages, services, store
+│   └── package.json
+├── deployment/                    # Production compose + scripts
+├── docker-compose.yml             # Dev infrastructure (MinIO, Redis, ES, RabbitMQ)
+├── scripts/                       # setup / update / start / reset (this guide)
+│   ├── setup.ps1     setup.sh
+│   ├── update.ps1    update.sh
+│   ├── start.ps1     start.sh
+│   └── reset-db.ps1  reset-db.sh
+├── CLAUDE.md                      # Architecture & domain reference
+└── GETTING_STARTED.md             # This file
 ```
 
 ---
 
 ## Next Steps
 
-After setup is complete:
-
-1. **Login to the application** at http://localhost:5173 with your superuser credentials
-2. **Explore the API** at http://localhost:8000/api/schema/swagger-ui/
-3. **Read CLAUDE.md** for detailed project architecture and conventions
-4. **Check the docs/ folder** for additional documentation
+1. Log in at <http://localhost:5173> with `admin` / `admin123`.
+2. Browse the API at <http://localhost:8000/api/schema/swagger-ui/>.
+3. Read [`CLAUDE.md`](CLAUDE.md) for the domain model, RBAC rules, retention/legal-hold semantics, and architectural conventions.
+4. Skim [`PROCEDURE_TESTING_GUIDE.md`](PROCEDURE_TESTING_GUIDE.md) for the procedure module flow (referenced by team memory).
 
 ---
 
 ## Support
 
-For issues:
-- Check logs: `docker-compose logs -f` (Docker) or terminal output (Django/React)
-- Review the main `CLAUDE.md` for project documentation
-- Verify all services are running: `docker-compose ps`
+- Container logs: `docker compose logs -f`
+- Backend logs: terminal where `runserver` runs
+- Frontend logs: terminal where `npm run dev` runs
+- Service status snapshot: `docker compose ps`
 
----
-
-**Happy coding!**
+**Happy coding.**
