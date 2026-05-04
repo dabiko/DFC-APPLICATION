@@ -208,6 +208,16 @@ CORS_ALLOW_HEADERS = [
     'x-csrftoken',
     'x-requested-with',
     'x-device-fingerprint',  # Custom header for trusted device identification
+    'range',  # Required for PDF/video streaming via react-pdf and HTML5 media
+]
+
+# Expose headers the browser needs to read from cross-origin responses
+# (range metadata for partial-content downloads, filename for download UX).
+CORS_EXPOSE_HEADERS = [
+    'content-disposition',
+    'content-length',
+    'content-range',
+    'accept-ranges',
 ]
 
 # CSRF Settings
@@ -281,7 +291,7 @@ ELASTICSEARCH_DSL = {
         ) if os.getenv('ELASTICSEARCH_USER') else None,
         'verify_certs': os.getenv('ELASTICSEARCH_VERIFY_CERTS', 'False') == 'True',
         'ssl_show_warn': False,
-        'timeout': 30,
+        'request_timeout': 30,
         'max_retries': 3,
         'retry_on_timeout': True,
     },

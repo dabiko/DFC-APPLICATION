@@ -139,6 +139,13 @@ export interface ProcedureStep {
   updated_at: string
 }
 
+export type AttachmentExtractionStatus =
+  | 'pending'
+  | 'completed'
+  | 'failed'
+  | 'unsupported'
+  | 'no_text'
+
 export interface StepAttachment {
   id: string
   step: string
@@ -164,6 +171,10 @@ export interface StepAttachment {
     folder_path: string | null
     document_url: string
   } | null
+  extracted_text: string
+  extraction_status: AttachmentExtractionStatus
+  extraction_error: string
+  extracted_at: string | null
 }
 
 // =============================================================================

@@ -32,13 +32,13 @@ def get_elasticsearch_client():
         # Extract connection parameters
         hosts = es_config['hosts']
         http_auth = es_config.get('http_auth')
-        timeout = es_config.get('timeout', 30)
+        request_timeout = es_config.get('request_timeout', es_config.get('timeout', 30))
 
         # Create client
         es = Elasticsearch(
             hosts=hosts,
-            http_auth=http_auth if http_auth and http_auth[0] else None,
-            timeout=timeout,
+            basic_auth=http_auth if http_auth and http_auth[0] else None,
+            request_timeout=request_timeout,
             max_retries=es_config.get('max_retries', 3),
             retry_on_timeout=es_config.get('retry_on_timeout', True),
         )

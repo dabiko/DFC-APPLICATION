@@ -783,6 +783,10 @@ class ProcedureViewSet(viewsets.ModelViewSet):
                     mime_type=att.mime_type,
                     checksum_sha256=att.checksum_sha256,
                     order=att.order,
+                    # Freeze the extracted text + status alongside the file metadata
+                    # so trainees see the same Text view the author approved.
+                    extracted_text=att.extracted_text,
+                    extraction_status=att.extraction_status,
                 )
 
             # Snapshot step-level quizzes
@@ -934,6 +938,7 @@ class StepAttachmentViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         from rest_framework.exceptions import ValidationError
+        from apps.procedures.tasks import extract_attachment_text
 
         step = self._get_step()
         document_id = self.request.data.get('document_id')
@@ -950,7 +955,7 @@ class StepAttachmentViewSet(viewsets.ModelViewSet):
                 raise ValidationError({'document_id': 'Document not found.'})
 
             ext = doc.file_name.rsplit('.', 1)[-1].lower() if '.' in doc.file_name else ''
-            serializer.save(
+            attachment = serializer.save(
                 step=step,
                 document_reference=doc,
                 file_name=doc.file_name,
@@ -960,6 +965,9 @@ class StepAttachmentViewSet(viewsets.ModelViewSet):
                 checksum_sha256=doc.checksum or '',
                 uploaded_by=self.request.user,
             )
+            # Async text extraction. For linked docs the task reuses the source
+            # Document's already-extracted text when present.
+            extract_attachment_text.delay(str(attachment.id))
             return
 
         # --- Upload mode: upload a new file ---
@@ -980,7 +988,7 @@ class StepAttachmentViewSet(viewsets.ModelViewSet):
         checksum = sha256.hexdigest()
         file.seek(0)  # Reset after reading
 
-        serializer.save(
+        attachment = serializer.save(
             step=step,
             file=file,
             file_name=file.name,
@@ -990,6 +998,8 @@ class StepAttachmentViewSet(viewsets.ModelViewSet):
             checksum_sha256=checksum,
             uploaded_by=self.request.user,
         )
+        # Async text extraction (PDF/DOCX only — task no-ops for other types).
+        extract_attachment_text.delay(str(attachment.id))
 
     @action(detail=False, methods=['post'], url_path='check-duplicate')
     def check_duplicate(self, request, procedure_pk=None, step_pk=None):

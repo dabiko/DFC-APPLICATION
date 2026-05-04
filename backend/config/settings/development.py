@@ -57,3 +57,12 @@ CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
     'http://127.0.0.1:3000',
 ]
+
+# Celery — run tasks synchronously inside the request handler in development.
+# Avoids the "needs a running worker + working broker" setup for everyday dev.
+# Tradeoff: requests that dispatch slow tasks (e.g. attachment text extraction)
+# block while the task runs. Production must NOT use this — start a real worker.
+# Override per-shell with `CELERY_TASK_ALWAYS_EAGER=False` if you do want to
+# test against a live worker.
+CELERY_TASK_ALWAYS_EAGER = os.getenv('CELERY_TASK_ALWAYS_EAGER', 'True') == 'True'
+CELERY_TASK_EAGER_PROPAGATES = True

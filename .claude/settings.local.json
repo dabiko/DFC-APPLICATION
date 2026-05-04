@@ -62,7 +62,16 @@
       "Bash(cd:*)",
       "Bash(DJANGO_SETTINGS_MODULE=config.settings.development python -c \"\nimport django; django.setup\\(\\)\nfrom django.urls import reverse\nprint\\(reverse\\('documents:document_dashboard_stats'\\)\\)\n\" 2>&1)",
       "Bash(find:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(timeout 15 npm run dev)",
+      "Bash(curl -s -X POST http://localhost:8000/api/v1/auth/login/ -H \"Content-Type: application/json\" -d '{\"username\":\"admin\",\"password\":\"admin123\"}')",
+      "Read(//tmp/**)",
+      "Bash(C:/Users/dabik/anaconda3/python.exe *)",
+      "Bash(tasklist)",
+      "Bash(wmic process *)",
+      "PowerShell(Get-WmiObject *)",
+      "Bash(celery -A config worker --loglevel=info --pool=solo)",
+      "Bash(npx eslint *)"
     ],
     "deny": [],
     "ask": []

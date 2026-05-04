@@ -5,7 +5,80 @@ Phase C: Quiz grading engine (spec Section 9.2)
 Phase D: Version diff engine
 Phase E: Branch condition evaluator
 Phase F: Training progression logic & assignment creation
+Phase ?: Rich-text sanitization for procedure description fields
 """
+
+import bleach
+
+
+# ---------------------------------------------------------------------------
+# Rich-text HTML sanitization
+#
+# Used for Procedure.description, ProcedureStep.description, and
+# ProcedureStep.example_scenarios — fields that the frontend authors via the
+# RichTextEditor (TipTap) and ships as HTML strings. Anything outside this
+# allowlist is stripped before persistence so we never store an attacker's
+# script tag, malicious style, or arbitrary markup.
+#
+# Keep this list aligned with the DOMPurify allowlist on the frontend
+# (frontend/src/components/RichText/RichTextDisplay.tsx). When you add a tag
+# in one place, add it in the other.
+# ---------------------------------------------------------------------------
+
+_ALLOWED_TAGS = [
+    'p', 'br',
+    'strong', 'em', 'u', 's',
+    'a',
+    'h2', 'h3', 'h4',
+    'ul', 'ol', 'li',
+    'blockquote',
+    'code', 'pre',
+    'hr',
+]
+
+_ALLOWED_ATTRS = {
+    'a': ['href', 'target', 'rel'],
+}
+
+# Only http/https/mailto. No javascript:, data:, etc.
+_ALLOWED_PROTOCOLS = ['http', 'https', 'mailto']
+
+
+def sanitize_rich_text(html):
+    """
+    Strip disallowed tags/attributes/protocols from a rich-text HTML string.
+
+    Returns an empty string for None or whitespace-only input so callers don't
+    have to special-case nullable fields. The TextField columns this is fed
+    into use ``default=''``.
+    """
+    if not html or not html.strip():
+        return ''
+
+    cleaned = bleach.clean(
+        html,
+        tags=_ALLOWED_TAGS,
+        attributes=_ALLOWED_ATTRS,
+        protocols=_ALLOWED_PROTOCOLS,
+        strip=True,        # remove disallowed tags rather than escape them
+        strip_comments=True,
+    )
+    # Force rel="noopener noreferrer nofollow" on every <a> regardless of what
+    # the client sent. This is the canonical hardening for user-authored links.
+    cleaned = bleach.linkify(
+        cleaned,
+        callbacks=[_set_link_rel],
+        skip_tags=['pre', 'code'],
+    )
+    return cleaned
+
+
+def _set_link_rel(attrs, new=False):
+    """bleach.linkify callback — forces safe rel + opens in new tab."""
+    # `attrs` keys are (None, 'href') style tuples
+    attrs[(None, 'rel')] = 'noopener noreferrer nofollow'
+    attrs[(None, 'target')] = '_blank'
+    return attrs
 
 
 # ---------------------------------------------------------------------------

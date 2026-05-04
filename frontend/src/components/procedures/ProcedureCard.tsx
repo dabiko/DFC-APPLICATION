@@ -4,6 +4,7 @@
 
 import { FileText, Clock, User, Layers, Building2, ArrowRight } from 'lucide-react'
 import { ProcedureStatusBadge } from './ProcedureStatusBadge'
+import { htmlToPlainSnippet } from '@/components/RichText'
 import type { Procedure } from '@/types/procedure'
 
 interface ProcedureCardProps {
@@ -38,7 +39,7 @@ export function ProcedureCard({ procedure, onClick }: ProcedureCardProps) {
             </div>
             {procedure.description && (
               <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
-                {procedure.description}
+                {htmlToPlainSnippet(procedure.description, 240)}
               </p>
             )}
           </div>

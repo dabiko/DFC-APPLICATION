@@ -9,6 +9,7 @@ import { useAppSelector, useAppDispatch } from '@store'
 import { fetchDepartments } from '@/store/slices/departmentSlice'
 import type { ProcedureDetail, Procedure } from '@/types/procedure'
 import { listProcedures } from '@/services/procedureService'
+import { RichTextEditor } from '@/components/RichText'
 
 interface ProcedureMetadataFormProps {
   initialData?: Partial<ProcedureDetail>
@@ -126,12 +127,11 @@ export function ProcedureMetadataForm({
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           Description
         </label>
-        <textarea
+        <RichTextEditor
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={3}
+          onChange={setDescription}
           placeholder="Describe the purpose and scope of this procedure..."
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+          editorClassName="min-h-[6em]"
         />
       </div>
 
@@ -150,7 +150,7 @@ export function ProcedureMetadataForm({
           }`}
         >
           <option value="">Select department...</option>
-          {departments.map((dept: any) => (
+          {departments.map((dept: { id: number | string; name: string }) => (
             <option key={dept.id} value={dept.id}>
               {dept.name}
             </option>

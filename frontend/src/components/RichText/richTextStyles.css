@@ -1,0 +1,166 @@
+/*
+ * Shared typographic styles for rich-text content rendered by RichTextEditor
+ * (in edit mode) and RichTextDisplay (in read mode). Mirrors the docxStyles
+ * approach so the look is consistent across docx import and authored content.
+ *
+ * Scoped to .rich-text to avoid leaking into the rest of the app.
+ */
+
+.rich-text {
+  font-size: 14px;
+  line-height: 1.65;
+  color: inherit;
+}
+
+.rich-text p {
+  margin: 0.5em 0;
+}
+
+.rich-text p:first-child {
+  margin-top: 0;
+}
+
+.rich-text p:last-child {
+  margin-bottom: 0;
+}
+
+.rich-text h1,
+.rich-text h2,
+.rich-text h3,
+.rich-text h4 {
+  font-weight: 600;
+  line-height: 1.3;
+  margin-top: 1.2em;
+  margin-bottom: 0.4em;
+  color: inherit;
+}
+
+.rich-text h2 {
+  font-size: 1.25em;
+}
+.rich-text h3 {
+  font-size: 1.1em;
+}
+.rich-text h4 {
+  font-size: 1em;
+}
+
+.rich-text strong {
+  font-weight: 600;
+}
+
+.rich-text em {
+  font-style: italic;
+}
+
+.rich-text u {
+  text-decoration: underline;
+}
+
+.rich-text s {
+  text-decoration: line-through;
+}
+
+.rich-text a {
+  color: rgb(37 99 235);
+  text-decoration: underline;
+}
+
+.dark .rich-text a {
+  color: rgb(96 165 250);
+}
+
+.rich-text ul,
+.rich-text ol {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+
+.rich-text ul {
+  list-style: disc;
+}
+
+.rich-text ol {
+  list-style: decimal;
+}
+
+.rich-text li {
+  margin: 0.2em 0;
+}
+
+.rich-text li > p {
+  margin: 0;
+}
+
+.rich-text blockquote {
+  margin: 0.75em 0;
+  padding-left: 0.9em;
+  border-left: 3px solid rgb(209 213 219);
+  color: rgb(75 85 99);
+  font-style: italic;
+}
+
+.dark .rich-text blockquote {
+  border-left-color: rgb(75 85 99);
+  color: rgb(156 163 175);
+}
+
+.rich-text code {
+  background: rgb(243 244 246);
+  border-radius: 0.25rem;
+  padding: 0.1em 0.35em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.92em;
+}
+
+.dark .rich-text code {
+  background: rgb(31 41 55);
+}
+
+.rich-text pre {
+  background: rgb(17 24 39);
+  color: rgb(229 231 235);
+  border-radius: 0.4rem;
+  padding: 0.75em 1em;
+  overflow-x: auto;
+  font-size: 0.9em;
+  margin: 0.75em 0;
+}
+
+.rich-text pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+.rich-text hr {
+  border: 0;
+  border-top: 1px solid rgb(209 213 219);
+  margin: 1em 0;
+}
+
+.dark .rich-text hr {
+  border-top-color: rgb(75 85 99);
+}
+
+/*
+ * TipTap empty-state placeholder — shown via the Placeholder extension.
+ * We emit `data-placeholder` on empty paragraphs and style with a CSS
+ * pseudo-element so it doesn't interfere with selection.
+ */
+.rich-text-editor .ProseMirror {
+  outline: none;
+  min-height: 6em;
+}
+
+.rich-text-editor .ProseMirror p.is-editor-empty:first-child::before {
+  color: rgb(156 163 175);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.dark .rich-text-editor .ProseMirror p.is-editor-empty:first-child::before {
+  color: rgb(107 114 128);
+}

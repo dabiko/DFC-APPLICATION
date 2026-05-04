@@ -190,12 +190,22 @@ class StepAttachment(models.Model):
         TEMPLATE = 'template', 'Template'
         REFERENCE = 'reference', 'Reference Document'
 
+    class ExtractionStatus(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        COMPLETED = 'completed', 'Completed'
+        FAILED = 'failed', 'Failed'
+        UNSUPPORTED = 'unsupported', 'Unsupported file type'
+        NO_TEXT = 'no_text', 'No extractable text (likely scanned)'
+
     ALLOWED_EXTENSIONS = [
         'pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt',
         'png', 'jpg', 'jpeg', 'gif', 'svg',
         'mp4', 'webm', 'ogg', 'mp3',
         'txt', 'csv', 'json',
     ]
+
+    # File extensions we run text extraction for. Other types stay 'unsupported'.
+    EXTRACTABLE_EXTENSIONS = ['pdf', 'docx']
 
     MAX_FILE_SIZE_MB = 100
 
@@ -230,6 +240,19 @@ class StepAttachment(models.Model):
         related_name='+',
     )
     uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    # Extracted text — populated asynchronously by a Celery task on create.
+    # The Text view in the UI reads from this field. Stored as plain text;
+    # extraction preserves original ordering (page-by-page for PDFs,
+    # paragraph order for .docx).
+    extracted_text = models.TextField(blank=True, default='')
+    extraction_status = models.CharField(
+        max_length=20,
+        choices=ExtractionStatus.choices,
+        default=ExtractionStatus.PENDING,
+    )
+    extraction_error = models.TextField(blank=True, default='')
+    extracted_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = 'procedure_step_attachments'
@@ -385,6 +408,11 @@ class VersionStepAttachment(models.Model):
         on_delete=models.SET_NULL,
         related_name='+',
     )
+
+    # Extracted text snapshotted from StepAttachment at publish time.
+    # Frozen with the version so trainees see the same text the author saw.
+    extracted_text = models.TextField(blank=True, default='')
+    extraction_status = models.CharField(max_length=20, blank=True, default='')
 
     class Meta:
         db_table = 'version_step_attachments'

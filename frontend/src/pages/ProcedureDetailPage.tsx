@@ -17,7 +17,6 @@ import {
   Clock,
   User,
   Tag,
-  Send,
   Rocket,
   History,
   ChevronDown,
@@ -38,6 +37,10 @@ import {
   Search,
   RotateCcw,
   X,
+  AlignLeft,
+  Download,
+  FlaskConical,
+  Link2,
 } from 'lucide-react'
 import { ThreePanelLayout } from '@/components/Layout/ThreePanelLayout'
 import { DashboardHeader } from '@/components/Dashboard/DashboardHeader'
@@ -51,6 +54,10 @@ import { WaiveAssignmentModal } from '@/components/procedures/WaiveAssignmentMod
 import { waiveAssignment } from '@/services/assignmentService'
 import { cn } from '@/utils/cn'
 import { DatePicker } from '@/components/DatePicker'
+import { RichTextDisplay } from '@/components/RichText'
+import { DocumentViewer } from '@/components/DocumentViewer'
+import { getDocumentPreviewUrl } from '@/services/documentService'
+import type { StepAttachment } from '@/types/procedure'
 import { authService } from '@/services/auth.service'
 import { usePermissions } from '@/contexts/PermissionContext'
 import {
@@ -99,6 +106,45 @@ export function ProcedureDetailPage() {
     }>
   >([])
 
+  // Step-attachment viewer (read-only here — we never edit on the detail page).
+  const [previewAttachment, setPreviewAttachment] = useState<{
+    fileUrl: string
+    fileName: string
+    title: string
+    fileSize: number
+    extractedText: string
+    extractionStatus: StepAttachment['extraction_status']
+    initialTab: 'document' | 'text'
+  } | null>(null)
+  const [previewLoading, setPreviewLoading] = useState<string | null>(null)
+
+  const handlePreviewAttachment = async (
+    att: StepAttachment,
+    initialTab: 'document' | 'text' = 'document'
+  ) => {
+    if (previewLoading) return
+    try {
+      setPreviewLoading(att.id)
+      const fileUrl =
+        att.is_linked && att.document_info
+          ? await getDocumentPreviewUrl(att.document_info.id)
+          : att.file
+      setPreviewAttachment({
+        fileUrl,
+        fileName: att.file_name || att.title,
+        title: att.title,
+        fileSize: att.file_size,
+        extractedText: att.extracted_text,
+        extractionStatus: att.extraction_status,
+        initialTab,
+      })
+    } catch (err) {
+      console.error('Failed to open preview:', err)
+    } finally {
+      setPreviewLoading(null)
+    }
+  }
+
   const [publishData, setPublishData] = useState({
     effective_from: new Date().toISOString().split('T')[0],
     expires_on: '',
@@ -128,7 +174,9 @@ export function ProcedureDetailPage() {
       .then(([procData, versionData, progressData]) => {
         setProcedure(procData)
         setVersions(
-          Array.isArray(versionData) ? versionData : ((versionData as any)?.results ?? [])
+          Array.isArray(versionData)
+            ? versionData
+            : ((versionData as { results?: ProcedureVersionListItem[] })?.results ?? [])
         )
         setReviewProgress(progressData)
       })
@@ -164,10 +212,15 @@ export function ProcedureDetailPage() {
         listVersions(procedure.id),
       ])
       setProcedure(procData)
-      setVersions(Array.isArray(versionData) ? versionData : ((versionData as any)?.results ?? []))
+      setVersions(
+        Array.isArray(versionData)
+          ? versionData
+          : ((versionData as { results?: ProcedureVersionListItem[] })?.results ?? [])
+      )
       setShowPublishForm(false)
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to publish')
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setError(detail || 'Failed to publish')
     } finally {
       setPublishing(false)
     }
@@ -181,7 +234,11 @@ export function ProcedureDetailPage() {
       listVersions(procedure.id),
     ])
     setProcedure(procData)
-    setVersions(Array.isArray(versionData) ? versionData : ((versionData as any)?.results ?? []))
+    setVersions(
+      Array.isArray(versionData)
+        ? versionData
+        : ((versionData as { results?: ProcedureVersionListItem[] })?.results ?? [])
+    )
     setRetireTarget(null)
   }
 
@@ -482,9 +539,10 @@ export function ProcedureDetailPage() {
                     Details
                   </h2>
                   {procedure?.description && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                      {procedure.description}
-                    </p>
+                    <RichTextDisplay
+                      html={procedure.description}
+                      className="text-gray-600 dark:text-gray-400 mb-4"
+                    />
                   )}
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     {procedure?.department_name && (
@@ -710,24 +768,90 @@ export function ProcedureDetailPage() {
                                 )}
                               </button>
                               {isExpanded && (
-                                <div className="pb-4 pl-9 text-sm text-gray-600 dark:text-gray-400 space-y-2">
-                                  {step.description && <p>{step.description}</p>}
+                                <div className="pb-4 pl-9 text-sm text-gray-600 dark:text-gray-400 space-y-3">
+                                  {step.description && (
+                                    <RichTextDisplay
+                                      html={step.description}
+                                      className="text-gray-600 dark:text-gray-400"
+                                    />
+                                  )}
                                   {step.estimated_duration_minutes && (
                                     <p className="text-xs text-gray-400">
                                       Est. {step.estimated_duration_minutes} min
                                     </p>
                                   )}
+                                  {step.example_scenarios && (
+                                    <div className="rounded-md border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/20 p-3">
+                                      <p className="flex items-center gap-1.5 text-xs font-semibold text-purple-800 dark:text-purple-300 mb-1.5">
+                                        <FlaskConical className="h-3.5 w-3.5" />
+                                        Example Scenarios
+                                      </p>
+                                      <RichTextDisplay
+                                        html={step.example_scenarios}
+                                        className="text-xs text-purple-700 dark:text-purple-300"
+                                      />
+                                    </div>
+                                  )}
                                   {step.attachments.length > 0 && (
-                                    <div className="space-y-1">
-                                      {step.attachments.map((att) => (
-                                        <div
-                                          key={att.id}
-                                          className="flex items-center gap-2 text-xs text-gray-500"
-                                        >
-                                          <Paperclip className="h-3 w-3" />
-                                          {att.title || att.file_name}
-                                        </div>
-                                      ))}
+                                    <div className="space-y-1.5">
+                                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                                        Attachments
+                                      </p>
+                                      {step.attachments.map((att) => {
+                                        const supportsText =
+                                          att.extraction_status &&
+                                          att.extraction_status !== 'unsupported' &&
+                                          (att.extraction_status as string) !== ''
+                                        return (
+                                          <div
+                                            key={att.id}
+                                            className="flex items-center gap-2 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-2.5 py-1.5"
+                                          >
+                                            {att.is_linked ? (
+                                              <Link2 className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />
+                                            ) : (
+                                              <FileText className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
+                                            )}
+                                            <span className="flex-1 truncate text-xs text-gray-700 dark:text-gray-300">
+                                              {att.title || att.file_name}
+                                            </span>
+                                            {att.is_linked && (
+                                              <span className="rounded px-1 py-0.5 text-[10px] font-medium bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
+                                                Linked
+                                              </span>
+                                            )}
+                                            {supportsText && (
+                                              <button
+                                                onClick={() => handlePreviewAttachment(att, 'text')}
+                                                disabled={previewLoading === att.id}
+                                                className="text-gray-400 hover:text-blue-500 disabled:opacity-50"
+                                                title="Read extracted text"
+                                              >
+                                                <AlignLeft className="h-3.5 w-3.5" />
+                                              </button>
+                                            )}
+                                            <button
+                                              onClick={() =>
+                                                handlePreviewAttachment(att, 'document')
+                                              }
+                                              disabled={previewLoading === att.id}
+                                              className="text-gray-400 hover:text-blue-500 disabled:opacity-50"
+                                              title="Open viewer"
+                                            >
+                                              <Eye className="h-3.5 w-3.5" />
+                                            </button>
+                                            <a
+                                              href={att.file}
+                                              download={att.file_name}
+                                              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                              title="Download"
+                                              onClick={(e) => e.stopPropagation()}
+                                            >
+                                              <Download className="h-3.5 w-3.5" />
+                                            </a>
+                                          </div>
+                                        )
+                                      })}
                                     </div>
                                   )}
                                 </div>
@@ -1058,12 +1182,11 @@ export function ProcedureDetailPage() {
                       const updated = await getProcedure(procedure.id)
                       setProcedure(updated)
                       setReviewProgress(null)
-                    } catch (err: any) {
-                      setError(
-                        err?.response?.data?.error ||
-                          err?.response?.data?.detail ||
-                          'Failed to revert procedure'
-                      )
+                    } catch (err: unknown) {
+                      const data = (
+                        err as { response?: { data?: { error?: string; detail?: string } } }
+                      )?.response?.data
+                      setError(data?.error || data?.detail || 'Failed to revert procedure')
                     } finally {
                       setReverting(false)
                     }
@@ -1082,6 +1205,21 @@ export function ProcedureDetailPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Step attachment viewer (read-only) */}
+      {previewAttachment && (
+        <DocumentViewer
+          isOpen={true}
+          onClose={() => setPreviewAttachment(null)}
+          fileUrl={previewAttachment.fileUrl}
+          fileName={previewAttachment.fileName}
+          title={previewAttachment.title}
+          fileSize={previewAttachment.fileSize}
+          extractedText={previewAttachment.extractedText}
+          extractionStatus={previewAttachment.extractionStatus}
+          initialTab={previewAttachment.initialTab}
+        />
       )}
     </>
   )

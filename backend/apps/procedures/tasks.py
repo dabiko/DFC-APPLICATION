@@ -415,3 +415,148 @@ def cleanup_abandoned_attempts():
 
     logger.info(f"Marked {updated} training attempts as abandoned")
     return {'abandoned_count': updated}
+
+
+# ---------------------------------------------------------------------------
+# Attachment Text Extraction
+# ---------------------------------------------------------------------------
+
+@shared_task(bind=True, max_retries=2)
+def extract_attachment_text(self, attachment_id):
+    """
+    Extract plain text from a StepAttachment file (.pdf or .docx) and store it
+    on the row so the frontend Text view can display it without re-downloading.
+
+    Strategy:
+      - Linked attachments: prefer the source Document's pre-extracted text
+        (it was already extracted by the documents pipeline). Fall back to
+        re-extraction from the file if the source is empty.
+      - Uploaded attachments: download the file from storage to a temp path
+        and run TextExtractor.extract_text against it.
+
+    Status outcomes (extraction_status field):
+      - 'completed'   — text saved
+      - 'unsupported' — extension not in EXTRACTABLE_EXTENSIONS
+      - 'no_text'     — extractor ran but returned empty (likely scanned PDF)
+      - 'failed'      — exception during extraction; details in extraction_error
+    """
+    from apps.procedures.models import StepAttachment
+    from apps.workflows.extractors import TextExtractor
+    import os
+    import tempfile
+    from pathlib import Path
+
+    try:
+        att = StepAttachment.objects.select_related('document_reference').get(id=attachment_id)
+    except StepAttachment.DoesNotExist:
+        logger.warning(f"[extract_attachment_text] Attachment {attachment_id} no longer exists")
+        return {'success': False, 'reason': 'not_found'}
+
+    ext = (att.file_extension or '').lower().lstrip('.')
+    if ext not in StepAttachment.EXTRACTABLE_EXTENSIONS:
+        att.extraction_status = StepAttachment.ExtractionStatus.UNSUPPORTED
+        att.extracted_text = ''
+        att.extracted_at = timezone.now()
+        att.save(update_fields=['extraction_status', 'extracted_text', 'extracted_at'])
+        return {'success': True, 'status': 'unsupported', 'extension': ext}
+
+    # Linked attachment fast path: reuse the source document's text.
+    if att.document_reference_id and att.document_reference:
+        source_text = att.document_reference.extracted_text or ''
+        if source_text.strip():
+            att.extracted_text = source_text
+            att.extraction_status = StepAttachment.ExtractionStatus.COMPLETED
+            att.extraction_error = ''
+            att.extracted_at = timezone.now()
+            att.save(update_fields=[
+                'extracted_text', 'extraction_status', 'extraction_error', 'extracted_at',
+            ])
+            logger.info(
+                f"[extract_attachment_text] Reused source document text for {attachment_id} "
+                f"({len(source_text)} chars)"
+            )
+            return {'success': True, 'status': 'reused_from_source', 'length': len(source_text)}
+        # Fall through to extract from the source document's file. The source
+        # may have no file at all (e.g. a placeholder Document) — guard before
+        # calling .open() so we mark the attachment as 'failed' permanently
+        # rather than entering Celery's retry loop on a non-transient error.
+        file_field = att.document_reference.file
+        file_name = att.document_reference.file_name or att.file_name
+        if not file_field or not file_field.name:
+            att.extraction_status = StepAttachment.ExtractionStatus.FAILED
+            att.extraction_error = 'Linked document has no file content to extract'
+            att.extracted_at = timezone.now()
+            att.save(update_fields=['extraction_status', 'extraction_error', 'extracted_at'])
+            return {'success': False, 'reason': 'linked_doc_has_no_file'}
+    else:
+        # Uploaded attachment — extract from its own file.
+        if not att.file or not att.file.name:
+            att.extraction_status = StepAttachment.ExtractionStatus.FAILED
+            att.extraction_error = 'Attachment has no file and no document_reference'
+            att.extracted_at = timezone.now()
+            att.save(update_fields=['extraction_status', 'extraction_error', 'extracted_at'])
+            return {'success': False, 'reason': 'no_file'}
+        file_field = att.file
+        file_name = att.file_name
+
+    # Download file to temp path and run extractor.
+    suffix = Path(file_name).suffix or f'.{ext}'
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            temp_path = tmp.name
+            file_field.open('rb')
+            try:
+                tmp.write(file_field.read())
+            finally:
+                file_field.close()
+
+        mime_type = att.mime_type or _guess_mime(ext)
+        text = TextExtractor.extract_text(temp_path, mime_type) or ''
+
+        if text.strip():
+            att.extracted_text = text
+            att.extraction_status = StepAttachment.ExtractionStatus.COMPLETED
+            att.extraction_error = ''
+        else:
+            att.extracted_text = ''
+            att.extraction_status = StepAttachment.ExtractionStatus.NO_TEXT
+            att.extraction_error = ''
+
+        att.extracted_at = timezone.now()
+        att.save(update_fields=[
+            'extracted_text', 'extraction_status', 'extraction_error', 'extracted_at',
+        ])
+        logger.info(
+            f"[extract_attachment_text] {attachment_id} -> {att.extraction_status} "
+            f"({len(text)} chars)"
+        )
+        return {'success': True, 'status': att.extraction_status, 'length': len(text)}
+
+    except Exception as exc:
+        logger.exception(f"[extract_attachment_text] failed for {attachment_id}")
+        att.extraction_status = StepAttachment.ExtractionStatus.FAILED
+        att.extraction_error = str(exc)[:1000]
+        att.extracted_at = timezone.now()
+        att.save(update_fields=['extraction_status', 'extraction_error', 'extracted_at'])
+        # Retry transient failures (network, MinIO hiccup) up to max_retries.
+        try:
+            raise self.retry(exc=exc, countdown=60)
+        except self.MaxRetriesExceededError:
+            return {'success': False, 'reason': 'max_retries_exceeded'}
+    finally:
+        if temp_path:
+            try:
+                os.unlink(temp_path)
+            except Exception:
+                pass
+
+
+_MIME_BY_EXT = {
+    'pdf': 'application/pdf',
+    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+}
+
+
+def _guess_mime(ext):
+    return _MIME_BY_EXT.get(ext.lower(), 'application/octet-stream')

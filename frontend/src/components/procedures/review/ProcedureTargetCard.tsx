@@ -3,8 +3,9 @@
  * target is a Procedure (replaces the default document preview card).
  */
 
-import { FileText, Tag, User, Clock, ListOrdered } from 'lucide-react'
+import { FileText, Tag, User, ListOrdered } from 'lucide-react'
 import { ProcedureStatusBadge } from '../ProcedureStatusBadge'
+import { htmlToPlainSnippet } from '@/components/RichText'
 import type { Procedure } from '@/types/procedure'
 
 interface ProcedureTargetCardProps {
@@ -31,7 +32,7 @@ export function ProcedureTargetCard({ procedure, onClick }: ProcedureTargetCardP
           </div>
           {procedure.description && (
             <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
-              {procedure.description}
+              {htmlToPlainSnippet(procedure.description, 200)}
             </p>
           )}
           <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400">

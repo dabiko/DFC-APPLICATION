@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   X,
 } from 'lucide-react'
+import { RichTextDisplay } from '@/components/RichText'
 import type { VersionStep, StepCompletionResponse } from './types'
 import { AttachmentViewer } from './AttachmentViewer'
 import { StepGateBlocker, type QuizAttemptInfo } from './StepGateBlocker'
@@ -76,10 +77,8 @@ export function StepContent({
           </p>
         )}
         {step.description && (
-          <div className="prose prose-sm dark:prose-invert max-w-none mb-6">
-            <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-              {step.description}
-            </p>
+          <div className="mb-6">
+            <RichTextDisplay html={step.description} className="text-gray-700 dark:text-gray-300" />
           </div>
         )}
 
@@ -132,9 +131,10 @@ export function StepContent({
               <FlaskConical className="h-4 w-4" />
               Example Scenarios
             </h3>
-            <p className="text-sm text-purple-700 dark:text-purple-300 whitespace-pre-wrap">
-              {step.example_scenarios}
-            </p>
+            <RichTextDisplay
+              html={step.example_scenarios}
+              className="text-purple-700 dark:text-purple-300"
+            />
           </div>
         )}
 

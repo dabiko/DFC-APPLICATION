@@ -29,6 +29,7 @@ import { ProcedureCard } from '@/components/procedures/ProcedureCard'
 import { ProcedureFilters } from '@/components/procedures/ProcedureFilters'
 import { ProcedureStatusBadge } from '@/components/procedures/ProcedureStatusBadge'
 import { ErrorState } from '@/components/common'
+import { htmlToPlainSnippet } from '@/components/RichText'
 import { authService } from '@/services/auth.service'
 import { listProcedures } from '@/services/procedureService'
 import { usePermissions } from '@/contexts/PermissionContext'
@@ -74,7 +75,7 @@ function ProcedureGridCard({ procedure, onClick }: { procedure: Procedure; onCli
         {/* Description */}
         {procedure.description && (
           <p className="line-clamp-2 text-xs text-gray-500 dark:text-gray-400 mb-3">
-            {procedure.description}
+            {htmlToPlainSnippet(procedure.description, 240)}
           </p>
         )}
 
@@ -200,8 +201,9 @@ export function ProceduresListPage() {
       const data = await listProcedures(cleanFilters as Filters)
       const items = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : []
       setProcedures(items)
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to load procedures')
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setError(detail || 'Failed to load procedures')
     } finally {
       setLoading(false)
     }

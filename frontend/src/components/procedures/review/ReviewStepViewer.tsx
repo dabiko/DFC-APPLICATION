@@ -23,6 +23,7 @@ import {
   Eye,
 } from 'lucide-react'
 import { StepCommentThread } from './StepCommentThread'
+import { RichTextDisplay } from '@/components/RichText'
 import type { ProcedureStep, ProcedureStepComment } from '@/types/procedure'
 
 interface ReviewStepViewerProps {
@@ -35,7 +36,7 @@ interface ReviewStepViewerProps {
     stepId: string,
     action: 'approve' | 'request_changes',
     comment: string
-  ) => Promise<any>
+  ) => Promise<unknown>
 }
 
 export function ReviewStepViewer({
@@ -159,9 +160,10 @@ export function ReviewStepViewer({
             {/* Step content */}
             <div className="space-y-3">
               {step.description && (
-                <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                  {step.description}
-                </div>
+                <RichTextDisplay
+                  html={step.description}
+                  className="text-sm text-gray-700 dark:text-gray-300"
+                />
               )}
 
               {/* Learning Objectives */}
@@ -213,9 +215,10 @@ export function ReviewStepViewer({
                     <FlaskConical className="h-3.5 w-3.5" />
                     Example Scenarios
                   </p>
-                  <p className="text-xs text-purple-700 dark:text-purple-300 whitespace-pre-wrap">
-                    {step.example_scenarios}
-                  </p>
+                  <RichTextDisplay
+                    html={step.example_scenarios}
+                    className="text-xs text-purple-700 dark:text-purple-300"
+                  />
                 </div>
               )}
 
@@ -308,8 +311,10 @@ export function ReviewStepViewer({
                           try {
                             await onStepReview(step.id, 'approve', reviewComment.trim())
                             setReviewComment('')
-                          } catch (err: any) {
-                            setReviewError(err?.message || 'Failed to approve step')
+                          } catch (err: unknown) {
+                            setReviewError(
+                              err instanceof Error ? err.message : 'Failed to approve step'
+                            )
                           } finally {
                             setReviewLoading(false)
                           }
@@ -335,8 +340,10 @@ export function ReviewStepViewer({
                           try {
                             await onStepReview(step.id, 'request_changes', reviewComment.trim())
                             setReviewComment('')
-                          } catch (err: any) {
-                            setReviewError(err?.message || 'Failed to request changes')
+                          } catch (err: unknown) {
+                            setReviewError(
+                              err instanceof Error ? err.message : 'Failed to request changes'
+                            )
                           } finally {
                             setReviewLoading(false)
                           }

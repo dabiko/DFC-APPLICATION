@@ -36,6 +36,8 @@ export interface StepAttachmentItem {
   file: string
   file_name: string
   file_size: number
+  extracted_text?: string
+  extraction_status?: 'pending' | 'completed' | 'failed' | 'unsupported' | 'no_text' | ''
 }
 
 export interface VersionQuiz {

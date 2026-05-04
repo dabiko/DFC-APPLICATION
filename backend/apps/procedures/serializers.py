@@ -13,6 +13,7 @@ from .models import (
     QuizAttempt, QuestionResponse,
     VersionQuiz, VersionQuestion, VersionAnswerOption,
 )
+from .utils import sanitize_rich_text
 
 
 class StepAttachmentSerializer(serializers.ModelSerializer):
@@ -22,8 +23,12 @@ class StepAttachmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = StepAttachment
         fields = '__all__'
-        read_only_fields = ['id', 'step', 'uploaded_by', 'uploaded_at', 'file_size',
-                            'file_name', 'file_extension', 'mime_type', 'checksum_sha256']
+        read_only_fields = [
+            'id', 'step', 'uploaded_by', 'uploaded_at', 'file_size',
+            'file_name', 'file_extension', 'mime_type', 'checksum_sha256',
+            # Extraction is server-side only; the Text view reads these.
+            'extracted_text', 'extraction_status', 'extraction_error', 'extracted_at',
+        ]
 
     def get_document_info(self, obj):
         if not obj.document_reference_id:
@@ -52,6 +57,15 @@ class ProcedureStepSerializer(serializers.ModelSerializer):
         model = ProcedureStep
         fields = '__all__'
         read_only_fields = ['id', 'procedure', 'created_at', 'updated_at', 'review_status']
+
+    # Sanitize the rich-text fields on every write. The frontend stores HTML
+    # produced by the TipTap editor; bleach strips anything outside the
+    # allowlist before it hits the database.
+    def validate_description(self, value):
+        return sanitize_rich_text(value)
+
+    def validate_example_scenarios(self, value):
+        return sanitize_rich_text(value)
 
 
 class ProcedureListSerializer(serializers.ModelSerializer):
@@ -82,6 +96,9 @@ class ProcedureDetailSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'state', 'current_version', 'created_by',
                             'created_at', 'updated_at', 'is_deleted',
                             'deleted_at', 'deleted_by']
+
+    def validate_description(self, value):
+        return sanitize_rich_text(value)
 
     def get_assignment_count(self, obj):
         from .models import ProcedureAssignment
@@ -120,6 +137,9 @@ class ProcedureCreateSerializer(serializers.ModelSerializer):
         model = Procedure
         fields = ['id', 'title', 'description', 'department', 'parent_procedure', 'tags']
         read_only_fields = ['id']
+
+    def validate_description(self, value):
+        return sanitize_rich_text(value)
 
 
 class StepReorderSerializer(serializers.Serializer):

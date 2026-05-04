@@ -26,8 +26,10 @@ import {
   Plus,
   ExternalLink,
   Eye,
+  AlignLeft,
+  FileInput,
 } from 'lucide-react'
-import type { ProcedureStep, StepAttachment, BranchCondition, Quiz } from '@/types/procedure'
+import type { ProcedureStep, StepAttachment, Quiz } from '@/types/procedure'
 import type { UserBasic } from '@/services/userManagementService'
 import {
   uploadAttachment,
@@ -40,6 +42,9 @@ import {
   deleteQuiz,
 } from '@/services/procedureService'
 import { ConfirmDialog } from '@/components/Modal/ConfirmDialog'
+import { DocumentViewer } from '@/components/DocumentViewer'
+import { RichTextEditor } from '@/components/RichText'
+import { getDocumentPreviewUrl } from '@/services/documentService'
 import { BranchConditionEditor } from '../branching/BranchConditionEditor'
 import { QuizBuilder } from '../quiz/QuizBuilder'
 import { UserSelectDropdown } from './UserSelectDropdown'
@@ -71,6 +76,92 @@ export function StepEditor({
   const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null)
   const [deletingQuiz, setDeletingQuiz] = useState<Quiz | null>(null)
   const [isDeletingQuiz, setIsDeletingQuiz] = useState(false)
+  const [previewAttachment, setPreviewAttachment] = useState<{
+    fileUrl: string
+    fileName: string
+    title: string
+    fileSize: number
+    extractedText: string
+    extractionStatus: StepAttachment['extraction_status']
+    initialTab: 'document' | 'text'
+  } | null>(null)
+  const [previewLoading, setPreviewLoading] = useState<string | null>(null)
+  const [useTextMenuFor, setUseTextMenuFor] = useState<string | null>(null)
+
+  // Close the "use as..." menu when clicking elsewhere.
+  useEffect(() => {
+    if (!useTextMenuFor) return
+    const handler = () => setUseTextMenuFor(null)
+    // Capture phase so the menu's own buttons can stop propagation if needed.
+    window.addEventListener('click', handler)
+    return () => window.removeEventListener('click', handler)
+  }, [useTextMenuFor])
+
+  /**
+   * Convert extracted plain text into safe HTML paragraphs so it lands in
+   * the rich-text editor as proper structure (not one giant pre-line block).
+   * Blank lines become paragraph breaks; single newlines become <br>.
+   */
+  const plainTextToHtml = (text: string): string => {
+    const escape = (s: string) =>
+      s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    return text
+      .split(/\n{2,}/)
+      .map((para) => `<p>${escape(para).replace(/\n/g, '<br>')}</p>`)
+      .join('')
+  }
+
+  /**
+   * Insert an attachment's extracted text into one of the rich-text fields.
+   * Confirms before overwriting non-empty content. Closes the menu either way.
+   */
+  const handleUseAttachmentText = (
+    att: StepAttachment,
+    target: 'description' | 'example_scenarios'
+  ) => {
+    setUseTextMenuFor(null)
+    if (!att.extracted_text || !att.extracted_text.trim()) return
+
+    const existing = (target === 'description' ? step.description : step.example_scenarios) || ''
+    if (existing && existing.replace(/<[^>]*>/g, '').trim().length > 0) {
+      const targetLabel = target === 'description' ? 'Instructions' : 'Example Scenarios'
+      const ok = window.confirm(
+        `${targetLabel} already has content. Replace it with the text from this attachment?`
+      )
+      if (!ok) return
+    }
+
+    onUpdate(step.id, { [target]: plainTextToHtml(att.extracted_text) })
+  }
+
+  const handlePreviewAttachment = async (
+    att: StepAttachment,
+    initialTab: 'document' | 'text' = 'document'
+  ) => {
+    if (previewLoading) return
+    try {
+      setPreviewLoading(att.id)
+      // Linked attachments: resolve a presigned inline URL from the documents API.
+      // Uploaded attachments: the `file` field is already a direct URL.
+      const fileUrl =
+        att.is_linked && att.document_info
+          ? await getDocumentPreviewUrl(att.document_info.id)
+          : att.file
+      setPreviewAttachment({
+        fileUrl,
+        fileName: att.file_name || att.title,
+        title: att.title,
+        fileSize: att.file_size,
+        extractedText: att.extracted_text,
+        extractionStatus: att.extraction_status,
+        initialTab,
+      })
+    } catch (err) {
+      console.error('Failed to open preview:', err)
+    } finally {
+      setPreviewLoading(null)
+    }
+  }
 
   // Load quizzes for this step
   useEffect(() => {
@@ -239,12 +330,12 @@ export function StepEditor({
             <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
               Instructions
             </label>
-            <textarea
+            <RichTextEditor
               value={step.description || ''}
-              onChange={(e) => onUpdate(step.id, { description: e.target.value })}
-              rows={3}
-              placeholder="Describe what the trainee should do in this step..."
-              className="w-full rounded-lg border-2 border-gray-200 bg-gray-50/50 px-3 py-2 text-sm transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700/50 dark:text-gray-100 dark:focus:border-blue-400 dark:focus:bg-gray-700"
+              onChange={(html) => onUpdate(step.id, { description: html })}
+              placeholder="Describe what the trainee should do in this step…"
+              readOnly={readOnly}
+              editorClassName="min-h-[6em]"
             />
           </div>
 
@@ -361,12 +452,12 @@ export function StepEditor({
             <p className="text-[11px] text-gray-400 mb-1">
               Practical examples that illustrate this step.
             </p>
-            <textarea
+            <RichTextEditor
               value={step.example_scenarios || ''}
-              onChange={(e) => onUpdate(step.id, { example_scenarios: e.target.value })}
-              rows={3}
-              placeholder="e.g. When a client submits incomplete KYC documents, the reviewer should..."
-              className="w-full rounded-lg border-2 border-gray-200 bg-gray-50/50 px-3 py-2 text-sm transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700/50 dark:text-gray-100 dark:focus:border-blue-400 dark:focus:bg-gray-700"
+              onChange={(html) => onUpdate(step.id, { example_scenarios: html })}
+              placeholder="e.g. When a client submits incomplete KYC documents, the reviewer should…"
+              readOnly={readOnly}
+              editorClassName="min-h-[6em]"
             />
           </div>
 
@@ -651,9 +742,67 @@ export function StepEditor({
                       </span>
                     )}
                     <span className="text-gray-400">{formatFileSize(att.file_size)}</span>
+                    {att.extraction_status &&
+                      att.extraction_status !== 'unsupported' &&
+                      (att.extraction_status as string) !== '' && (
+                        <button
+                          onClick={() => handlePreviewAttachment(att, 'text')}
+                          disabled={previewLoading === att.id}
+                          className="text-gray-400 hover:text-blue-500 disabled:opacity-50"
+                          title="Read extracted text"
+                        >
+                          <AlignLeft className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    {/* "Use text as..." menu — only when extraction completed with content */}
+                    {!readOnly &&
+                      att.extraction_status === 'completed' &&
+                      att.extracted_text &&
+                      att.extracted_text.trim().length > 0 && (
+                        <div className="relative">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setUseTextMenuFor(useTextMenuFor === att.id ? null : att.id)
+                            }}
+                            className="text-gray-400 hover:text-blue-500"
+                            title="Use this text in a step field"
+                          >
+                            <FileInput className="h-3.5 w-3.5" />
+                          </button>
+                          {useTextMenuFor === att.id && (
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              className="absolute right-0 top-full z-20 mt-1 min-w-[200px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800"
+                            >
+                              <button
+                                onClick={() => handleUseAttachmentText(att, 'description')}
+                                className="block w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                              >
+                                Use as Instructions
+                              </button>
+                              <button
+                                onClick={() => handleUseAttachmentText(att, 'example_scenarios')}
+                                className="block w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                              >
+                                Use as Example Scenarios
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    <button
+                      onClick={() => handlePreviewAttachment(att, 'document')}
+                      disabled={previewLoading === att.id}
+                      className="text-gray-400 hover:text-blue-500 disabled:opacity-50"
+                      title="Open viewer"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                    </button>
                     <button
                       onClick={() => handleDeleteAttachment(att.id)}
                       className="text-gray-400 hover:text-red-500"
+                      title="Remove"
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -785,6 +934,21 @@ export function StepEditor({
             onClose={() => setLinkModalOpen(false)}
             onSelect={handleLinkDocument}
           />
+
+          {/* In-browser document viewer */}
+          {previewAttachment && (
+            <DocumentViewer
+              isOpen={true}
+              onClose={() => setPreviewAttachment(null)}
+              fileUrl={previewAttachment.fileUrl}
+              fileName={previewAttachment.fileName}
+              title={previewAttachment.title}
+              fileSize={previewAttachment.fileSize}
+              extractedText={previewAttachment.extractedText}
+              extractionStatus={previewAttachment.extractionStatus}
+              initialTab={previewAttachment.initialTab}
+            />
+          )}
         </div>
       )}
       <ConfirmDialog
@@ -810,8 +974,9 @@ export function StepEditor({
             {(deletingQuiz?.questions?.length ?? 0) > 0 && (
               <>
                 {' '}
-                This will permanently remove {deletingQuiz!.questions!.length} question
-                {deletingQuiz!.questions!.length > 1 ? 's' : ''} and all associated answer options.
+                This will permanently remove {deletingQuiz?.questions?.length ?? 0} question
+                {(deletingQuiz?.questions?.length ?? 0) > 1 ? 's' : ''} and all associated answer
+                options.
               </>
             )}{' '}
             This action cannot be undone.

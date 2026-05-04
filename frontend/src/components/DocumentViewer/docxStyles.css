@@ -1,0 +1,138 @@
+/*
+ * Minimal typographic styles for content rendered by mammoth.js from .docx.
+ * mammoth produces semantic HTML (h1-h6, p, ul/ol, table, blockquote, strong/em)
+ * but no styles. Without these, output looks unstyled.
+ *
+ * Scoped to .docx-rendered to avoid leaking into the rest of the app.
+ */
+
+.docx-rendered {
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.docx-rendered h1,
+.docx-rendered h2,
+.docx-rendered h3,
+.docx-rendered h4,
+.docx-rendered h5,
+.docx-rendered h6 {
+  font-weight: 600;
+  line-height: 1.25;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  color: inherit;
+}
+
+.docx-rendered h1 {
+  font-size: 1.875em;
+}
+.docx-rendered h2 {
+  font-size: 1.5em;
+}
+.docx-rendered h3 {
+  font-size: 1.25em;
+}
+.docx-rendered h4 {
+  font-size: 1.1em;
+}
+
+.docx-rendered p {
+  margin: 0.75em 0;
+}
+
+.docx-rendered ul,
+.docx-rendered ol {
+  margin: 0.75em 0;
+  padding-left: 1.5em;
+}
+
+.docx-rendered ul {
+  list-style: disc;
+}
+.docx-rendered ol {
+  list-style: decimal;
+}
+
+.docx-rendered li {
+  margin: 0.25em 0;
+}
+
+.docx-rendered li > p {
+  margin: 0;
+}
+
+.docx-rendered blockquote {
+  margin: 1em 0;
+  padding-left: 1em;
+  border-left: 3px solid rgb(209 213 219);
+  color: rgb(75 85 99);
+  font-style: italic;
+}
+
+.dark .docx-rendered blockquote {
+  border-left-color: rgb(75 85 99);
+  color: rgb(156 163 175);
+}
+
+.docx-rendered strong {
+  font-weight: 600;
+}
+
+.docx-rendered em {
+  font-style: italic;
+}
+
+.docx-rendered a {
+  color: rgb(37 99 235);
+  text-decoration: underline;
+}
+
+.dark .docx-rendered a {
+  color: rgb(96 165 250);
+}
+
+.docx-rendered table {
+  border-collapse: collapse;
+  margin: 1em 0;
+  width: 100%;
+  font-size: 0.95em;
+}
+
+.docx-rendered th,
+.docx-rendered td {
+  border: 1px solid rgb(209 213 219);
+  padding: 0.5em 0.75em;
+  text-align: left;
+  vertical-align: top;
+}
+
+.dark .docx-rendered th,
+.dark .docx-rendered td {
+  border-color: rgb(75 85 99);
+}
+
+.docx-rendered th {
+  background: rgb(243 244 246);
+  font-weight: 600;
+}
+
+.dark .docx-rendered th {
+  background: rgb(31 41 55);
+}
+
+.docx-rendered img {
+  max-width: 100%;
+  height: auto;
+  margin: 1em 0;
+}
+
+.docx-rendered hr {
+  border: 0;
+  border-top: 1px solid rgb(209 213 219);
+  margin: 1.5em 0;
+}
+
+.dark .docx-rendered hr {
+  border-top-color: rgb(75 85 99);
+}

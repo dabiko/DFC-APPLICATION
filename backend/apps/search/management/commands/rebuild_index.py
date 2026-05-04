@@ -294,10 +294,11 @@ class Command(BaseCommand):
             from elasticsearch import Elasticsearch
 
             es_config = settings.ELASTICSEARCH_DSL['default']
+            http_auth = es_config.get('http_auth')
             es = Elasticsearch(
                 hosts=es_config['hosts'],
-                http_auth=es_config.get('http_auth'),
-                timeout=5
+                basic_auth=http_auth if http_auth and http_auth[0] else None,
+                request_timeout=5
             )
 
             # Ping Elasticsearch
