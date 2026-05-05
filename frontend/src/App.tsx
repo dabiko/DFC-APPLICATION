@@ -48,6 +48,7 @@ import { TraineeDetailPage } from './pages/TraineeDetailPage'
 import { TrainingEvidencePage } from './pages/TrainingEvidencePage'
 import DemoPage from './pages/DemoPage'
 import ContactPage from './pages/ContactPage'
+import AboutPage from './pages/AboutPage'
 import { Navigate } from 'react-router-dom'
 
 function App() {
@@ -502,6 +503,7 @@ function App() {
               {/* Other pages */}
               <Route path="/demo" element={<DemoPage />} />
               <Route path="/contact" element={<ContactPage />} />
+              <Route path="/about" element={<AboutPage />} />
 
               {/* 404 - Catch all undefined routes */}
               <Route path="*" element={<NotFoundRouter />} />
