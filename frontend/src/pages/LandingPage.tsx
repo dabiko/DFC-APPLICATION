@@ -1,5 +1,5 @@
-import React from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useEffect } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useTheme } from '../hooks/useTheme'
 import HeroSection from '../components/Landing/HeroSection'
 import FeaturesSection from '../components/Landing/FeaturesSection'
@@ -19,6 +19,17 @@ import LandingHeader from '../components/Landing/LandingHeader'
 const LandingPage: React.FC = () => {
   const { theme, setTheme } = useTheme()
   const navigate = useNavigate()
+  const location = useLocation()
+
+  // Scroll to a hash target when arriving from another route (e.g. /#features).
+  useEffect(() => {
+    if (!location.hash) return
+    const id = window.setTimeout(() => {
+      const el = document.querySelector(location.hash)
+      if (el) el.scrollIntoView({ behavior: 'smooth' })
+    }, 100)
+    return () => window.clearTimeout(id)
+  }, [location.hash])
 
   const cycleTheme = () => {
     if (theme === 'light') {

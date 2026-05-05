@@ -1,4 +1,5 @@
 import React from 'react'
+import { useLocation } from 'react-router-dom'
 import { Mail, Phone, MapPin, Github, Linkedin, Twitter } from 'lucide-react'
 
 interface FooterProps {
@@ -11,6 +12,7 @@ interface FooterProps {
  */
 const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
   const currentYear = new Date().getFullYear()
+  const location = useLocation()
 
   const footerSections = [
     {
@@ -63,9 +65,11 @@ const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
 
   const scrollToSection = (href: string) => {
     if (href.startsWith('#')) {
-      const element = document.querySelector(href)
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth' })
+      if (location.pathname === '/') {
+        const element = document.querySelector(href)
+        if (element) element.scrollIntoView({ behavior: 'smooth' })
+      } else {
+        onNavigate('/' + href)
       }
     } else {
       onNavigate(href)

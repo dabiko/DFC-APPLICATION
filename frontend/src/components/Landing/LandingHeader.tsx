@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Moon, Sun, Menu, X, LayoutDashboard, LogOut } from 'lucide-react'
 import { authService } from '@/services/auth.service'
 
@@ -16,6 +17,7 @@ const LandingHeader: React.FC<LandingHeaderProps> = ({ theme, onToggleTheme, onN
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const location = useLocation()
 
   useEffect(() => {
     const handleScroll = () => {
@@ -38,10 +40,12 @@ const LandingHeader: React.FC<LandingHeaderProps> = ({ theme, onToggleTheme, onN
   ]
 
   const scrollToSection = (href: string) => {
-    const element = document.querySelector(href)
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' })
-      setIsMobileMenuOpen(false)
+    setIsMobileMenuOpen(false)
+    if (location.pathname === '/') {
+      const element = document.querySelector(href)
+      if (element) element.scrollIntoView({ behavior: 'smooth' })
+    } else {
+      onNavigate('/' + href)
     }
   }
 
