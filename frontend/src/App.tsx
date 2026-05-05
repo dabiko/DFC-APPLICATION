@@ -46,6 +46,7 @@ import { QuizTakingPage } from './pages/QuizTakingPage'
 import { TrainingAssignmentsPage } from './pages/TrainingAssignmentsPage'
 import { TraineeDetailPage } from './pages/TraineeDetailPage'
 import { TrainingEvidencePage } from './pages/TrainingEvidencePage'
+import DemoPage from './pages/DemoPage'
 import { Navigate } from 'react-router-dom'
 
 function App() {
@@ -498,7 +499,7 @@ function App() {
               />
 
               {/* Other pages */}
-              <Route path="/demo" element={<div className="p-8">Demo page (coming soon)</div>} />
+              <Route path="/demo" element={<DemoPage />} />
               <Route
                 path="/contact"
                 element={<div className="p-8">Contact page (coming soon)</div>}
