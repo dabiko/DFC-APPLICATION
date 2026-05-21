@@ -2,6 +2,7 @@
 Django==5.2.8
 djangorestframework==3.15.2
 djangorestframework-simplejwt==5.3.1
+drf-nested-routers==0.93.5  # Nested URL routers (apps.workflows, apps.procedures)
 
 # Database and Storage
 psycopg2-binary==2.9.10
@@ -50,6 +51,16 @@ qrcode==8.0  # QR code generation for MFA setup
 django-prometheus==2.3.1
 sentry-sdk==2.19.2
 django-silk==5.1.0  # Performance profiling (development/staging)
+
+# HTML sanitization
+bleach==6.2.0  # Used in apps.procedures serializers/utils
+
+# Email (Resend)
+resend==2.10.0  # Transactional email service
+
+# Numeric / ML (lazy imports in intelligence/classification/workflows)
+numpy==2.2.6
+opencv-python-headless==4.11.0.86
 
 # Utilities
 pytz==2024.2
