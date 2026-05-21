@@ -188,14 +188,14 @@ phase4_deploy() {
     cd "$APP_DIR/frontend"
     if command -v npm &>/dev/null; then
         npm ci --legacy-peer-deps
-        VITE_API_BASE_URL="https://$DOMAIN/api/v1" npm run build
+        VITE_API_URL="https://$DOMAIN/api/v1" npx vite build
         mkdir -p "$APP_DIR/deployment/frontend-dist"
         cp -r dist/. "$APP_DIR/deployment/frontend-dist/"
         log "Frontend built → deployment/frontend-dist/"
     else
         warn "npm not found on this server."
         warn "Build the frontend on your local machine and rsync it:"
-        warn "  cd frontend && npm ci && VITE_API_BASE_URL=https://$DOMAIN/api/v1 npm run build"
+        warn "  cd frontend && npm ci && VITE_API_URL=https://$DOMAIN/api/v1 npm run build"
         warn "  rsync -av dist/ deploy@162.243.32.216:$APP_DIR/deployment/frontend-dist/"
         warn "Then re-run: bash deploy.sh phase4"
         read -rp "Press Enter once you've rsynced the frontend, or Ctrl-C to abort..."
@@ -277,7 +277,7 @@ update() {
     if command -v npm &>/dev/null; then
         cd "$APP_DIR/frontend"
         npm ci --legacy-peer-deps
-        VITE_API_BASE_URL="https://$DOMAIN/api/v1" npm run build
+        VITE_API_URL="https://$DOMAIN/api/v1" npx vite build
         rsync -av --delete dist/ "$APP_DIR/deployment/frontend-dist/"
     else
         warn "npm not on server — rsync frontend-dist manually then reload nginx:"
