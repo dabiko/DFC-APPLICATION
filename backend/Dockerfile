@@ -31,11 +31,11 @@ RUN apt-get update && apt-get install -y \
 
 # Copy requirements files
 COPY requirements/base.txt /app/requirements/base.txt
-COPY requirements/development.txt /app/requirements/development.txt
+COPY requirements/production.txt /app/requirements/production.txt
 
 # Install Python dependencies
 RUN pip install --upgrade pip && \
-    pip install -r requirements/development.txt
+    pip install -r requirements/production.txt
 
 # Copy project files
 COPY . /app/
