@@ -73,7 +73,8 @@
       "Bash(celery -A config worker --loglevel=info --pool=solo)",
       "Bash(npx eslint *)",
       "Bash(./venv/Scripts/pip.exe install *)",
-      "Bash(./venv/Scripts/python.exe manage.py check)"
+      "Bash(./venv/Scripts/python.exe manage.py check)",
+      "Bash(ssh *)"
     ],
     "deny": [],
     "ask": []
