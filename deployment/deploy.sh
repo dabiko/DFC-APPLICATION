@@ -8,7 +8,7 @@
 set -euo pipefail
 
 # ── Config ────────────────────────────────────────────────────────────────────
-DOMAIN="dfc.dabiko-software.tech"
+DOMAIN="dfc-app.dabiko-software.tech"
 REPO_URL="https://github.com/dabiko/DFC-APPLICATION.git"
 APP_DIR="/opt/dfc"
 DEPLOY_USER="deploy"
