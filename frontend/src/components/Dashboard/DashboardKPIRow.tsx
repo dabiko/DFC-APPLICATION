@@ -40,6 +40,22 @@ function formatNumber(n: number): string {
   return n.toLocaleString()
 }
 
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(1024))
+  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`
+}
+
+function formatStoragePercent(used: number, limit: number): string {
+  if (limit === 0) return '0%'
+  const pct = (used / limit) * 100
+  if (pct === 0) return '0%'
+  if (pct < 0.1) return '< 0.1%'
+  if (pct < 1) return `${pct.toFixed(2)}%`
+  return `${Math.round(pct)}%`
+}
+
 export function DashboardKPIRow({ data }: DashboardKPIRowProps) {
   const navigate = useNavigate()
 
@@ -51,10 +67,11 @@ export function DashboardKPIRow({ data }: DashboardKPIRowProps) {
   const overdueTotal = (data.workflowStats?.overdue ?? 0) + (data.assignmentDashboard?.overdue ?? 0)
   const complianceScore = data.auditStats?.success_rate ?? 0
   const storageUsed = data.documentStats?.storage_used_bytes ?? 0
-  const storageLimit = data.documentStats?.storage_limit_bytes ?? 500 * 1024 * 1024 * 1024
+  const storageLimit = data.documentStats?.storage_limit_bytes ?? 0
 
-  const storagePercent = storageLimit > 0 ? Math.round((storageUsed / storageLimit) * 100) : 0
-  const storageGB = (storageUsed / (1024 * 1024 * 1024)).toFixed(1)
+  const storagePercent = formatStoragePercent(storageUsed, storageLimit)
+  const storageValue = formatBytes(storageUsed)
+  const storageLimitLabel = storageLimit > 0 ? ` of ${formatBytes(storageLimit)}` : ''
 
   const primaryKPIs: KPIItem[] = [
     {
@@ -128,15 +145,11 @@ export function DashboardKPIRow({ data }: DashboardKPIRowProps) {
     },
     {
       title: 'Storage Used',
-      value: `${storageGB} GB`,
+      value: storageValue,
       icon: <HardDrive className="w-5 h-5" />,
-      color:
-        storagePercent >= 80
-          ? 'text-red-700 dark:text-red-400'
-          : 'text-blue-700 dark:text-blue-400',
-      bgColor:
-        storagePercent >= 80 ? 'bg-red-50 dark:bg-red-900/30' : 'bg-blue-50 dark:bg-blue-900/30',
-      subtitle: `${storagePercent}% of capacity`,
+      color: 'text-blue-700 dark:text-blue-400',
+      bgColor: 'bg-blue-50 dark:bg-blue-900/30',
+      subtitle: `${storagePercent}${storageLimitLabel}`,
       path: '/billing',
     },
   ]

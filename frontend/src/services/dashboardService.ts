@@ -69,7 +69,7 @@ export async function getDocumentStats(): Promise<DocumentStats> {
       total_documents: 0,
       total_folders: 0,
       storage_used_bytes: 0,
-      storage_limit_bytes: 500 * 1024 * 1024 * 1024, // 500GB default
+      storage_limit_bytes: 0,
       documents_by_department: [],
       documents_by_type: [],
       recent_uploads_count: 0,

@@ -14,16 +14,75 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _get_minio_bucket_size():
+    """
+    Sum the actual sizes of all current (non-deleted-marker) objects in the
+    MinIO bucket by paginating ListObjectsV2.  Returns None on any error so
+    callers can fall back gracefully.
+    """
+    try:
+        from apps.documents.storage import get_s3_client
+        s3 = get_s3_client()
+        bucket = settings.AWS_STORAGE_BUCKET_NAME
+        total = 0
+        paginator = s3.get_paginator('list_objects_v2')
+        for page in paginator.paginate(Bucket=bucket):
+            for obj in page.get('Contents', []):
+                total += obj.get('Size', 0)
+        return total
+    except Exception:
+        logger.warning('Could not retrieve bucket size from MinIO; falling back to DB sum.')
+        return None
+
+
+def _get_minio_server_capacity():
+    """
+    Return (total_bytes, available_bytes) for the MinIO server's underlying
+    disk via the MinIO admin API, signed with AWS Signature V4 using botocore
+    (no extra packages required beyond boto3/botocore which are always present).
+    Returns (None, None) on any error.
+    """
+    try:
+        import json
+        import requests
+        from botocore.auth import SigV4Auth
+        from botocore.awsrequest import AWSRequest
+        from botocore.credentials import Credentials
+
+        url = f"{settings.AWS_S3_ENDPOINT_URL}/minio/admin/v3/info"
+        creds = Credentials(settings.AWS_ACCESS_KEY_ID, settings.AWS_SECRET_ACCESS_KEY)
+        # MinIO admin API requires the empty-body SHA256 header to be set explicitly
+        _EMPTY_SHA256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+        aws_req = AWSRequest(method='GET', url=url, headers={'x-amz-content-sha256': _EMPTY_SHA256})
+        SigV4Auth(creds, 's3', settings.AWS_S3_REGION_NAME or 'us-east-1').add_auth(aws_req)
+
+        resp = requests.get(url, headers=dict(aws_req.headers), timeout=5)
+        resp.raise_for_status()
+        info = resp.json()
+
+        total = 0
+        avail = 0
+        for server in info.get('servers', []):
+            for drive in server.get('drives', []):
+                total += drive.get('totalspace', 0)
+                avail += drive.get('availspace', 0)
+
+        if total > 0:
+            return total, avail
+        return None, None
+    except Exception:
+        logger.warning('Could not retrieve server capacity from MinIO admin API.')
+        return None, None
+
+
 def get_storage_usage(department=None, user=None):
     """
     Get storage usage statistics.
 
-    Args:
-        department: Filter by department (optional)
-        user: Filter by user (optional)
-
-    Returns:
-        Dictionary with storage statistics
+    When called with no filters (org-wide), total_size_bytes is sourced from
+    the actual MinIO bucket via ListObjectsV2 so it always reflects true disk
+    usage.  Department- and user-scoped calls continue to use the DB because
+    MinIO keys are not partitioned by those dimensions.
     """
     queryset = Document.objects.filter(is_deleted=False)
 
@@ -39,8 +98,16 @@ def get_storage_usage(department=None, user=None):
         total_documents=Count('id')
     )
 
-    total_size = stats['total_size'] or 0
+    db_total_size = stats['total_size'] or 0
     total_docs = stats['total_documents'] or 0
+
+    # For unfiltered (org-wide) queries use MinIO as the source of truth.
+    # For scoped queries the DB is the only option.
+    if department is None and user is None:
+        minio_size = _get_minio_bucket_size()
+        total_size = minio_size if minio_size is not None else db_total_size
+    else:
+        total_size = db_total_size
 
     # Group by document type
     by_type = {}

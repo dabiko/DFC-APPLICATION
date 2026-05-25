@@ -4910,8 +4910,13 @@ class DocumentDashboardStatsView(APIView):
             personal = storage_summary.get('personal_usage', {})
             storage_used = personal.get('total_size_bytes', 0)
 
-        # Try to get quota from department
-        storage_limit = 500 * 1024 * 1024 * 1024  # 500GB default
+        # Storage limit: use real MinIO server disk capacity for staff/superusers;
+        # for regular users try their department quota, then fall back to server capacity.
+        from apps.documents.utils import _get_minio_server_capacity
+        server_total, _ = _get_minio_server_capacity()
+        fallback_limit = server_total if server_total else 500 * 1024 * 1024 * 1024
+
+        storage_limit = fallback_limit
         if not user.is_staff and hasattr(user, 'department') and user.department:
             from apps.documents.utils import get_department_quota_status
             try:

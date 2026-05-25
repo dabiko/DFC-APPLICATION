@@ -21,6 +21,8 @@ import {
   BarChart3,
 } from 'lucide-react'
 import { authService } from '@/services/auth.service'
+import { getDocumentStats } from '@/services/dashboardService'
+import type { DocumentStats } from '@/services/dashboardService'
 import { SmartFolderItem } from '@components/Folder'
 import {
   DepartmentSidebar,
@@ -29,6 +31,12 @@ import {
 } from '@/components/Department'
 import { getSmartFolders } from '@/utils/smartFolders'
 import { cn } from '@utils/cn'
+
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`
+  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(1)} MB`
+  return `${(bytes / 1024).toFixed(1)} KB`
+}
 
 // Navigation links
 const navLinks = [
@@ -65,6 +73,28 @@ export function DashboardSidebar({
     const saved = localStorage.getItem('sidebar-training-expanded')
     return saved ? JSON.parse(saved) : true
   })
+
+  // Storage stats from backend
+  const [storageStats, setStorageStats] = useState<DocumentStats | null>(null)
+
+  useEffect(() => {
+    getDocumentStats()
+      .then(setStorageStats)
+      .catch(() => {})
+  }, [])
+
+  const storageUsed = storageStats?.storage_used_bytes ?? 0
+  const storageLimit = storageStats?.storage_limit_bytes ?? 0
+  const storageBarPercent =
+    storageLimit > 0
+      ? Math.min(Math.max((storageUsed / storageLimit) * 100, storageUsed > 0 ? 1 : 0), 100)
+      : 0
+  const storageLabel =
+    storageLimit > 0
+      ? `${formatBytes(storageUsed)} of ${formatBytes(storageLimit)} used`
+      : storageStats
+        ? `${formatBytes(storageUsed)} used`
+        : 'Loading…'
 
   // State for cross-department access modal
   const [accessModalOpen, setAccessModalOpen] = useState(false)
@@ -481,7 +511,7 @@ export function DashboardSidebar({
             >
               <Cloud className="w-5 h-5 text-gray-500 dark:text-gray-400" />
               <div className="absolute left-full ml-2 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
-                <div className="font-medium">325 GB of 500 GB used</div>
+                <div className="font-medium">{storageLabel}</div>
               </div>
             </button>
           </div>
@@ -496,11 +526,11 @@ export function DashboardSidebar({
             <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1">
               <div
                 className="bg-blue-600 dark:bg-blue-500 h-1 rounded-full transition-all"
-                style={{ width: '65%' }}
+                style={{ width: `${storageBarPercent}%` }}
               />
             </div>
             {/* Usage text */}
-            <p className="text-xs text-gray-500 dark:text-gray-400">325 GB of 500 GB used</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">{storageLabel}</p>
           </div>
         )}
       </div>
