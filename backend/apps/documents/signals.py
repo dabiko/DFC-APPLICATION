@@ -646,6 +646,39 @@ def log_folder_activity(user, folder, activity_type):
 
 
 # ========================================
+# Compression Trigger Signal
+# ========================================
+
+@receiver(post_save, sender=Document)
+def trigger_compression_on_upload(sender, instance, **kwargs):
+    """
+    Dispatch the async compression task as soon as a document has a MinIO key
+    and is still in PENDING compression status.
+
+    The task itself is idempotent — the PENDING→COMPRESSING state transition
+    is atomic so duplicate signals cannot cause double-processing.
+    """
+    if kwargs.get('raw', False):
+        return
+
+    if instance.is_deleted:
+        return
+
+    if instance.compression_status != Document.CompressionStatus.PENDING:
+        return
+
+    if not instance.minio_object_key:
+        return
+
+    try:
+        from apps.workflows.tasks import compress_document_async
+        compress_document_async.delay(str(instance.id))
+        logger.debug("Queued compression task for document %s", instance.id)
+    except Exception as e:
+        logger.error("Failed to queue compression task for document %s: %s", instance.id, e)
+
+
+# ========================================
 # Workflow Auto-Trigger Signals
 # ========================================
 

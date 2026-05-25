@@ -6,6 +6,7 @@ Tasks include:
 - PDF conversion for Office documents
 - OCR processing
 - Search indexing
+- Lossless document compression
 """
 from celery import shared_task
 from django.core.files.base import ContentFile
@@ -1460,3 +1461,129 @@ def generate_sla_compliance_report(organization_id=None, period_days=30):
             'success': False,
             'message': str(e)
         }
+
+
+# ============================================================
+# Lossless compression task
+# ============================================================
+
+@shared_task(bind=True, max_retries=2, default_retry_delay=60)
+def compress_document_async(self, document_id: str):
+    """
+    Compress a document losslessly in the background and replace the stored object.
+
+    Flow:
+      1. Download from MinIO
+      2. Run format-aware lossless compression (pikepdf / Pillow / zip-repack)
+      3. If savings >= 5%: overwrite the object in MinIO and update the Document record
+      4. Otherwise: mark as SKIPPED and leave the original unchanged
+
+    The task is idempotent: it checks compression_status before doing any work,
+    so re-queuing a finished document is safe.
+    """
+    import hashlib
+    from apps.documents.models import Document
+    from apps.storage.services import StorageService
+    from apps.workflows.compressor import DocumentCompressor, CompressionSkipped
+    from django.utils import timezone
+
+    try:
+        document = Document.objects.get(id=document_id)
+    except Document.DoesNotExist:
+        logger.warning("compress_document_async: document %s not found", document_id)
+        return {'success': False, 'message': 'Document not found'}
+
+    # Idempotency guard — only run when in PENDING state
+    if document.compression_status != Document.CompressionStatus.PENDING:
+        logger.debug(
+            "compress_document_async: skipping document %s — status is %s",
+            document_id, document.compression_status,
+        )
+        return {'success': True, 'message': f'Already processed ({document.compression_status})'}
+
+    if not document.minio_object_key:
+        logger.warning("compress_document_async: document %s has no MinIO key", document_id)
+        return {'success': False, 'message': 'No MinIO object key'}
+
+    # Mark as in-progress (prevents duplicate runs if task is re-queued)
+    Document.objects.filter(pk=document.pk, compression_status=Document.CompressionStatus.PENDING).update(
+        compression_status=Document.CompressionStatus.COMPRESSING
+    )
+
+    storage = StorageService()
+    bucket = document.minio_bucket or storage.default_bucket
+
+    try:
+        # 1. Download original content
+        original_data = storage.download_file(bucket, document.minio_object_key)
+        if original_data is None:
+            raise RuntimeError(f"Failed to download {bucket}/{document.minio_object_key}")
+
+        original_size = len(original_data)
+
+        # 2. Compress
+        compressed_data, algorithm = DocumentCompressor.compress(original_data, document.file_type or '')
+
+        # 3. Upload compressed bytes back to the same key (overwrites the original)
+        compressed_size = len(compressed_data)
+        new_checksum = hashlib.sha256(compressed_data).hexdigest()
+        new_etag = storage.replace_object(
+            bucket=bucket,
+            object_key=document.minio_object_key,
+            data=compressed_data,
+            mime_type=document.file_type or 'application/octet-stream',
+            metadata={
+                'original-size': str(original_size),
+                'compression-algorithm': algorithm,
+                'compressed-at': timezone.now().isoformat(),
+            },
+        )
+
+        if not new_etag.get('success'):
+            raise RuntimeError(f"MinIO replace failed: {new_etag.get('error')}")
+
+        # 4. Persist compression metadata (use update() to avoid triggering signals again)
+        Document.objects.filter(pk=document.pk).update(
+            compression_status=Document.CompressionStatus.COMPRESSED,
+            original_size=original_size,
+            file_size=compressed_size,
+            compression_algorithm=algorithm,
+            compression_ratio=round(compressed_size / original_size, 4),
+            compressed_at=timezone.now(),
+            checksum=new_checksum,
+            minio_etag=new_etag.get('etag', ''),
+        )
+
+        savings_pct = (1 - compressed_size / original_size) * 100
+        logger.info(
+            "Document %s compressed: %d → %d bytes (%.1f%% saved) via %s",
+            document_id, original_size, compressed_size, savings_pct, algorithm,
+        )
+        return {
+            'success': True,
+            'algorithm': algorithm,
+            'original_size': original_size,
+            'compressed_size': compressed_size,
+            'savings_pct': round(savings_pct, 1),
+        }
+
+    except CompressionSkipped as e:
+        logger.info("Document %s compression skipped: %s", document_id, e)
+        Document.objects.filter(pk=document.pk).update(
+            compression_status=Document.CompressionStatus.SKIPPED,
+            original_size=document.file_size,
+        )
+        return {'success': True, 'message': str(e), 'skipped': True}
+
+    except Exception as exc:
+        logger.error("Document %s compression failed: %s", document_id, exc, exc_info=True)
+        if self.request.retries < self.max_retries:
+            # Reset to PENDING so the idempotency guard lets the retry through
+            Document.objects.filter(pk=document.pk).update(
+                compression_status=Document.CompressionStatus.PENDING,
+            )
+        else:
+            Document.objects.filter(pk=document.pk).update(
+                compression_status=Document.CompressionStatus.FAILED,
+            )
+        raise self.retry(exc=exc)

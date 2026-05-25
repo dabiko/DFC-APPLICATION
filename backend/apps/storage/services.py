@@ -268,6 +268,43 @@ class StorageService:
             print(f"Error deleting file: {e}")
             return False
 
+    def replace_object(
+        self,
+        bucket: str,
+        object_key: str,
+        data: bytes,
+        mime_type: str,
+        metadata: Optional[Dict[str, str]] = None,
+    ) -> Dict[str, any]:
+        """
+        Overwrite an existing MinIO object with new content at the same key.
+
+        Used by the compression pipeline to swap in compressed bytes without
+        changing the object path (and therefore without invalidating any
+        existing signed URLs or database references).
+
+        Returns a dict with 'success', 'etag', 'file_size', and optionally 'error'.
+        """
+        upload_params = {
+            'Bucket': bucket,
+            'Key': object_key,
+            'Body': data,
+            'ContentType': mime_type,
+            'Metadata': {k: str(v) for k, v in (metadata or {}).items()},
+        }
+        if getattr(settings, 'AWS_S3_ENCRYPTION', False):
+            upload_params['ServerSideEncryption'] = 'AES256'
+
+        try:
+            response = self.s3_client.put_object(**upload_params)
+            return {
+                'success': True,
+                'etag': response.get('ETag', '').strip('"'),
+                'file_size': len(data),
+            }
+        except ClientError as e:
+            return {'success': False, 'error': str(e)}
+
     def generate_signed_url(
         self,
         bucket: str,

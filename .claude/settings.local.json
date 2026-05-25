@@ -74,7 +74,22 @@
       "Bash(npx eslint *)",
       "Bash(./venv/Scripts/pip.exe install *)",
       "Bash(./venv/Scripts/python.exe manage.py check)",
-      "Bash(ssh *)"
+      "Bash(ssh *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(nslookup dfc.dabiko-software.tech)",
+      "Bash(nslookup dabiko-software.tech)",
+      "Bash(New-Item -ItemType Directory -Force \"C:\\\\Users\\\\dabik\\\\IdeaProjects\\\\DFC-APPLICATION\\\\backend\\\\static\")",
+      "Bash(Out-Null)",
+      "Bash(New-Item -ItemType File -Path \"C:\\\\Users\\\\dabik\\\\IdeaProjects\\\\DFC-APPLICATION\\\\backend\\\\static\\\\.gitkeep\" -Force)",
+      "Bash(npm ci *)",
+      "Bash(npm run *)",
+      "Bash(git -C \"C:/Users/dabik/IdeaProjects/DFC-APPLICATION\" status --short)",
+      "Bash(git *)",
+      "Bash(nslookup dfc.dabiko-software.tech 8.8.8.8)",
+      "Bash(nslookup dfc-app.dabiko-software.tech)",
+      "Bash(scp -o StrictHostKeyChecking=no -r \"C:/Users/dabik/IdeaProjects/DFC-APPLICATION/frontend/dist/.\" root@162.243.32.216:/opt/dfc/deployment/frontend-dist/)"
     ],
     "deny": [],
     "ask": []

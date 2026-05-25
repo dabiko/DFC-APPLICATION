@@ -241,6 +241,34 @@ class Document(models.Model):
         help_text='Path to PDF version of document (for Office files)'
     )
 
+    # Compression
+    class CompressionStatus(models.TextChoices):
+        PENDING = 'PENDING', 'Pending'
+        COMPRESSING = 'COMPRESSING', 'Compressing'
+        COMPRESSED = 'COMPRESSED', 'Compressed'
+        SKIPPED = 'SKIPPED', 'Skipped'
+        FAILED = 'FAILED', 'Failed'
+
+    compression_status = models.CharField(
+        max_length=20,
+        choices=CompressionStatus.choices,
+        default=CompressionStatus.PENDING,
+        db_index=True,
+    )
+    original_size = models.BigIntegerField(
+        null=True, blank=True,
+        help_text='File size in bytes before compression'
+    )
+    compression_algorithm = models.CharField(
+        max_length=50, blank=True,
+        help_text='Algorithm used: pikepdf, pillow, zip-repack'
+    )
+    compression_ratio = models.FloatField(
+        null=True, blank=True,
+        help_text='Compressed / original size ratio (lower is better)'
+    )
+    compressed_at = models.DateTimeField(null=True, blank=True)
+
     # Soft delete
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
