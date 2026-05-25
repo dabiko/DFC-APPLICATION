@@ -17,11 +17,32 @@ function formatDuration(startedAt: string | null): string {
 
 function formatEstimated(estimatedEnd: string | null): string {
   if (!estimatedEnd) return ''
-  return new Date(estimatedEnd).toLocaleTimeString([], {
+  const date = new Date(estimatedEnd)
+  const dateStr = date.toLocaleDateString([], {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+  const timeStr = date.toLocaleTimeString([], {
     hour: '2-digit',
     minute: '2-digit',
     timeZoneName: 'short',
   })
+  return `${dateStr} at ${timeStr}`
+}
+
+function computeTimeRemaining(estimatedEnd: string | null): string {
+  if (!estimatedEnd) return ''
+  const diffMs = new Date(estimatedEnd).getTime() - Date.now()
+  if (diffMs <= 0) return 'Ending shortly'
+  const totalSecs = Math.floor(diffMs / 1000)
+  const days = Math.floor(totalSecs / 86400)
+  const hours = Math.floor((totalSecs % 86400) / 3600)
+  const mins = Math.floor((totalSecs % 3600) / 60)
+  if (days > 0) return `~${days}d ${hours}h remaining`
+  if (hours > 0) return `~${hours}h ${mins}m remaining`
+  return `~${mins + 1}m remaining`
 }
 
 export function MaintenancePage() {
@@ -29,6 +50,7 @@ export function MaintenancePage() {
   const navigate = useNavigate()
   const location = useLocation()
   const [duration, setDuration] = useState('')
+  const [timeRemaining, setTimeRemaining] = useState('')
   const [nextCheckIn, setNextCheckIn] = useState(30)
   const [isChecking, setIsChecking] = useState(false)
 
@@ -39,6 +61,14 @@ export function MaintenancePage() {
     const id = setInterval(tick, 1000)
     return () => clearInterval(id)
   }, [status?.started_at])
+
+  // Live time-remaining countdown
+  useEffect(() => {
+    const tick = () => setTimeRemaining(computeTimeRemaining(status?.estimated_end ?? null))
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [status?.estimated_end])
 
   // Countdown to next auto-check
   useEffect(() => {
@@ -123,6 +153,7 @@ export function MaintenancePage() {
               <div className="text-left">
                 <p className="text-xs text-slate-400">Estimated return</p>
                 <p className="text-sm font-semibold text-white">{estimatedEnd}</p>
+                {timeRemaining && <p className="text-xs text-amber-400 mt-0.5">{timeRemaining}</p>}
               </div>
             </div>
           )}

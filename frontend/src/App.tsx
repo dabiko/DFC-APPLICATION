@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom'
 import { Provider } from 'react-redux'
 import { store } from '@store'
 import { ToastContainer, NetworkStatusBanner } from '@components/common'
@@ -56,17 +56,34 @@ import AboutPage from './pages/AboutPage'
 import CareersPage from './pages/CareersPage'
 import { Navigate } from 'react-router-dom'
 
+// Auth routes that must remain accessible during maintenance so admins can log in.
+// Without this, an admin with no active session has no way to reach the login page
+// and disable maintenance mode — creating a permanent lockout.
+const MAINTENANCE_BYPASS_PATHS = [
+  '/login',
+  '/register',
+  '/signup',
+  '/forgot-password',
+  '/reset-password',
+]
+
 /**
  * Renders maintenance UX depending on user role:
  * - Superadmin: persistent top banner with one-click deactivation
+ * - Auth routes (/login etc.): always rendered so admins can log in and disable maintenance
  * - Regular user: full-screen maintenance page with auto-recovery
  */
 function MaintenanceGuard({ children }: { children: React.ReactNode }) {
   const { status, isLoading } = useMaintenanceStatus()
   const userData = authService.getUser()
   const isSuperAdmin = userData?.is_superuser && userData?.is_staff
+  const location = useLocation()
 
-  if (!isLoading && status?.maintenance_mode && !isSuperAdmin) {
+  const isAuthRoute = MAINTENANCE_BYPASS_PATHS.some(
+    (p) => location.pathname === p || location.pathname.startsWith(p + '/')
+  )
+
+  if (!isLoading && status?.maintenance_mode && !isSuperAdmin && !isAuthRoute) {
     return <MaintenancePage />
   }
 
