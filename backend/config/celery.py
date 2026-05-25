@@ -7,6 +7,7 @@ Uses RabbitMQ as the message broker for the event-driven architecture.
 import os
 from celery import Celery
 from celery.schedules import crontab
+from kombu import Exchange, Queue
 
 # Set the default Django settings module for the 'celery' program.
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
@@ -24,34 +25,24 @@ app.autodiscover_tasks()
 # =============================================================================
 # RabbitMQ / Event Queue Configuration
 # =============================================================================
+# RabbitMQ 4.x removed support for transient non-exclusive queues.
+# All queues must be declared durable and messages persistent.
 
-# Define task queues for event processing
-app.conf.task_queues = {
-    'default': {
-        'exchange': 'default',
-        'routing_key': 'default',
-    },
-    'events': {
-        'exchange': 'dfc.events',
-        'exchange_type': 'topic',
-        'routing_key': 'event.#',
-    },
-    'events.document': {
-        'exchange': 'dfc.events',
-        'exchange_type': 'topic',
-        'routing_key': 'event.document.#',
-    },
-    'events.workflow': {
-        'exchange': 'dfc.events',
-        'exchange_type': 'topic',
-        'routing_key': 'event.workflow.#',
-    },
-    'events.retention': {
-        'exchange': 'dfc.events',
-        'exchange_type': 'topic',
-        'routing_key': 'event.retention.#',
-    },
-}
+_default_exchange = Exchange('default', type='direct', durable=True)
+_events_exchange = Exchange('dfc.events', type='topic', durable=True)
+
+app.conf.task_queues = [
+    Queue('default',          _default_exchange, routing_key='default',            durable=True),
+    Queue('events',           _events_exchange,  routing_key='event.#',             durable=True),
+    Queue('events.document',  _events_exchange,  routing_key='event.document.#',    durable=True),
+    Queue('events.workflow',  _events_exchange,  routing_key='event.workflow.#',    durable=True),
+    Queue('events.retention', _events_exchange,  routing_key='event.retention.#',   durable=True),
+]
+
+app.conf.task_default_queue = 'default'
+app.conf.task_default_exchange = 'default'
+app.conf.task_default_routing_key = 'default'
+app.conf.task_default_delivery_mode = 'persistent'
 
 # Task routing - direct event tasks to appropriate queues
 app.conf.task_routes = {

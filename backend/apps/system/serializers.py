@@ -160,6 +160,12 @@ class PlatformStatsSerializer(serializers.Serializer):
     api_requests_today = serializers.IntegerField()
     organizations_by_plan = serializers.DictField()
     recent_signups = serializers.IntegerField()
+    bucket_used_bytes = serializers.IntegerField()
+    bucket_used_gb = serializers.FloatField()
+    server_total_bytes = serializers.IntegerField()
+    server_total_gb = serializers.FloatField()
+    server_available_bytes = serializers.IntegerField()
+    server_available_gb = serializers.FloatField()
 
 
 class OrganizationListSerializer(serializers.Serializer):

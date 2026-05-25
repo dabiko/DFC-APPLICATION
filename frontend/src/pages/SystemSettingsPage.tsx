@@ -30,7 +30,15 @@ import {
   Power,
   PowerOff,
   Search,
+  Database,
 } from 'lucide-react'
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(1024))
+  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`
+}
 import { ThreePanelLayout } from '@/components/Layout/ThreePanelLayout'
 import { DashboardHeader } from '@/components/Dashboard/DashboardHeader'
 import { DashboardSidebar } from '@/components/Dashboard/DashboardSidebar'
@@ -391,6 +399,113 @@ export function SystemSettingsPage() {
                   icon={TrendingUp}
                   color="orange"
                 />
+              </div>
+
+              {/* Object Store — MinIO bucket stats */}
+              <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+                <div className="flex items-center gap-2 mb-5">
+                  <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+                    <Database className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      Object Store (MinIO)
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Live bucket and disk capacity from the MinIO server
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+                  {/* DFC bucket used */}
+                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
+                      DFC Bucket Used
+                    </p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                      {formatBytes(stats.bucket_used_bytes ?? 0)}
+                    </p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                      Actual objects in dfc-documents
+                    </p>
+                  </div>
+
+                  {/* Server total capacity */}
+                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
+                      Disk Capacity
+                    </p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                      {formatBytes(stats.server_total_bytes ?? 0)}
+                    </p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                      Total host disk (all data)
+                    </p>
+                  </div>
+
+                  {/* Server available */}
+                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
+                      Disk Available
+                    </p>
+                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                      {formatBytes(stats.server_available_bytes ?? 0)}
+                    </p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                      Free space on host disk
+                    </p>
+                  </div>
+                </div>
+
+                {/* Capacity bar */}
+                {(stats.server_total_bytes ?? 0) > 0 &&
+                  (() => {
+                    const diskUsed =
+                      (stats.server_total_bytes ?? 0) - (stats.server_available_bytes ?? 0)
+                    const diskPct = Math.round((diskUsed / stats.server_total_bytes) * 100)
+                    const bucketPct = Math.max(
+                      (stats.bucket_used_bytes ?? 0) > 0 ? 0.2 : 0,
+                      ((stats.bucket_used_bytes ?? 0) / stats.server_total_bytes) * 100
+                    )
+                    return (
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                          <span>Disk utilisation</span>
+                          <span>
+                            {diskPct}% used &nbsp;|&nbsp; DFC bucket:{' '}
+                            {formatBytes(stats.bucket_used_bytes ?? 0)}
+                          </span>
+                        </div>
+                        <div className="h-3 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden flex">
+                          <div
+                            className="h-full bg-blue-500 rounded-l-full transition-all duration-700"
+                            style={{ width: `${bucketPct}%` }}
+                            title={`DFC bucket: ${formatBytes(stats.bucket_used_bytes ?? 0)}`}
+                          />
+                          <div
+                            className="h-full bg-gray-400 dark:bg-gray-500 transition-all duration-700"
+                            style={{ width: `${Math.max(0, diskPct - bucketPct)}%` }}
+                            title="Other disk usage"
+                          />
+                        </div>
+                        <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+                          <span className="flex items-center gap-1.5">
+                            <span className="inline-block w-2.5 h-2.5 rounded-sm bg-blue-500" />
+                            DFC bucket
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <span className="inline-block w-2.5 h-2.5 rounded-sm bg-gray-400 dark:bg-gray-500" />
+                            Other disk usage
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <span className="inline-block w-2.5 h-2.5 rounded-sm bg-gray-100 dark:bg-gray-700" />
+                            Free ({formatBytes(stats.server_available_bytes ?? 0)})
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })()}
               </div>
 
               {/* Plan Distribution */}

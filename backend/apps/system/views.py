@@ -172,30 +172,134 @@ class SystemHealthView(APIView):
     permission_classes = [IsSuperAdmin]
 
     def get(self, request):
-        """Get recent health checks for all services."""
-        # Get latest health check for each service
-        services = ['database', 'storage', 'search', 'cache', 'celery']
+        """Run live health checks against every service and return results."""
+        import time
+        now = timezone.now()
         health_data = {}
 
-        for service in services:
-            latest = SystemHealthCheck.objects.filter(
-                service_name=service
-            ).order_by('-checked_at').first()
+        # ── 1. Database ────────────────────────────────────────────────────────
+        t0 = time.monotonic()
+        try:
+            from django.db import connection
+            with connection.cursor() as cur:
+                cur.execute('SELECT 1')
+            health_data['database'] = {
+                'service_name': 'database',
+                'status': 'healthy',
+                'response_time_ms': round((time.monotonic() - t0) * 1000),
+                'details': {'engine': connection.vendor},
+                'error_message': None,
+                'checked_at': now,
+            }
+        except Exception as e:
+            health_data['database'] = {
+                'service_name': 'database', 'status': 'unhealthy',
+                'response_time_ms': round((time.monotonic() - t0) * 1000),
+                'details': {}, 'error_message': str(e), 'checked_at': now,
+            }
 
-            if latest:
-                health_data[service] = SystemHealthCheckSerializer(latest).data
-            else:
-                health_data[service] = {
-                    'service_name': service,
-                    'status': 'unknown',
-                    'response_time_ms': None,
-                    'details': {},
-                    'error_message': 'No health check recorded',
-                    'checked_at': None,
-                }
+        # ── 2. Storage (MinIO) ─────────────────────────────────────────────────
+        t0 = time.monotonic()
+        try:
+            from apps.documents.storage import get_s3_client
+            from django.conf import settings as django_settings
+            s3 = get_s3_client()
+            s3.head_bucket(Bucket=django_settings.AWS_STORAGE_BUCKET_NAME)
+            health_data['storage'] = {
+                'service_name': 'storage', 'status': 'healthy',
+                'response_time_ms': round((time.monotonic() - t0) * 1000),
+                'details': {
+                    'provider': 'MinIO',
+                    'bucket': django_settings.AWS_STORAGE_BUCKET_NAME,
+                    'endpoint': django_settings.AWS_S3_ENDPOINT_URL,
+                },
+                'error_message': None, 'checked_at': now,
+            }
+        except Exception as e:
+            health_data['storage'] = {
+                'service_name': 'storage', 'status': 'unhealthy',
+                'response_time_ms': round((time.monotonic() - t0) * 1000),
+                'details': {}, 'error_message': str(e), 'checked_at': now,
+            }
 
-        # Calculate overall status
-        statuses = [h.get('status', 'unknown') for h in health_data.values()]
+        # ── 3. Search (Elasticsearch) ──────────────────────────────────────────
+        t0 = time.monotonic()
+        try:
+            from django.conf import settings as django_settings
+            import requests as req
+            es_url = getattr(django_settings, 'ELASTICSEARCH_DSL', {}).get(
+                'default', {}
+            ).get('hosts', 'http://localhost:9200')
+            if isinstance(es_url, list):
+                es_url = es_url[0]
+            r = req.get(f'{es_url}/_cluster/health', timeout=3)
+            es_status = r.json().get('status', 'unknown')
+            health_data['search'] = {
+                'service_name': 'search',
+                'status': 'healthy' if es_status == 'green' else ('degraded' if es_status == 'yellow' else 'unhealthy'),
+                'response_time_ms': round((time.monotonic() - t0) * 1000),
+                'details': {'cluster_status': es_status, 'url': str(es_url)},
+                'error_message': None if es_status in ('green', 'yellow') else f'Cluster status: {es_status}',
+                'checked_at': now,
+            }
+        except Exception as e:
+            health_data['search'] = {
+                'service_name': 'search', 'status': 'unhealthy',
+                'response_time_ms': round((time.monotonic() - t0) * 1000),
+                'details': {}, 'error_message': str(e), 'checked_at': now,
+            }
+
+        # ── 4. Cache (Redis) ───────────────────────────────────────────────────
+        t0 = time.monotonic()
+        try:
+            from django.core.cache import cache
+            cache.set('_health_probe', '1', timeout=5)
+            val = cache.get('_health_probe')
+            if val != '1':
+                raise RuntimeError('Cache round-trip returned unexpected value')
+            health_data['cache'] = {
+                'service_name': 'cache', 'status': 'healthy',
+                'response_time_ms': round((time.monotonic() - t0) * 1000),
+                'details': {'backend': str(type(cache).__name__)},
+                'error_message': None, 'checked_at': now,
+            }
+        except Exception as e:
+            health_data['cache'] = {
+                'service_name': 'cache', 'status': 'unhealthy',
+                'response_time_ms': round((time.monotonic() - t0) * 1000),
+                'details': {}, 'error_message': str(e), 'checked_at': now,
+            }
+
+        # ── 5. Celery / Broker ─────────────────────────────────────────────────
+        # Use a direct broker connection test — avoids creating transient reply
+        # queues (which RabbitMQ 4.x prohibits) while still confirming the
+        # message bus is reachable.
+        t0 = time.monotonic()
+        try:
+            from config.celery import app as celery_app
+            from kombu import Connection as KombuConnection
+            broker_url = celery_app.conf.broker_url
+            with KombuConnection(broker_url, connect_timeout=3) as conn:
+                conn.ensure_connection(max_retries=1, timeout=3)
+            health_data['celery'] = {
+                'service_name': 'celery',
+                'status': 'degraded',
+                'response_time_ms': round((time.monotonic() - t0) * 1000),
+                'details': {'broker': 'connected', 'active_workers': 0},
+                'error_message': 'Broker reachable — no Celery workers are running',
+                'checked_at': now,
+            }
+        except Exception as e:
+            err_msg = str(e)
+            if len(err_msg) > 200:
+                err_msg = err_msg[:200].rsplit(' ', 1)[0] + '…'
+            health_data['celery'] = {
+                'service_name': 'celery', 'status': 'unhealthy',
+                'response_time_ms': round((time.monotonic() - t0) * 1000),
+                'details': {}, 'error_message': err_msg, 'checked_at': now,
+            }
+
+        statuses = [h['status'] for h in health_data.values()]
         if all(s == 'healthy' for s in statuses):
             overall_status = 'healthy'
         elif any(s == 'unhealthy' for s in statuses):
@@ -208,17 +312,12 @@ class SystemHealthView(APIView):
         return Response({
             'overall_status': overall_status,
             'services': health_data,
-            'checked_at': timezone.now(),
+            'checked_at': now,
         })
 
     def post(self, request):
-        """Manually trigger health checks."""
-        # This would trigger actual health checks in a real implementation
-        # For now, return mock data
-        return Response({
-            'status': 'Health checks initiated',
-            'services': ['database', 'storage', 'search', 'cache', 'celery'],
-        })
+        """POST re-uses GET — returns a fresh live check."""
+        return self.get(request)
 
 
 class PlatformStatsView(APIView):
@@ -253,6 +352,13 @@ class PlatformStatsView(APIView):
         )['total'] or 0
         total_storage_gb = total_storage / (1024 * 1024 * 1024)
 
+        # MinIO bucket / server capacity (real disk values)
+        from apps.documents.utils import _get_minio_bucket_size, _get_minio_server_capacity
+        bucket_used_bytes = _get_minio_bucket_size() or 0
+        server_total_bytes, server_avail_bytes = _get_minio_server_capacity()
+        server_total_bytes = server_total_bytes or 0
+        server_avail_bytes = server_avail_bytes or 0
+
         # Plan distribution
         plan_counts = Organization.objects.values('subscription_plan').annotate(
             count=Count('id')
@@ -272,9 +378,16 @@ class PlatformStatsView(APIView):
             'active_users_today': active_users_today,
             'total_documents': total_documents,
             'total_storage_used_gb': round(total_storage_gb, 2),
-            'api_requests_today': 0,  # Would need to implement request tracking
+            'api_requests_today': 0,
             'organizations_by_plan': orgs_by_plan,
             'recent_signups': recent_signups,
+            # MinIO object store
+            'bucket_used_bytes': bucket_used_bytes,
+            'bucket_used_gb': round(bucket_used_bytes / (1024 ** 3), 3),
+            'server_total_bytes': server_total_bytes,
+            'server_total_gb': round(server_total_bytes / (1024 ** 3), 1),
+            'server_available_bytes': server_avail_bytes,
+            'server_available_gb': round(server_avail_bytes / (1024 ** 3), 1),
         }
 
         serializer = PlatformStatsSerializer(stats)

@@ -124,6 +124,13 @@ export interface PlatformStats {
   api_requests_today: number
   organizations_by_plan: Record<string, number>
   recent_signups: number
+  // MinIO object store
+  bucket_used_bytes: number
+  bucket_used_gb: number
+  server_total_bytes: number
+  server_total_gb: number
+  server_available_bytes: number
+  server_available_gb: number
 }
 
 export interface OrganizationSummary {
