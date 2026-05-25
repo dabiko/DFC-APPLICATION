@@ -32,6 +32,7 @@ import {
   Search,
   Database,
   Clock,
+  Mail,
 } from 'lucide-react'
 
 function formatBytes(bytes: number): string {
@@ -100,6 +101,11 @@ export function SystemSettingsPage() {
   // Form states
   const [editedSettings, setEditedSettings] = useState<Partial<SystemSettings>>({})
   const [editedAuditConfig, setEditedAuditConfig] = useState<Partial<AuditConfiguration>>({})
+  const [saveNotification, setSaveNotification] = useState<{
+    type: 'success' | 'error'
+    message: string
+  } | null>(null)
+  const [newRecipient, setNewRecipient] = useState('')
 
   // Get user data from auth service for header
   const userData = authService.getUser()
@@ -230,11 +236,37 @@ export function SystemSettingsPage() {
       const updated = await updateAuditConfiguration(editedAuditConfig)
       setAuditConfig(updated)
       setEditedAuditConfig({})
+      setSaveNotification({ type: 'success', message: 'Audit configuration saved successfully.' })
     } catch (error) {
       console.error('Error saving audit config:', error)
+      setSaveNotification({
+        type: 'error',
+        message: 'Failed to save audit configuration. Please try again.',
+      })
     } finally {
       setIsSaving(false)
+      setTimeout(() => setSaveNotification(null), 4000)
     }
+  }
+
+  const currentRecipients = (): string[] =>
+    editedAuditConfig.alert_recipients ?? auditConfig?.alert_recipients ?? []
+
+  const addRecipient = () => {
+    const email = newRecipient.trim()
+    if (!email || !email.includes('@')) return
+    const existing = currentRecipients()
+    if (existing.includes(email)) return
+    setEditedAuditConfig((prev) => ({ ...prev, alert_recipients: [...existing, email] }))
+    setNewRecipient('')
+  }
+
+  const removeRecipient = (email: string) => {
+    const existing = currentRecipients()
+    setEditedAuditConfig((prev) => ({
+      ...prev,
+      alert_recipients: existing.filter((r) => r !== email),
+    }))
   }
 
   // Organization actions
@@ -926,6 +958,7 @@ export function SystemSettingsPage() {
           )}
           {activeTab === 'security' && auditConfig && (
             <div className="space-y-6">
+              {/* Event Logging — all 8 categories */}
               <SettingsSection title="Event Logging" icon={FileText}>
                 <div className="grid grid-cols-2 gap-4">
                   <SettingsToggle
@@ -974,30 +1007,140 @@ export function SystemSettingsPage() {
                       setEditedAuditConfig((prev) => ({ ...prev, log_api_events: v }))
                     }
                   />
+                  <SettingsToggle
+                    label="Search Events"
+                    checked={editedAuditConfig.log_search_events ?? auditConfig.log_search_events}
+                    onChange={(v) =>
+                      setEditedAuditConfig((prev) => ({ ...prev, log_search_events: v }))
+                    }
+                  />
+                  <SettingsToggle
+                    label="System Events"
+                    checked={editedAuditConfig.log_system_events ?? auditConfig.log_system_events}
+                    onChange={(v) =>
+                      setEditedAuditConfig((prev) => ({ ...prev, log_system_events: v }))
+                    }
+                  />
                 </div>
               </SettingsSection>
 
+              {/* Alerts — with editable thresholds */}
               <SettingsSection title="Alerts" icon={Bell}>
-                <SettingsToggle
-                  label="Alert on Failed Logins"
-                  description={`Alert after ${auditConfig.failed_login_threshold} failed attempts`}
-                  checked={
-                    editedAuditConfig.alert_on_failed_logins ?? auditConfig.alert_on_failed_logins
-                  }
-                  onChange={(v) =>
-                    setEditedAuditConfig((prev) => ({ ...prev, alert_on_failed_logins: v }))
-                  }
-                />
-                <SettingsToggle
-                  label="Alert on Bulk Deletion"
-                  description={`Alert when ${auditConfig.bulk_deletion_threshold}+ items deleted`}
-                  checked={
-                    editedAuditConfig.alert_on_bulk_deletion ?? auditConfig.alert_on_bulk_deletion
-                  }
-                  onChange={(v) =>
-                    setEditedAuditConfig((prev) => ({ ...prev, alert_on_bulk_deletion: v }))
-                  }
-                />
+                {/* Failed Logins */}
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900 dark:text-white">
+                      Alert on Failed Logins
+                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Threshold:</p>
+                      <input
+                        type="number"
+                        min="1"
+                        value={
+                          editedAuditConfig.failed_login_threshold ??
+                          auditConfig.failed_login_threshold
+                        }
+                        onChange={(e) =>
+                          setEditedAuditConfig((prev) => ({
+                            ...prev,
+                            failed_login_threshold: Math.max(1, parseInt(e.target.value) || 1),
+                          }))
+                        }
+                        className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 dark:bg-gray-900 dark:text-white"
+                      />
+                      <p className="text-sm text-gray-500 dark:text-gray-400">failed attempts</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEditedAuditConfig((prev) => ({
+                        ...prev,
+                        alert_on_failed_logins: !(
+                          editedAuditConfig.alert_on_failed_logins ??
+                          auditConfig.alert_on_failed_logins
+                        ),
+                      }))
+                    }
+                    className={cn(
+                      'relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0',
+                      (editedAuditConfig.alert_on_failed_logins ??
+                        auditConfig.alert_on_failed_logins)
+                        ? 'bg-purple-600'
+                        : 'bg-gray-200 dark:bg-gray-700'
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
+                        (editedAuditConfig.alert_on_failed_logins ??
+                          auditConfig.alert_on_failed_logins)
+                          ? 'translate-x-6'
+                          : 'translate-x-1'
+                      )}
+                    />
+                  </button>
+                </div>
+
+                {/* Bulk Deletion */}
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900 dark:text-white">
+                      Alert on Bulk Deletion
+                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Threshold:</p>
+                      <input
+                        type="number"
+                        min="1"
+                        value={
+                          editedAuditConfig.bulk_deletion_threshold ??
+                          auditConfig.bulk_deletion_threshold
+                        }
+                        onChange={(e) =>
+                          setEditedAuditConfig((prev) => ({
+                            ...prev,
+                            bulk_deletion_threshold: Math.max(1, parseInt(e.target.value) || 1),
+                          }))
+                        }
+                        className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-purple-500 dark:bg-gray-900 dark:text-white"
+                      />
+                      <p className="text-sm text-gray-500 dark:text-gray-400">items deleted</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEditedAuditConfig((prev) => ({
+                        ...prev,
+                        alert_on_bulk_deletion: !(
+                          editedAuditConfig.alert_on_bulk_deletion ??
+                          auditConfig.alert_on_bulk_deletion
+                        ),
+                      }))
+                    }
+                    className={cn(
+                      'relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0',
+                      (editedAuditConfig.alert_on_bulk_deletion ??
+                        auditConfig.alert_on_bulk_deletion)
+                        ? 'bg-purple-600'
+                        : 'bg-gray-200 dark:bg-gray-700'
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
+                        (editedAuditConfig.alert_on_bulk_deletion ??
+                          auditConfig.alert_on_bulk_deletion)
+                          ? 'translate-x-6'
+                          : 'translate-x-1'
+                      )}
+                    />
+                  </button>
+                </div>
+
+                {/* Permission Changes */}
                 <SettingsToggle
                   label="Alert on Permission Changes"
                   checked={
@@ -1010,6 +1153,72 @@ export function SystemSettingsPage() {
                 />
               </SettingsSection>
 
+              {/* Alert Recipients */}
+              <SettingsSection title="Alert Recipients" icon={Mail}>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Email addresses that receive security alert notifications.
+                </p>
+                {currentRecipients().length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {currentRecipients().map((email) => (
+                      <span
+                        key={email}
+                        className="flex items-center gap-1 px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-sm"
+                      >
+                        {email}
+                        <button
+                          type="button"
+                          onClick={() => removeRecipient(email)}
+                          className="ml-1 hover:text-purple-900 dark:hover:text-purple-100"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {currentRecipients().length === 0 && (
+                  <p className="text-sm text-gray-400 dark:text-gray-500 italic mt-1">
+                    No recipients configured — alerts will not be delivered.
+                  </p>
+                )}
+                <div className="flex gap-2 mt-2">
+                  <input
+                    type="email"
+                    placeholder="Enter email address"
+                    value={newRecipient}
+                    onChange={(e) => setNewRecipient(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addRecipient())}
+                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 dark:bg-gray-900 dark:text-white text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={addRecipient}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium"
+                  >
+                    Add
+                  </button>
+                </div>
+              </SettingsSection>
+
+              {/* Save / Cancel + notification */}
+              {saveNotification && (
+                <div
+                  className={cn(
+                    'flex items-center gap-2 px-4 py-3 rounded-lg text-sm border',
+                    saveNotification.type === 'success'
+                      ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800'
+                      : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800'
+                  )}
+                >
+                  {saveNotification.type === 'success' ? (
+                    <Check className="w-4 h-4 flex-shrink-0" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                  )}
+                  {saveNotification.message}
+                </div>
+              )}
               {Object.keys(editedAuditConfig).length > 0 && (
                 <div className="flex justify-end gap-3">
                   <button
