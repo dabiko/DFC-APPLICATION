@@ -52,6 +52,24 @@ class SystemSettings(models.Model):
         default=list,
         help_text='List of IP addresses allowed during maintenance'
     )
+    maintenance_started_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Timestamp when maintenance mode was last activated'
+    )
+    maintenance_started_by = models.ForeignKey(
+        'users.CustomUser',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='maintenance_activations',
+        help_text='User who activated maintenance mode'
+    )
+    maintenance_estimated_end = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Estimated end time for the maintenance window (shown to users)'
+    )
 
     # Registration Settings
     allow_registration = models.BooleanField(

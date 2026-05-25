@@ -18,6 +18,9 @@ export interface SystemSettings {
   maintenance_mode: boolean
   maintenance_message: string
   maintenance_allowed_ips: string[]
+  maintenance_started_at: string | null
+  maintenance_started_by_name: string | null
+  maintenance_estimated_end: string | null
   // Registration
   allow_registration: boolean
   require_email_verification: boolean
@@ -192,6 +195,15 @@ export interface FeatureFlagsUpdate {
   priority_support?: boolean
 }
 
+// Public maintenance status (no auth required — polled by frontend during maintenance)
+export interface MaintenanceStatus {
+  maintenance_mode: boolean
+  message: string
+  estimated_end: string | null
+  started_at: string | null
+  started_by_name: string | null
+}
+
 // Public Platform Identity (no auth required — used by landing page)
 export interface PublicPlatformInfo {
   platform_name: string
@@ -202,6 +214,11 @@ export interface PublicPlatformInfo {
 
 export async function getPublicPlatformInfo(): Promise<PublicPlatformInfo> {
   const response = await apiClient.get('/system/public-info/')
+  return response.data
+}
+
+export async function getMaintenanceStatus(): Promise<MaintenanceStatus> {
+  const response = await apiClient.get('/system/status/')
   return response.data
 }
 

@@ -19,16 +19,24 @@ class MaintenanceModeMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        # Skip maintenance check for auth endpoints so admins can still log in
-        skip_paths = ('/api/v1/auth/login/', '/api/v1/auth/token/refresh/')
+        # Skip maintenance check for auth endpoints and the public status endpoint
+        skip_paths = (
+            '/api/v1/auth/login/',
+            '/api/v1/auth/token/refresh/',
+            '/api/v1/system/status/',
+            '/api/v1/system/public-info/',
+            '/api/v1/system/settings/',  # Always allow admins to toggle maintenance off
+        )
         if any(request.path.startswith(p) for p in skip_paths):
             return self.get_response(request)
 
         maintenance_info = self._get_maintenance_info()
 
         if maintenance_info['enabled']:
-            # Superusers bypass maintenance mode
-            if request.user.is_authenticated and request.user.is_superuser:
+            # Superusers bypass maintenance mode.
+            # AuthenticationMiddleware only handles session auth, not JWT, so we
+            # must also authenticate the JWT token directly in the middleware.
+            if (request.user.is_authenticated and request.user.is_superuser) or self._is_superuser_via_jwt(request):
                 return self.get_response(request)
 
             # IP allow-list bypass
@@ -39,7 +47,12 @@ class MaintenanceModeMiddleware:
 
             message = maintenance_info.get('message') or 'The platform is currently undergoing maintenance. Please try again later.'
             return JsonResponse(
-                {'detail': message, 'code': 'maintenance_mode'},
+                {
+                    'detail': message,
+                    'code': 'maintenance_mode',
+                    'estimated_end': maintenance_info.get('estimated_end'),
+                    'started_at': maintenance_info.get('started_at'),
+                },
                 status=503,
             )
 
@@ -56,16 +69,40 @@ class MaintenanceModeMiddleware:
             if settings is None:
                 info = {'enabled': False}
             else:
+                started_by_name = None
+                if settings.maintenance_started_by_id:
+                    try:
+                        u = settings.maintenance_started_by
+                        started_by_name = u.get_full_name() or u.email
+                    except Exception:
+                        pass
                 info = {
                     'enabled': settings.maintenance_mode,
                     'message': settings.maintenance_message,
                     'allowed_ips': settings.maintenance_allowed_ips or [],
+                    'estimated_end': settings.maintenance_estimated_end.isoformat() if settings.maintenance_estimated_end else None,
+                    'started_at': settings.maintenance_started_at.isoformat() if settings.maintenance_started_at else None,
+                    'started_by_name': started_by_name,
                 }
         except Exception:
             info = {'enabled': False}
 
         cache.set(self.CACHE_KEY, info, self.CACHE_TTL)
         return info
+
+    @staticmethod
+    def _is_superuser_via_jwt(request) -> bool:
+        """Authenticate the JWT token in the Authorization header and check superuser status."""
+        try:
+            from apps.users.mfa_authentication import MFAJWTAuthentication
+            auth = MFAJWTAuthentication()
+            result = auth.authenticate(request)
+            if result:
+                user, _ = result
+                return bool(user.is_superuser)
+        except Exception:
+            pass
+        return False
 
     @staticmethod
     def _get_client_ip(request) -> str:

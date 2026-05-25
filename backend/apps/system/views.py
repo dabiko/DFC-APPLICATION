@@ -51,6 +51,44 @@ class PublicPlatformInfoView(APIView):
         })
 
 
+class PublicMaintenanceStatusView(APIView):
+    """
+    Public endpoint that returns the current maintenance status.
+    No authentication required — always accessible even during maintenance.
+    Used by the frontend to poll and auto-recover when maintenance ends.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        from django.core.cache import cache
+        cached = cache.get('system_settings_maintenance')
+        if cached is not None:
+            started_by_name = cached.get('started_by_name')
+            return Response({
+                'maintenance_mode': cached.get('enabled', False),
+                'message': cached.get('message', ''),
+                'estimated_end': cached.get('estimated_end'),
+                'started_at': cached.get('started_at'),
+                'started_by_name': started_by_name,
+            })
+
+        settings = SystemSettings.objects.first()
+        if not settings:
+            return Response({'maintenance_mode': False, 'message': '', 'estimated_end': None, 'started_at': None, 'started_by_name': None})
+
+        started_by_name = None
+        if settings.maintenance_started_by:
+            started_by_name = settings.maintenance_started_by.get_full_name() or settings.maintenance_started_by.email
+
+        return Response({
+            'maintenance_mode': settings.maintenance_mode,
+            'message': settings.maintenance_message,
+            'estimated_end': settings.maintenance_estimated_end,
+            'started_at': settings.maintenance_started_at,
+            'started_by_name': started_by_name,
+        })
+
+
 class IsSuperAdmin(permissions.BasePermission):
     """
     Permission check for super admin access.
@@ -86,26 +124,46 @@ class SystemSettingsView(APIView):
         settings = SystemSettings.objects.first()
         if not settings:
             settings = SystemSettings.objects.create()
+        was_active = settings.maintenance_mode
         serializer = SystemSettingsSerializer(settings, data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            obj = serializer.save()
+            self._handle_maintenance_toggle(obj, was_active, request.user)
             from django.core.cache import cache
             cache.delete('system_settings_maintenance')
-            return Response(serializer.data)
+            return Response(SystemSettingsSerializer(obj).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def patch(self, request):
         settings = SystemSettings.objects.first()
         if not settings:
             settings = SystemSettings.objects.create()
+        was_active = settings.maintenance_mode
         serializer = SystemSettingsSerializer(settings, data=request.data, partial=True)
         if serializer.is_valid():
-            serializer.save()
+            obj = serializer.save()
+            self._handle_maintenance_toggle(obj, was_active, request.user)
             # Invalidate maintenance-mode cache so the middleware picks up the change immediately
             from django.core.cache import cache
             cache.delete('system_settings_maintenance')
-            return Response(serializer.data)
+            return Response(SystemSettingsSerializer(obj).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @staticmethod
+    def _handle_maintenance_toggle(obj, was_active, user):
+        """Auto-set or clear maintenance tracking fields on toggle."""
+        update_fields = []
+        if obj.maintenance_mode and not was_active:
+            obj.maintenance_started_at = timezone.now()
+            obj.maintenance_started_by = user
+            update_fields = ['maintenance_started_at', 'maintenance_started_by']
+        elif not obj.maintenance_mode and was_active:
+            obj.maintenance_started_at = None
+            obj.maintenance_started_by = None
+            obj.maintenance_estimated_end = None
+            update_fields = ['maintenance_started_at', 'maintenance_started_by', 'maintenance_estimated_end']
+        if update_fields:
+            obj.save(update_fields=update_fields)
 
 
 class AuditConfigurationView(APIView):

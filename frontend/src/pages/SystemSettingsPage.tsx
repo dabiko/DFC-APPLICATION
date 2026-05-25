@@ -31,6 +31,7 @@ import {
   PowerOff,
   Search,
   Database,
+  Clock,
 } from 'lucide-react'
 
 function formatBytes(bytes: number): string {
@@ -66,6 +67,7 @@ import {
   type OrganizationSummary,
 } from '@/services/systemService'
 import { ErrorState } from '@/components/common'
+import { DateTimePicker } from '@/components/Admin/DateTimePicker'
 import { cn } from '@/utils/cn'
 
 type TabId = 'overview' | 'settings' | 'security' | 'organizations' | 'announcements' | 'health'
@@ -582,18 +584,45 @@ export function SystemSettingsPage() {
               </SettingsSection>
 
               <SettingsSection title="Maintenance Mode" icon={AlertTriangle}>
-                {(editedSettings.maintenance_mode ?? settings.maintenance_mode) && (
-                  <div className="flex items-start gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg p-4">
-                    <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-semibold text-amber-800 dark:text-amber-300">
+                {(editedSettings.maintenance_mode ?? settings.maintenance_mode) ? (
+                  <div className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 overflow-hidden">
+                    <div className="flex items-center gap-3 px-4 py-3 bg-red-100 dark:bg-red-900/40 border-b border-red-200 dark:border-red-800">
+                      <span className="flex h-2.5 w-2.5 relative">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
+                      </span>
+                      <p className="font-bold text-red-800 dark:text-red-300 text-sm uppercase tracking-wide">
                         Maintenance Mode is ACTIVE
                       </p>
-                      <p className="text-sm text-amber-700 dark:text-amber-400 mt-0.5">
-                        All non-admin users are blocked with a 503 response. Only super-admins and
-                        IPs in the allow-list can access the platform.
-                      </p>
                     </div>
+                    <div className="px-4 py-3 space-y-2 text-sm text-red-700 dark:text-red-400">
+                      <p>
+                        All non-admin users are blocked. Only super-admins and IPs in the allow-list
+                        can access the platform.
+                      </p>
+                      {settings.maintenance_started_at && (
+                        <div className="flex items-center gap-4 pt-1 flex-wrap">
+                          <span className="flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5" />
+                            Started: {new Date(settings.maintenance_started_at).toLocaleString()}
+                          </span>
+                          {settings.maintenance_started_by_name && (
+                            <span className="flex items-center gap-1.5">
+                              <Users className="w-3.5 h-3.5" />
+                              By: {settings.maintenance_started_by_name}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                    <Power className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Maintenance mode is inactive. Enable it to block all non-admin access during
+                      planned outages.
+                    </p>
                   </div>
                 )}
                 <SettingsToggle
@@ -607,6 +636,21 @@ export function SystemSettingsPage() {
                   value={editedSettings.maintenance_message ?? settings.maintenance_message}
                   onChange={(v) =>
                     setEditedSettings((prev) => ({ ...prev, maintenance_message: v }))
+                  }
+                />
+                <DateTimePicker
+                  label="Estimated End Time (optional)"
+                  placeholder="Pick a date & time…"
+                  value={
+                    editedSettings.maintenance_estimated_end ??
+                    settings.maintenance_estimated_end ??
+                    ''
+                  }
+                  onChange={(v) =>
+                    setEditedSettings((prev) => ({
+                      ...prev,
+                      maintenance_estimated_end: v || null,
+                    }))
                   }
                 />
                 <SettingsInput

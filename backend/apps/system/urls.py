@@ -6,6 +6,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
     PublicPlatformInfoView,
+    PublicMaintenanceStatusView,
     SystemSettingsView,
     AuditConfigurationView,
     PlatformAnnouncementViewSet,
@@ -24,6 +25,7 @@ router.register(r'organizations', OrganizationManagementViewSet, basename='organ
 urlpatterns = [
     # Public — no auth required
     path('public-info/', PublicPlatformInfoView.as_view(), name='public-info'),
+    path('status/', PublicMaintenanceStatusView.as_view(), name='status'),
 
     # System settings
     path('settings/', SystemSettingsView.as_view(), name='settings'),

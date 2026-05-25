@@ -14,6 +14,13 @@ from .models import (
 class SystemSettingsSerializer(serializers.ModelSerializer):
     """Serializer for system-wide settings."""
 
+    maintenance_started_by_name = serializers.SerializerMethodField(read_only=True)
+
+    def get_maintenance_started_by_name(self, obj):
+        if obj.maintenance_started_by:
+            return obj.maintenance_started_by.get_full_name() or obj.maintenance_started_by.email
+        return None
+
     class Meta:
         model = SystemSettings
         fields = [
@@ -27,6 +34,9 @@ class SystemSettingsSerializer(serializers.ModelSerializer):
             'maintenance_mode',
             'maintenance_message',
             'maintenance_allowed_ips',
+            'maintenance_started_at',
+            'maintenance_started_by_name',
+            'maintenance_estimated_end',
             # Registration
             'allow_registration',
             'require_email_verification',
@@ -66,7 +76,7 @@ class SystemSettingsSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'maintenance_started_at', 'maintenance_started_by_name', 'created_at', 'updated_at']
 
 
 class AuditConfigurationSerializer(serializers.ModelSerializer):

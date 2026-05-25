@@ -12,6 +12,9 @@ let failedQueue: Array<{
 // Account deactivation state - prevents multiple modals
 let deactivationHandled = false
 
+// Maintenance mode state - prevents multiple events
+let maintenanceHandled = false
+
 // Reset refresh state on module load (handles page navigation/reload)
 console.log('🔧 apiClient initialized, isRefreshing reset to false')
 
@@ -32,6 +35,24 @@ export const resetRefreshState = () => {
   isRefreshing = false
   failedQueue = []
   console.log('🔧 Refresh state manually reset')
+}
+
+/**
+ * Dispatch a custom event when the platform enters maintenance mode.
+ * React components listen to show the full-screen maintenance page.
+ */
+function dispatchMaintenanceMode(detail: {
+  message: string
+  estimatedEnd: string | null
+  startedAt: string | null
+}) {
+  if (maintenanceHandled) return
+  maintenanceHandled = true
+  window.dispatchEvent(new CustomEvent('maintenance-mode-detected', { detail }))
+}
+
+export function resetMaintenanceState() {
+  maintenanceHandled = false
 }
 
 /**
@@ -114,8 +135,25 @@ apiClient.interceptors.response.use(
       })
     }
 
+    const errorData = error.response?.data as {
+      code?: string
+      detail?: string
+      user_id?: string
+      estimated_end?: string | null
+      started_at?: string | null
+    }
+
+    // Handle maintenance mode (503) — show the maintenance page
+    if (error.response?.status === 503 && errorData?.code === 'maintenance_mode') {
+      dispatchMaintenanceMode({
+        message: errorData.detail || 'The platform is under maintenance.',
+        estimatedEnd: errorData.estimated_end ?? null,
+        startedAt: errorData.started_at ?? null,
+      })
+      return Promise.reject(error)
+    }
+
     // Check for account deactivated error (can come from any authenticated endpoint or token refresh)
-    const errorData = error.response?.data as { code?: string; detail?: string; user_id?: string }
     if (errorData?.code === 'account_deactivated') {
       console.log('🚫 Account deactivated - showing modal and clearing session')
 
