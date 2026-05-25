@@ -35,9 +35,9 @@ services:
   # MinIO Object Storage with Server-Side Encryption
   # ==============================================================================
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/aistor/minio:latest
     container_name: dfc_minio
-    command: server /data --console-address ":9001"
+    command: minio server /data --license /minio.license
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
@@ -49,6 +49,7 @@ services:
     volumes:
       - minio_data:/data
       - ./certs/minio:/root/.minio/certs:ro  # TLS certificates
+      - ./minio.license:/minio.license:ro
     ports:
       - "9000:9000"  # API
       - "9001:9001"  # Console

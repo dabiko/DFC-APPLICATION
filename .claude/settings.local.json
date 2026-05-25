@@ -90,7 +90,8 @@
       "Bash(nslookup dfc.dabiko-software.tech 8.8.8.8)",
       "Bash(nslookup dfc-app.dabiko-software.tech)",
       "Bash(scp -o StrictHostKeyChecking=no -r \"C:/Users/dabik/IdeaProjects/DFC-APPLICATION/frontend/dist/.\" root@162.243.32.216:/opt/dfc/deployment/frontend-dist/)",
-      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\dabik\\\\IdeaProjects\\\\DFC-APPLICATION\\\\backend\" -Name -Depth 1 | Where-Object { $_ -match \"settings\" -or $_ -match \"\\\\.py$\" })"
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\dabik\\\\IdeaProjects\\\\DFC-APPLICATION\\\\backend\" -Name -Depth 1 | Where-Object { $_ -match \"settings\" -or $_ -match \"\\\\.py$\" })",
+      "WebFetch(domain:docs.min.io)"
     ],
     "deny": [],
     "ask": []

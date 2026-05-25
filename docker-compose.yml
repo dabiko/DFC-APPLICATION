@@ -43,9 +43,9 @@ services:
 
   # MinIO Object Storage (S3-compatible)
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/aistor/minio:latest
     container_name: dfc_minio
-    command: server /data --console-address ":9001"
+    command: minio server /data --license /minio.license
     environment:
       MINIO_ROOT_USER: dfc_minio_admin
       MINIO_ROOT_PASSWORD: dfc_minio_password_2025
@@ -56,6 +56,7 @@ services:
       - "9001:9001"  # MinIO Console UI
     volumes:
       - minio_data:/data
+      - ./minio.license:/minio.license:ro
     networks:
       - dfc_network
     healthcheck:
