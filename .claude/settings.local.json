@@ -113,7 +113,9 @@
       "Bash(C:\\\\Users\\\\dabik\\\\anaconda3\\\\python.exe -c \"import celery; print\\(celery.__version__\\)\")",
       "PowerShell(C:\\\\Users\\\\dabik\\\\anaconda3\\\\python.exe -c \"import celery; print\\(celery.__version__\\)\" 2>&1)",
       "PowerShell(C:\\\\Users\\\\dabik\\\\anaconda3\\\\python.exe -c \"import kombu; print\\(kombu.__version__\\)\" 2>&1)",
-      "Bash(python3 -m json.tool)"
+      "Bash(python3 -m json.tool)",
+      "Bash(Get-ChildItem *)",
+      "Bash(Select-Object -First 20)"
     ],
     "deny": [],
     "ask": []

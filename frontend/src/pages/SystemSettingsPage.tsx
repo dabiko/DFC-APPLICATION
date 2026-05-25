@@ -203,6 +203,15 @@ export function SystemSettingsPage() {
     try {
       const updated = await updateSystemSettings(editedSettings)
       setSettings(updated)
+      // Sync platform name to sidebar
+      if ('platform_name' in editedSettings) {
+        localStorage.setItem('dfc_platform_name', updated.platform_name)
+        window.dispatchEvent(
+          new CustomEvent('platform-name-updated', {
+            detail: { platform_name: updated.platform_name },
+          })
+        )
+      }
       setEditedSettings({})
     } catch (error) {
       console.error('Error saving settings:', error)
@@ -548,17 +557,48 @@ export function SystemSettingsPage() {
                   value={editedSettings.platform_name ?? settings.platform_name}
                   onChange={(v) => setEditedSettings((prev) => ({ ...prev, platform_name: v }))}
                 />
+                <p className="text-xs text-gray-400 dark:text-gray-500 -mt-2">
+                  Changes to Platform Name are reflected immediately in the sidebar after saving.
+                </p>
                 <SettingsInput
                   label="Support Email"
+                  type="email"
                   value={editedSettings.support_email ?? settings.support_email}
                   onChange={(v) => setEditedSettings((prev) => ({ ...prev, support_email: v }))}
+                />
+                <SettingsInput
+                  label="Notification From Email"
+                  type="email"
+                  value={editedSettings.email_from_address ?? settings.email_from_address}
+                  onChange={(v) =>
+                    setEditedSettings((prev) => ({ ...prev, email_from_address: v }))
+                  }
+                />
+                <SettingsInput
+                  label="Notification From Name"
+                  value={editedSettings.email_from_name ?? settings.email_from_name}
+                  onChange={(v) => setEditedSettings((prev) => ({ ...prev, email_from_name: v }))}
                 />
               </SettingsSection>
 
               <SettingsSection title="Maintenance Mode" icon={AlertTriangle}>
+                {(editedSettings.maintenance_mode ?? settings.maintenance_mode) && (
+                  <div className="flex items-start gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg p-4">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-amber-800 dark:text-amber-300">
+                        Maintenance Mode is ACTIVE
+                      </p>
+                      <p className="text-sm text-amber-700 dark:text-amber-400 mt-0.5">
+                        All non-admin users are blocked with a 503 response. Only super-admins and
+                        IPs in the allow-list can access the platform.
+                      </p>
+                    </div>
+                  </div>
+                )}
                 <SettingsToggle
                   label="Enable Maintenance Mode"
-                  description="Block all non-admin access to the platform"
+                  description="Blocks all non-admin access — returns 503 with the maintenance message below"
                   checked={editedSettings.maintenance_mode ?? settings.maintenance_mode}
                   onChange={(v) => setEditedSettings((prev) => ({ ...prev, maintenance_mode: v }))}
                 />
@@ -567,6 +607,23 @@ export function SystemSettingsPage() {
                   value={editedSettings.maintenance_message ?? settings.maintenance_message}
                   onChange={(v) =>
                     setEditedSettings((prev) => ({ ...prev, maintenance_message: v }))
+                  }
+                />
+                <SettingsInput
+                  label="Allowed IPs (comma-separated, bypasses maintenance block)"
+                  value={(
+                    editedSettings.maintenance_allowed_ips ??
+                    settings.maintenance_allowed_ips ??
+                    []
+                  ).join(', ')}
+                  onChange={(v) =>
+                    setEditedSettings((prev) => ({
+                      ...prev,
+                      maintenance_allowed_ips: v
+                        .split(',')
+                        .map((s) => s.trim())
+                        .filter(Boolean),
+                    }))
                   }
                 />
               </SettingsSection>
@@ -608,7 +665,7 @@ export function SystemSettingsPage() {
                   label="Storage Provider"
                   value={editedSettings.storage_provider ?? settings.storage_provider}
                   options={[
-                    { value: 'minio', label: 'MinIO' },
+                    { value: 'minio', label: 'MinIO (AIStor)' },
                     { value: 's3', label: 'Amazon S3' },
                     { value: 'azure', label: 'Azure Blob Storage' },
                     { value: 'gcs', label: 'Google Cloud Storage' },
@@ -621,6 +678,11 @@ export function SystemSettingsPage() {
                   }
                 />
                 <SettingsInput
+                  label="Storage Bucket Name"
+                  value={editedSettings.storage_bucket ?? settings.storage_bucket}
+                  onChange={(v) => setEditedSettings((prev) => ({ ...prev, storage_bucket: v }))}
+                />
+                <SettingsInput
                   label="Max File Size (MB)"
                   type="number"
                   value={String(editedSettings.max_file_size_mb ?? settings.max_file_size_mb)}
@@ -628,6 +690,54 @@ export function SystemSettingsPage() {
                     setEditedSettings((prev) => ({ ...prev, max_file_size_mb: parseInt(v) || 500 }))
                   }
                 />
+                {/* Live storage stats from MinIO */}
+                {stats && (
+                  <div className="mt-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 p-4">
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+                      Live Storage Stats
+                    </p>
+                    <div className="grid grid-cols-3 gap-4 text-center">
+                      <div>
+                        <p className="text-lg font-bold text-gray-900 dark:text-white">
+                          {formatBytes(stats.bucket_used_bytes ?? 0)}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Bucket Used</p>
+                      </div>
+                      <div>
+                        <p className="text-lg font-bold text-gray-900 dark:text-white">
+                          {formatBytes(stats.server_available_bytes ?? 0)}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Disk Available</p>
+                      </div>
+                      <div>
+                        <p className="text-lg font-bold text-gray-900 dark:text-white">
+                          {formatBytes(stats.server_total_bytes ?? 0)}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Disk Capacity</p>
+                      </div>
+                    </div>
+                    {(stats.server_total_bytes ?? 0) > 0 && (
+                      <div className="mt-3">
+                        <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-blue-500 rounded-full transition-all"
+                            style={{
+                              width: `${Math.round(((stats.server_total_bytes - stats.server_available_bytes) / stats.server_total_bytes) * 100)}%`,
+                            }}
+                          />
+                        </div>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 text-right">
+                          {Math.round(
+                            ((stats.server_total_bytes - stats.server_available_bytes) /
+                              stats.server_total_bytes) *
+                              100
+                          )}
+                          % disk used
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </SettingsSection>
 
               <SettingsSection title="Search & OCR" icon={Search}>
@@ -646,12 +756,96 @@ export function SystemSettingsPage() {
                     }))
                   }
                 />
+                {/* Live search service health */}
+                {health?.services?.search && (
+                  <div
+                    className={cn(
+                      'flex items-center gap-2 px-3 py-2 rounded-lg text-sm border',
+                      health.services.search.status === 'healthy'
+                        ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-700 dark:text-green-400'
+                        : health.services.search.status === 'degraded'
+                          ? 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/20 dark:border-amber-700 dark:text-amber-400'
+                          : 'bg-red-50 border-red-200 text-red-700 dark:bg-red-900/20 dark:border-red-700 dark:text-red-400'
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'w-2 h-2 rounded-full flex-shrink-0',
+                        health.services.search.status === 'healthy'
+                          ? 'bg-green-500'
+                          : health.services.search.status === 'degraded'
+                            ? 'bg-amber-500'
+                            : 'bg-red-500'
+                      )}
+                    />
+                    <span>
+                      Search service:{' '}
+                      <strong className="capitalize">{health.services.search.status}</strong>
+                      {health.services.search.response_time_ms != null && (
+                        <span className="ml-1 opacity-70">
+                          ({health.services.search.response_time_ms} ms)
+                        </span>
+                      )}
+                      {health.services.search.error_message && (
+                        <span className="ml-1 opacity-70">
+                          — {health.services.search.error_message}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                )}
+                <SettingsInput
+                  label="Index Delay (seconds)"
+                  type="number"
+                  value={String(
+                    editedSettings.search_index_delay_seconds ?? settings.search_index_delay_seconds
+                  )}
+                  onChange={(v) =>
+                    setEditedSettings((prev) => ({
+                      ...prev,
+                      search_index_delay_seconds: parseInt(v) || 5,
+                    }))
+                  }
+                />
                 <SettingsToggle
                   label="Enable OCR"
-                  description="Enable OCR for scanned documents"
+                  description="Enable OCR processing for scanned documents (requires Celery workers)"
                   checked={editedSettings.enable_ocr ?? settings.enable_ocr}
                   onChange={(v) => setEditedSettings((prev) => ({ ...prev, enable_ocr: v }))}
                 />
+                {/* Celery worker health for OCR */}
+                {health?.services?.celery && (
+                  <div
+                    className={cn(
+                      'flex items-center gap-2 px-3 py-2 rounded-lg text-sm border',
+                      health.services.celery.status === 'healthy'
+                        ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-700 dark:text-green-400'
+                        : health.services.celery.status === 'degraded'
+                          ? 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/20 dark:border-amber-700 dark:text-amber-400'
+                          : 'bg-red-50 border-red-200 text-red-700 dark:bg-red-900/20 dark:border-red-700 dark:text-red-400'
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'w-2 h-2 rounded-full flex-shrink-0',
+                        health.services.celery.status === 'healthy'
+                          ? 'bg-green-500'
+                          : health.services.celery.status === 'degraded'
+                            ? 'bg-amber-500'
+                            : 'bg-red-500'
+                      )}
+                    />
+                    <span>
+                      Task workers (OCR):{' '}
+                      <strong className="capitalize">{health.services.celery.status}</strong>
+                      {health.services.celery.error_message && (
+                        <span className="ml-1 opacity-70">
+                          — {health.services.celery.error_message}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                )}
               </SettingsSection>
 
               {Object.keys(editedSettings).length > 0 && (

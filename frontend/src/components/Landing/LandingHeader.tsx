@@ -2,18 +2,33 @@ import React, { useState, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Moon, Sun, Menu, X, LayoutDashboard, LogOut } from 'lucide-react'
 import { authService } from '@/services/auth.service'
+import type { PublicPlatformInfo } from '@/services/systemService'
 
 interface LandingHeaderProps {
   theme: string
   onToggleTheme: () => void
   onNavigate: (path: string) => void
+  platformInfo?: PublicPlatformInfo
 }
 
 /**
  * Landing Page Header
  * Features: Sticky header, logo, navigation, theme toggle, mobile menu
  */
-const LandingHeader: React.FC<LandingHeaderProps> = ({ theme, onToggleTheme, onNavigate }) => {
+const LandingHeader: React.FC<LandingHeaderProps> = ({
+  theme,
+  onToggleTheme,
+  onNavigate,
+  platformInfo,
+}) => {
+  const platformName = platformInfo?.platform_name || 'Digital Filing Cabinet'
+  const platformTagline = platformInfo?.platform_tagline || 'Secure Document Management'
+  const initials = platformName
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -80,19 +95,20 @@ const LandingHeader: React.FC<LandingHeaderProps> = ({ theme, onToggleTheme, onN
         <div className="flex items-center justify-between h-16 sm:h-20">
           {/* Logo Section */}
           <div className="flex items-center space-x-3">
-            {/* Logo Placeholder - User can add their company logo here */}
             <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-500 dark:to-blue-600 rounded-lg flex items-center justify-center shadow-lg">
-              <span className="text-white font-bold text-lg sm:text-xl">DT</span>
+              <span className="text-white font-bold text-lg sm:text-xl">{initials}</span>
             </div>
 
-            {/* Company Name */}
+            {/* Platform Name */}
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-                DabiTech Inc
+                {platformName}
               </h1>
-              <p className="text-xs text-gray-600 dark:text-gray-400 hidden sm:block">
-                Digital Filing Cabinet
-              </p>
+              {platformTagline && (
+                <p className="text-xs text-gray-600 dark:text-gray-400 hidden sm:block">
+                  {platformTagline}
+                </p>
+              )}
             </div>
           </div>
 

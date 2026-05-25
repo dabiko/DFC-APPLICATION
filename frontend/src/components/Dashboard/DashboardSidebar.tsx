@@ -108,7 +108,18 @@ export function DashboardSidebar({
   // Organization branding
   const userData = authService.getUser()
   const orgLogoUrl = userData?.organization_logo_url
-  const orgName = userData?.organization_name || 'Digital Filing Cabinet'
+  const [platformName, setPlatformName] = useState(
+    () => localStorage.getItem('dfc_platform_name') || ''
+  )
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const name = (e as CustomEvent<{ platform_name: string }>).detail?.platform_name
+      if (name) setPlatformName(name)
+    }
+    window.addEventListener('platform-name-updated', handler)
+    return () => window.removeEventListener('platform-name-updated', handler)
+  }, [])
+  const orgName = platformName || userData?.organization_name || 'Digital Filing Cabinet'
 
   // Get smart folders (My Documents, Shared with Me, Recent, Favorites, Trash)
   const smartFolders = useMemo(() => getSmartFolders(), [])

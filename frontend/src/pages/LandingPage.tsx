@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useTheme } from '../hooks/useTheme'
 import HeroSection from '../components/Landing/HeroSection'
@@ -10,16 +10,31 @@ import StatsSection from '../components/Landing/StatsSection'
 import CTASection from '../components/Landing/CTASection'
 import Footer from '../components/Landing/Footer'
 import LandingHeader from '../components/Landing/LandingHeader'
+import { getPublicPlatformInfo, type PublicPlatformInfo } from '../services/systemService'
 
 /**
  * Landing Page - Enterprise-grade marketing page for DFC
  * Features: Hero, Features, Security, Pricing, Stats, CTA, Footer
  * Supports: Light/Dark theme, Smooth animations, Conversion optimization
  */
+const DEFAULT_PLATFORM: PublicPlatformInfo = {
+  platform_name: 'Digital Filing Cabinet',
+  platform_tagline: 'Secure Document Management',
+  support_email: '',
+  support_phone: '',
+}
+
 const LandingPage: React.FC = () => {
   const { theme, setTheme } = useTheme()
   const navigate = useNavigate()
   const location = useLocation()
+  const [platformInfo, setPlatformInfo] = useState<PublicPlatformInfo>(DEFAULT_PLATFORM)
+
+  useEffect(() => {
+    getPublicPlatformInfo()
+      .then(setPlatformInfo)
+      .catch(() => {})
+  }, [])
 
   // Scroll to a hash target when arriving from another route (e.g. /#features).
   useEffect(() => {
@@ -44,12 +59,17 @@ const LandingPage: React.FC = () => {
   return (
     <div className="landing-page min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 transition-colors duration-300">
       {/* Header with Navigation */}
-      <LandingHeader theme={theme} onToggleTheme={cycleTheme} onNavigate={navigate} />
+      <LandingHeader
+        theme={theme}
+        onToggleTheme={cycleTheme}
+        onNavigate={navigate}
+        platformInfo={platformInfo}
+      />
 
       {/* Main Content */}
       <main>
         {/* Hero Section - Above the fold */}
-        <HeroSection onNavigate={navigate} />
+        <HeroSection onNavigate={navigate} platformInfo={platformInfo} />
 
         {/* Features Section - Core value propositions */}
         <FeaturesSection />
@@ -71,7 +91,7 @@ const LandingPage: React.FC = () => {
       </main>
 
       {/* Footer - Links & Legal */}
-      <Footer onNavigate={navigate} />
+      <Footer onNavigate={navigate} platformInfo={platformInfo} />
     </div>
   )
 }

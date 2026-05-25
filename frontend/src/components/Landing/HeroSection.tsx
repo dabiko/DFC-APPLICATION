@@ -1,18 +1,22 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { ArrowRight, FileText, Shield, Zap, CheckCircle, LayoutDashboard } from 'lucide-react'
 import { authService } from '@/services/auth.service'
+import type { PublicPlatformInfo } from '@/services/systemService'
 
 interface HeroSectionProps {
   onNavigate: (path: string) => void
+  platformInfo?: PublicPlatformInfo
 }
 
 /**
  * Hero Section - Above the fold conversion-focused section
  * Features: Animated filing cabinet visualization, compelling copy, CTAs
  */
-const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
+const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate, platformInfo }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const platformName = platformInfo?.platform_name || 'Digital Filing Cabinet'
+  const platformTagline = platformInfo?.platform_tagline || ''
 
   useEffect(() => {
     // Check authentication status on component mount
@@ -230,11 +234,15 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
 
           {/* Main Headline */}
           <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-gray-900 dark:text-white mb-6 sm:mb-8 leading-tight animate-slideUp">
-            Secure Digital Filing
-            <br />
-            <span className="bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">
-              & Operational Excellence
-            </span>
+            {platformName}
+            {platformTagline && (
+              <>
+                <br />
+                <span className="bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">
+                  {platformTagline}
+                </span>
+              </>
+            )}
           </h1>
 
           {/* Subheadline */}

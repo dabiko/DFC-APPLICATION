@@ -192,6 +192,19 @@ export interface FeatureFlagsUpdate {
   priority_support?: boolean
 }
 
+// Public Platform Identity (no auth required — used by landing page)
+export interface PublicPlatformInfo {
+  platform_name: string
+  platform_tagline: string
+  support_email: string
+  support_phone: string
+}
+
+export async function getPublicPlatformInfo(): Promise<PublicPlatformInfo> {
+  const response = await apiClient.get('/system/public-info/')
+  return response.data
+}
+
 // System Settings
 export async function getSystemSettings(): Promise<SystemSettings> {
   const response = await apiClient.get('/system/settings/')

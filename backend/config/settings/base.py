@@ -64,6 +64,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'apps.system.middleware.MaintenanceModeMiddleware',  # Maintenance mode enforcement
     'apps.organizations.middleware.TenantMiddleware',  # Multi-tenant organization context
     'django_otp.middleware.OTPMiddleware',  # MFA middleware
     'apps.users.mfa_middleware.MFAEnforcementMiddleware',  # MFA enforcement for admin

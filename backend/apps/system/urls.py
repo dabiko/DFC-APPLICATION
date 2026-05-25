@@ -5,6 +5,7 @@ URL configuration for system administration.
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
+    PublicPlatformInfoView,
     SystemSettingsView,
     AuditConfigurationView,
     PlatformAnnouncementViewSet,
@@ -21,6 +22,9 @@ router.register(r'announcements', PlatformAnnouncementViewSet, basename='announc
 router.register(r'organizations', OrganizationManagementViewSet, basename='organizations')
 
 urlpatterns = [
+    # Public — no auth required
+    path('public-info/', PublicPlatformInfoView.as_view(), name='public-info'),
+
     # System settings
     path('settings/', SystemSettingsView.as_view(), name='settings'),
     path('audit-config/', AuditConfigurationView.as_view(), name='audit-config'),

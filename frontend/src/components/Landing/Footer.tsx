@@ -1,18 +1,30 @@
 import React from 'react'
 import { useLocation } from 'react-router-dom'
-import { Mail, Phone, MapPin, Github, Linkedin, Twitter } from 'lucide-react'
+import { Mail, Phone, Github, Linkedin, Twitter } from 'lucide-react'
+import type { PublicPlatformInfo } from '@/services/systemService'
 
 interface FooterProps {
   onNavigate: (path: string) => void
+  platformInfo?: PublicPlatformInfo
 }
 
 /**
  * Footer - Links, legal, contact information
  * Professional footer with company info and links
  */
-const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
+const Footer: React.FC<FooterProps> = ({ onNavigate, platformInfo }) => {
   const currentYear = new Date().getFullYear()
   const location = useLocation()
+  const platformName = platformInfo?.platform_name || 'Digital Filing Cabinet'
+  const platformTagline = platformInfo?.platform_tagline || 'Secure Document Management'
+  const supportEmail = platformInfo?.support_email || ''
+  const supportPhone = platformInfo?.support_phone || ''
+  const initials = platformName
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
 
   const footerSections = [
     {
@@ -86,11 +98,13 @@ const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             {/* Logo */}
             <div className="flex items-center space-x-3 mb-4">
               <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center shadow-lg">
-                <span className="text-white font-bold text-lg">DT</span>
+                <span className="text-white font-bold text-lg">{initials}</span>
               </div>
               <div>
-                <h3 className="text-xl font-bold text-white">DabiTech Inc</h3>
-                <p className="text-sm text-gray-400 dark:text-gray-500">Digital Filing Cabinet</p>
+                <h3 className="text-xl font-bold text-white">{platformName}</h3>
+                {platformTagline && (
+                  <p className="text-sm text-gray-400 dark:text-gray-500">{platformTagline}</p>
+                )}
               </div>
             </div>
 
@@ -101,28 +115,28 @@ const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
 
             {/* Contact Info */}
             <div className="space-y-2 text-sm">
-              <div className="flex items-center space-x-2">
-                <Mail className="w-4 h-4 text-blue-400 dark:text-blue-500" />
-                <a
-                  href="mailto:hello@dabitech.com"
-                  className="hover:text-white dark:hover:text-gray-200 transition-colors"
-                >
-                  hello@dabitech.com
-                </a>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Phone className="w-4 h-4 text-blue-400 dark:text-blue-500" />
-                <a
-                  href="tel:+1234567890"
-                  className="hover:text-white dark:hover:text-gray-200 transition-colors"
-                >
-                  +1 (234) 567-890
-                </a>
-              </div>
-              <div className="flex items-center space-x-2">
-                <MapPin className="w-4 h-4 text-blue-400 dark:text-blue-500" />
-                <span>San Francisco, CA 94103</span>
-              </div>
+              {supportEmail && (
+                <div className="flex items-center space-x-2">
+                  <Mail className="w-4 h-4 text-blue-400 dark:text-blue-500" />
+                  <a
+                    href={`mailto:${supportEmail}`}
+                    className="hover:text-white dark:hover:text-gray-200 transition-colors"
+                  >
+                    {supportEmail}
+                  </a>
+                </div>
+              )}
+              {supportPhone && (
+                <div className="flex items-center space-x-2">
+                  <Phone className="w-4 h-4 text-blue-400 dark:text-blue-500" />
+                  <a
+                    href={`tel:${supportPhone.replace(/\s/g, '')}`}
+                    className="hover:text-white dark:hover:text-gray-200 transition-colors"
+                  >
+                    {supportPhone}
+                  </a>
+                </div>
+              )}
             </div>
           </div>
 
@@ -171,7 +185,7 @@ const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
           <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
             {/* Copyright */}
             <div className="text-sm text-gray-400 dark:text-gray-500">
-              © {currentYear} DabiTech Inc. All rights reserved.
+              © {currentYear} {platformName}. All rights reserved.
             </div>
 
             {/* Social Links */}

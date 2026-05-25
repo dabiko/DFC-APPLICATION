@@ -27,6 +27,30 @@ from .serializers import (
 )
 
 
+class PublicPlatformInfoView(APIView):
+    """
+    Public endpoint returning minimal platform identity for the landing page.
+    No authentication required.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        settings = SystemSettings.objects.first()
+        if not settings:
+            return Response({
+                'platform_name': 'Digital Filing Cabinet',
+                'platform_tagline': '',
+                'support_email': '',
+                'support_phone': '',
+            })
+        return Response({
+            'platform_name': settings.platform_name,
+            'platform_tagline': settings.platform_tagline,
+            'support_email': settings.support_email,
+            'support_phone': settings.support_phone,
+        })
+
+
 class IsSuperAdmin(permissions.BasePermission):
     """
     Permission check for super admin access.
@@ -65,6 +89,8 @@ class SystemSettingsView(APIView):
         serializer = SystemSettingsSerializer(settings, data=request.data)
         if serializer.is_valid():
             serializer.save()
+            from django.core.cache import cache
+            cache.delete('system_settings_maintenance')
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -75,6 +101,9 @@ class SystemSettingsView(APIView):
         serializer = SystemSettingsSerializer(settings, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
+            # Invalidate maintenance-mode cache so the middleware picks up the change immediately
+            from django.core.cache import cache
+            cache.delete('system_settings_maintenance')
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
