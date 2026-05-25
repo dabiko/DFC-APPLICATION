@@ -43,6 +43,10 @@ export interface DocumentStats {
   documents_by_department: Array<{ name: string; count: number }>
   documents_by_type: Array<{ type: string; count: number }>
   recent_uploads_count: number
+  total_original_size_bytes: number
+  total_compressed_size_bytes: number
+  storage_saved_bytes: number
+  storage_saved_percent: number
 }
 
 export type DateRange = '1d' | '7d' | '30d' | '90d' | 'custom'
@@ -69,6 +73,10 @@ export async function getDocumentStats(): Promise<DocumentStats> {
       documents_by_department: [],
       documents_by_type: [],
       recent_uploads_count: 0,
+      total_original_size_bytes: 0,
+      total_compressed_size_bytes: 0,
+      storage_saved_bytes: 0,
+      storage_saved_percent: 0,
     }
   }
 }

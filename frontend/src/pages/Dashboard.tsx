@@ -21,6 +21,7 @@ import { DateRangeFilter } from '@components/Dashboard/DateRangeFilter'
 import { DonutChart } from '@components/Dashboard/DonutChart'
 import { AreaChartWidget } from '@components/Dashboard/AreaChartWidget'
 import { SimpleBarChart } from '@components/Dashboard/SimpleBarChart'
+import { StorageCompressionCard } from '@components/Dashboard/StorageCompressionCard'
 import { CreateFolderModal } from '@components/Folder/CreateFolderModal'
 import { DocumentUploadModal } from '@components/Upload/DocumentUploadModal'
 import { SelectDepartmentModal } from '@components/Dashboard/SelectDepartmentModal'
@@ -285,6 +286,11 @@ export function Dashboard() {
                         {/* KPI Cards */}
                         <DashboardKPIRow data={data} />
 
+                        {/* Storage Compression Summary */}
+                        {data.documentStats && (
+                          <StorageCompressionCard stats={data.documentStats} compact />
+                        )}
+
                         {/* Workflow + Training Side-by-Side */}
                         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                           <WorkflowOverviewWidget data={data} />
@@ -520,6 +526,11 @@ export function Dashboard() {
                             color="indigo"
                           />
                         </div>
+
+                        {/* Storage Compression Detail */}
+                        {data.documentStats && (
+                          <StorageCompressionCard stats={data.documentStats} />
+                        )}
 
                         {/* Charts Row */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

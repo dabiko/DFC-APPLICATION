@@ -4889,7 +4889,7 @@ class DocumentDashboardStatsView(APIView):
     def get(self, request):
         from apps.folders.models import Folder
         from apps.documents.utils import get_user_storage_summary
-        from django.db.models import Count
+        from django.db.models import BigIntegerField, Case, Count, F, Sum, When
         from datetime import timedelta
 
         user = request.user
@@ -4950,6 +4950,26 @@ class DocumentDashboardStatsView(APIView):
         seven_days_ago = timezone.now() - timedelta(days=7)
         recent_uploads_count = docs_qs.filter(created_at__gte=seven_days_ago).count()
 
+        # Compression / storage-savings stats
+        # original_size is populated only for compressed files; fall back to file_size
+        size_agg = docs_qs.aggregate(
+            total_original=Sum(
+                Case(
+                    When(original_size__isnull=False, then=F('original_size')),
+                    default=F('file_size'),
+                    output_field=BigIntegerField(),
+                )
+            ),
+            total_compressed=Sum('file_size'),
+        )
+        total_original_size = size_agg['total_original'] or 0
+        total_compressed_size = size_agg['total_compressed'] or 0
+        storage_saved = max(0, total_original_size - total_compressed_size)
+        storage_saved_percent = (
+            round(storage_saved / total_original_size * 100, 1)
+            if total_original_size > 0 else 0.0
+        )
+
         return Response({
             'total_documents': total_documents,
             'total_folders': total_folders,
@@ -4958,4 +4978,8 @@ class DocumentDashboardStatsView(APIView):
             'documents_by_department': documents_by_department,
             'documents_by_type': documents_by_type,
             'recent_uploads_count': recent_uploads_count,
+            'total_original_size_bytes': total_original_size,
+            'total_compressed_size_bytes': total_compressed_size,
+            'storage_saved_bytes': storage_saved,
+            'storage_saved_percent': storage_saved_percent,
         })
