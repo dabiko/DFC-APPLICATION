@@ -638,8 +638,8 @@ const StatsCard: React.FC<{
 
 // Main Component
 const AccessReviewCampaignsTab: React.FC = () => {
-  const [campaigns, setCampaigns] = useState<AccessReviewCampaign[]>(mockCampaigns)
-  const [reviewItems, setReviewItems] = useState<ReviewItem[]>(mockReviewItems)
+  const [campaigns, setCampaigns] = useState<AccessReviewCampaign[]>([])
+  const [reviewItems, setReviewItems] = useState<ReviewItem[]>([])
   const [selectedCampaign, setSelectedCampaign] = useState<AccessReviewCampaign | null>(null)
   const [filterStatus, setFilterStatus] = useState<CampaignStatus | 'all'>('all')
   const [showCreateModal, setShowCreateModal] = useState(false)

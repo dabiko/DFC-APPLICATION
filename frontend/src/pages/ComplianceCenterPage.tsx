@@ -44,6 +44,8 @@ import {
   ControlsTab,
   FindingsTab,
   AssessmentsTab,
+  DocumentsTab,
+  RetentionTab,
   DSARTab,
   PIIInventoryTab,
   ConsentTrackingTab,
@@ -467,65 +469,7 @@ export function ComplianceCenterPage() {
       setHealth(transformDashboardData(response))
     } catch (error) {
       console.error('Failed to fetch compliance dashboard:', error)
-      // Use fallback mock data when API is not available
-      setHealth({
-        overallScore: 87,
-        scoreTrend: 3,
-        frameworkScores: [
-          { id: '1', name: 'KYC', fullName: 'Know Your Customer', score: 94, status: 'compliant' },
-          {
-            id: '2',
-            name: 'AML',
-            fullName: 'Anti-Money Laundering',
-            score: 89,
-            status: 'compliant',
-          },
-          {
-            id: '3',
-            name: 'GDPR',
-            fullName: 'General Data Protection Regulation',
-            score: 78,
-            status: 'at_risk',
-          },
-          { id: '4', name: 'SOX', fullName: 'Sarbanes-Oxley Act', score: 91, status: 'compliant' },
-        ],
-        totalRegulations: 6,
-        activeRegulations: 4,
-        totalControls: 124,
-        compliantControls: 108,
-        nonCompliantControls: 12,
-        openFindings: 8,
-        criticalFindings: 2,
-        overdueFindings: 1,
-        totalDocuments: 12847,
-        compliantDocuments: 12105,
-        documentsAtRisk: 156,
-        upcomingAssessments: 2,
-        overdueAssessments: 0,
-        unreadAlerts: 5,
-        criticalAlerts: 1,
-        recentActivity: [
-          {
-            type: 'finding',
-            action: 'created',
-            title: 'Missing retention policy on 23 documents',
-            severity: 'medium',
-            timestamp: new Date().toISOString(),
-          },
-          {
-            type: 'assessment',
-            action: 'completed',
-            title: 'Q4 KYC Assessment completed',
-            timestamp: new Date(Date.now() - 86400000).toISOString(),
-          },
-          {
-            type: 'control',
-            action: 'updated',
-            title: 'GDPR-Art17 control marked compliant',
-            timestamp: new Date(Date.now() - 172800000).toISOString(),
-          },
-        ],
-      })
+      setHealth(DEFAULT_HEALTH)
     } finally {
       setIsLoading(false)
     }
@@ -905,21 +849,6 @@ export function ComplianceCenterPage() {
     </div>
   )
 
-  // Render placeholder for other tabs
-  const renderPlaceholderTab = (tabId: TabId) => (
-    <div className="flex flex-col items-center justify-center py-16">
-      <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
-        <Shield className="w-8 h-8 text-gray-400" />
-      </div>
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-        {TABS.find((t) => t.id === tabId)?.label} Module
-      </h3>
-      <p className="text-sm text-gray-500 dark:text-gray-400 text-center max-w-md">
-        This module is under development and will be available soon.
-      </p>
-    </div>
-  )
-
   // Main content renderer
   const renderContent = () => (
     <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900">
@@ -990,8 +919,8 @@ export function ComplianceCenterPage() {
             {activeTab === 'controls' && <ControlsTab />}
             {activeTab === 'findings' && <FindingsTab />}
             {activeTab === 'assessments' && <AssessmentsTab />}
-            {activeTab === 'documents' && renderPlaceholderTab('documents')}
-            {activeTab === 'retention' && renderPlaceholderTab('retention')}
+            {activeTab === 'documents' && <DocumentsTab />}
+            {activeTab === 'retention' && <RetentionTab />}
             {activeTab === 'access' && renderAccessTab()}
             {activeTab === 'privacy' && renderPrivacyTab()}
             {activeTab === 'reports' && renderReportsTab()}

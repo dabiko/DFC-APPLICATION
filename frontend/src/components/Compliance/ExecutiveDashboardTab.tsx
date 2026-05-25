@@ -707,11 +707,11 @@ const AlertItem: React.FC<{
 // Main Component
 const ExecutiveDashboardTab: React.FC = () => {
   const [timeRange, setTimeRange] = useState<TimeRange>('30d')
-  const [kpis] = useState<KPIMetric[]>(mockKPIs)
-  const [frameworks] = useState<FrameworkCompliance[]>(mockFrameworks)
-  const [risks] = useState<RiskItem[]>(mockRisks)
-  const [alerts, setAlerts] = useState<ComplianceAlert[]>(mockAlerts)
-  const [trendData] = useState<TrendDataPoint[]>(mockTrendData)
+  const [kpis] = useState<KPIMetric[]>([])
+  const [frameworks] = useState<FrameworkCompliance[]>([])
+  const [risks] = useState<RiskItem[]>([])
+  const [alerts, setAlerts] = useState<ComplianceAlert[]>([])
+  const [trendData] = useState<TrendDataPoint[]>([])
 
   const overallScore = Math.round(
     frameworks.reduce((acc, f) => acc + f.score, 0) / frameworks.length
@@ -725,7 +725,7 @@ const ExecutiveDashboardTab: React.FC = () => {
   const handleExportDashboard = useCallback(
     (format: 'pdf' | 'excel' | 'csv' = 'pdf') => {
       // Prepare KPI metrics data
-      const kpiRows = mockKPIs.map((kpi) => ({
+      const kpiRows = kpis.map((kpi) => ({
         name: kpi.name,
         value: kpi.value,
         unit: kpi.unit === '%' ? '%' : kpi.unit,
@@ -736,7 +736,7 @@ const ExecutiveDashboardTab: React.FC = () => {
       }))
 
       // Prepare framework compliance data
-      const frameworkRows = mockFrameworks.map((fw) => ({
+      const frameworkRows = frameworks.map((fw) => ({
         framework: fw.name,
         score: `${fw.score}%`,
         previous: `${fw.previousScore}%`,
@@ -751,7 +751,7 @@ const ExecutiveDashboardTab: React.FC = () => {
       }))
 
       // Prepare top risks data
-      const risksRows = mockRisks.map((risk) => ({
+      const risksRows = risks.map((risk) => ({
         title: risk.title,
         category: risk.category,
         severity: risk.severity.charAt(0).toUpperCase() + risk.severity.slice(1),
@@ -801,11 +801,11 @@ const ExecutiveDashboardTab: React.FC = () => {
         subtitle: `Time Range: ${timeRange.toUpperCase()}`,
         generatedAt: new Date().toISOString(),
         summary: {
-          'Overall Health Score': `${mockKPIs.find((k) => k.name === 'Compliance Health Score')?.value || 0}%`,
-          'Frameworks Monitored': mockFrameworks.length,
-          'Open Findings': mockKPIs.find((k) => k.name === 'Open Findings')?.value || 0,
-          'Top Risks': mockRisks.length,
-          'Recent Alerts': mockAlerts.length,
+          'Overall Health Score': `${kpis.find((k) => k.name === 'Compliance Health Score')?.value || 0}%`,
+          'Frameworks Monitored': frameworks.length,
+          'Open Findings': kpis.find((k) => k.name === 'Open Findings')?.value || 0,
+          'Top Risks': risks.length,
+          'Recent Alerts': alerts.length,
         },
       }
 

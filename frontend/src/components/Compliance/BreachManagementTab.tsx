@@ -1164,13 +1164,7 @@ export function BreachManagementTab() {
   const [showFormModal, setShowFormModal] = useState(false)
 
   useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true)
-      await new Promise((resolve) => setTimeout(resolve, 500))
-      setBreaches(MOCK_BREACHES)
-      setIsLoading(false)
-    }
-    loadData()
+    setIsLoading(false)
   }, [])
 
   const filteredBreaches = breaches.filter((breach) => {

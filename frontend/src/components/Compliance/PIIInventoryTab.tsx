@@ -1031,13 +1031,7 @@ export function PIIInventoryTab() {
   const [editingElement, setEditingElement] = useState<PIIDataElement | null>(null)
 
   useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true)
-      await new Promise((resolve) => setTimeout(resolve, 500))
-      setElements(MOCK_PII_ELEMENTS)
-      setIsLoading(false)
-    }
-    loadData()
+    setIsLoading(false)
   }, [])
 
   const filteredElements = elements.filter((element) => {

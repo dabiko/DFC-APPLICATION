@@ -618,9 +618,9 @@ const PermissionMatrix: React.FC<{ permissions: Permission[] }> = ({ permissions
 
 // Main Component
 const PermissionAnalysisTab: React.FC = () => {
-  const [permissions] = useState<Permission[]>(mockPermissions)
-  const [issues] = useState<PermissionIssue[]>(mockIssues)
-  const [roles] = useState<RoleAnalysis[]>(mockRoles)
+  const [permissions] = useState<Permission[]>([])
+  const [issues] = useState<PermissionIssue[]>([])
+  const [roles] = useState<RoleAnalysis[]>([])
   const [activeView, setActiveView] = useState<'issues' | 'roles' | 'matrix'>('issues')
   const [severityFilter, setSeverityFilter] = useState<string>('all')
 

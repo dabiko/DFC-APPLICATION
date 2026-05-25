@@ -1051,14 +1051,7 @@ export function DSARTab() {
   const [showFormModal, setShowFormModal] = useState(false)
 
   useEffect(() => {
-    // Simulate API call
-    const loadData = async () => {
-      setIsLoading(true)
-      await new Promise((resolve) => setTimeout(resolve, 500))
-      setDsars(MOCK_DSARS)
-      setIsLoading(false)
-    }
-    loadData()
+    setIsLoading(false)
   }, [])
 
   const filteredDSARs = dsars.filter((dsar) => {

@@ -702,8 +702,8 @@ const RuleCard: React.FC<{
 
 // Main Component
 const AnomalyDetectionTab: React.FC = () => {
-  const [alerts, setAlerts] = useState<AnomalyAlert[]>(mockAlerts)
-  const [rules, setRules] = useState<AnomalyRule[]>(mockRules)
+  const [alerts, setAlerts] = useState<AnomalyAlert[]>([])
+  const [rules, setRules] = useState<AnomalyRule[]>([])
   const [activeView, setActiveView] = useState<'alerts' | 'rules'>('alerts')
   const [statusFilter, setStatusFilter] = useState<AlertStatus | 'all'>('all')
   const [riskFilter, setRiskFilter] = useState<RiskLevel | 'all'>('all')

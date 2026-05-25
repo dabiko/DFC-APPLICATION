@@ -1271,7 +1271,7 @@ const CampaignFormModal: React.FC<{
 
 // Main Component
 const AcknowledgmentCampaignsTab: React.FC = () => {
-  const [campaigns, setCampaigns] = useState<Campaign[]>(mockCampaigns)
+  const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [showFormModal, setShowFormModal] = useState(false)

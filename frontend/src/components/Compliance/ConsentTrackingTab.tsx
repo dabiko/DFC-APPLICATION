@@ -800,14 +800,7 @@ export function ConsentTrackingTab() {
   const [selectedConsent, setSelectedConsent] = useState<ConsentRecord | null>(null)
 
   useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true)
-      await new Promise((resolve) => setTimeout(resolve, 500))
-      setConsents(MOCK_CONSENTS)
-      setPurposes(MOCK_PURPOSES)
-      setIsLoading(false)
-    }
-    loadData()
+    setIsLoading(false)
   }, [])
 
   const filteredConsents = consents.filter((consent) => {

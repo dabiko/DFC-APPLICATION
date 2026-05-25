@@ -581,8 +581,8 @@ const PolicyCard: React.FC<{ policy: MFAPolicy }> = ({ policy }) => {
 
 // Main Component
 const MFAComplianceTab: React.FC = () => {
-  const [users, setUsers] = useState<MFAUser[]>(mockUsers)
-  const [policies] = useState<MFAPolicy[]>(mockPolicies)
+  const [users, setUsers] = useState<MFAUser[]>([])
+  const [policies] = useState<MFAPolicy[]>([])
   const [filterStatus, setFilterStatus] = useState<MFAStatus | 'all'>('all')
   const [filterRisk, setFilterRisk] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')

@@ -645,78 +645,7 @@ export function RegulationsTab() {
       setRegulations(data)
     } catch (error) {
       console.error('Failed to fetch regulations:', error)
-      // Fallback mock data
-      setRegulations([
-        {
-          id: '1',
-          name: 'Know Your Customer',
-          short_name: 'KYC',
-          description:
-            'Customer identification and verification requirements for financial institutions.',
-          jurisdiction: 'Global',
-          effective_date: '2020-01-01',
-          status: 'active',
-          compliance_score: 94,
-          last_assessment_date: '2024-10-15',
-          next_assessment_date: '2025-01-15',
-          control_count: 32,
-          compliant_control_count: 30,
-          finding_count: 2,
-          created_at: '2020-01-01',
-          updated_at: '2024-10-15',
-        },
-        {
-          id: '2',
-          name: 'Anti-Money Laundering',
-          short_name: 'AML',
-          description: 'Regulations to prevent money laundering and terrorist financing.',
-          jurisdiction: 'Global',
-          effective_date: '2018-06-01',
-          status: 'active',
-          compliance_score: 89,
-          last_assessment_date: '2024-09-20',
-          next_assessment_date: '2025-03-20',
-          control_count: 45,
-          compliant_control_count: 40,
-          finding_count: 3,
-          created_at: '2018-06-01',
-          updated_at: '2024-09-20',
-        },
-        {
-          id: '3',
-          name: 'General Data Protection Regulation',
-          short_name: 'GDPR',
-          description: 'EU regulation on data protection and privacy.',
-          jurisdiction: 'European Union',
-          effective_date: '2018-05-25',
-          status: 'active',
-          compliance_score: 78,
-          last_assessment_date: '2024-08-10',
-          next_assessment_date: '2025-02-10',
-          control_count: 28,
-          compliant_control_count: 22,
-          finding_count: 5,
-          created_at: '2018-05-25',
-          updated_at: '2024-08-10',
-        },
-        {
-          id: '4',
-          name: 'Sarbanes-Oxley Act',
-          short_name: 'SOX',
-          description: 'US federal law mandating financial practices and corporate governance.',
-          jurisdiction: 'United States',
-          effective_date: '2002-07-30',
-          status: 'active',
-          compliance_score: 91,
-          last_assessment_date: '2024-11-01',
-          next_assessment_date: '2025-05-01',
-          control_count: 19,
-          compliant_control_count: 17,
-          finding_count: 1,
-          created_at: '2002-07-30',
-          updated_at: '2024-11-01',
-        },
-      ])
+      setRegulations([])
     } finally {
       setIsLoading(false)
     }

@@ -10,6 +10,10 @@ export { ControlsTab } from './ControlsTab'
 export { FindingsTab } from './FindingsTab'
 export { AssessmentsTab } from './AssessmentsTab'
 
+// Documents & Retention
+export { DocumentsTab } from './DocumentsTab'
+export { RetentionTab } from './RetentionTab'
+
 // Phase 3: Privacy & DSAR
 export { DSARTab } from './DSARTab'
 export { PIIInventoryTab } from './PIIInventoryTab'
