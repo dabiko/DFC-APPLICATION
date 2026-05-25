@@ -4900,31 +4900,22 @@ class DocumentDashboardStatsView(APIView):
         total_documents = docs_qs.count()
         total_folders = Folder.objects.count()
 
-        # Storage - get org-wide usage for staff, personal for regular users
-        if user.is_staff or user.is_superuser:
-            from apps.documents.utils import get_storage_usage
-            storage_info = get_storage_usage()
-            storage_used = storage_info.get('total_size_bytes', 0)
+        # Storage - org-wide usage so this matches the UsageTab in org settings
+        org = getattr(user, 'organization', None)
+        if org:
+            org_storage_agg = Document.objects.filter(
+                organization=org, is_deleted=False
+            ).aggregate(total=models.Sum('file_size'))
+            storage_used = org_storage_agg['total'] or 0
         else:
-            storage_summary = get_user_storage_summary(user)
-            personal = storage_summary.get('personal_usage', {})
-            storage_used = personal.get('total_size_bytes', 0)
+            storage_used = docs_qs.aggregate(total=models.Sum('file_size'))['total'] or 0
 
-        # Storage limit: use real MinIO server disk capacity for staff/superusers;
-        # for regular users try their department quota, then fall back to server capacity.
-        from apps.documents.utils import _get_minio_server_capacity
-        server_total, _ = _get_minio_server_capacity()
-        fallback_limit = server_total if server_total else 500 * 1024 * 1024 * 1024
-
-        storage_limit = fallback_limit
-        if not user.is_staff and hasattr(user, 'department') and user.department:
-            from apps.documents.utils import get_department_quota_status
-            try:
-                quota_info = get_department_quota_status(user.department)
-                if quota_info and quota_info.get('quota_bytes'):
-                    storage_limit = quota_info['quota_bytes']
-            except Exception:
-                pass
+        # Storage limit: use the org's subscription quota so local and production
+        # always display the same limit instead of the physical MinIO disk size.
+        if org and org.max_storage_gb:
+            storage_limit = int(org.max_storage_gb * (1024 ** 3))
+        else:
+            storage_limit = 500 * 1024 * 1024 * 1024  # 500 GB fallback
 
         # Documents by department
         dept_breakdown = (

@@ -507,8 +507,22 @@ class OrganizationManagementViewSet(viewsets.ViewSet):
                 models.Q(domain__icontains=search)
             )
 
+        from apps.documents.models import Document
+
+        # Fetch actual storage used per org in one query (avoids N+1)
+        org_storage_qs = (
+            Document.objects.filter(is_deleted=False)
+            .values('organization_id')
+            .annotate(total_bytes=models.Sum('file_size'))
+        )
+        storage_by_org = {
+            row['organization_id']: row['total_bytes'] or 0
+            for row in org_storage_qs
+        }
+
         data = []
         for org in organizations:
+            storage_bytes = storage_by_org.get(org.id, 0)
             data.append({
                 'id': org.id,
                 'name': org.name,
@@ -518,6 +532,7 @@ class OrganizationManagementViewSet(viewsets.ViewSet):
                 'max_users': org.max_users,
                 'current_user_count': org.current_user_count,
                 'max_storage_gb': org.max_storage_gb,
+                'current_storage_gb': round(storage_bytes / (1024 ** 3), 3),
                 'is_active': org.is_active,
                 'created_at': org.created_at,
             })

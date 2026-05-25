@@ -53,6 +53,7 @@ import {
   getSystemHealth,
   getPlatformStats,
   getAnnouncements,
+  createAnnouncement,
   deleteAnnouncement,
   activateAnnouncement,
   deactivateAnnouncement,
@@ -106,6 +107,31 @@ export function SystemSettingsPage() {
     message: string
   } | null>(null)
   const [newRecipient, setNewRecipient] = useState('')
+
+  // New announcement form
+  const [showAnnouncementForm, setShowAnnouncementForm] = useState(false)
+  const [newAnnouncement, setNewAnnouncement] = useState<{
+    title: string
+    message: string
+    severity: PlatformAnnouncement['severity']
+    is_dismissible: boolean
+    target_all_users: boolean
+    target_plans: string[]
+    starts_at: string | null
+    ends_at: string | null
+    is_active: boolean
+  }>({
+    title: '',
+    message: '',
+    severity: 'info',
+    is_dismissible: true,
+    target_all_users: true,
+    target_plans: [],
+    starts_at: null,
+    ends_at: null,
+    is_active: true,
+  })
+  const [isCreatingAnnouncement, setIsCreatingAnnouncement] = useState(false)
 
   // Get user data from auth service for header
   const userData = authService.getUser()
@@ -335,6 +361,31 @@ export function SystemSettingsPage() {
     }
   }
 
+  const handleCreateAnnouncement = async () => {
+    if (!newAnnouncement.title.trim() || !newAnnouncement.message.trim()) return
+    setIsCreatingAnnouncement(true)
+    try {
+      const created = await createAnnouncement(newAnnouncement)
+      setAnnouncements((prev) => [created, ...prev])
+      setShowAnnouncementForm(false)
+      setNewAnnouncement({
+        title: '',
+        message: '',
+        severity: 'info',
+        is_dismissible: true,
+        target_all_users: true,
+        target_plans: [],
+        starts_at: null,
+        ends_at: null,
+        is_active: true,
+      })
+    } catch (error) {
+      console.error('Error creating announcement:', error)
+    } finally {
+      setIsCreatingAnnouncement(false)
+    }
+  }
+
   // Content renderer
   const renderContent = () => {
     if (isLoading) {
@@ -431,7 +482,7 @@ export function SystemSettingsPage() {
                 <StatCard
                   title="Total Documents"
                   value={stats.total_documents.toLocaleString()}
-                  subtitle={`${stats.total_storage_used_gb.toFixed(1)} GB used`}
+                  subtitle={`${formatBytes(stats.total_storage_used_gb * 1024 ** 3)} used`}
                   icon={FileText}
                   color="green"
                 />
@@ -1266,6 +1317,9 @@ export function SystemSettingsPage() {
                         Users
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                        Storage
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                         Status
                       </th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
@@ -1320,6 +1374,38 @@ export function SystemSettingsPage() {
                           <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
                             {org.current_user_count} / {org.max_users}
                           </td>
+                          <td className="px-4 py-3 text-sm">
+                            {(() => {
+                              const usedGb = org.current_storage_gb ?? 0
+                              const maxGb = org.max_storage_gb
+                              const pct = maxGb > 0 ? Math.min((usedGb / maxGb) * 100, 100) : 0
+                              return (
+                                <div className="min-w-[100px]">
+                                  <div className="flex justify-between text-xs mb-1">
+                                    <span className="text-gray-700 dark:text-gray-300">
+                                      {formatBytes(usedGb * 1024 ** 3)}
+                                    </span>
+                                    <span className="text-gray-400 dark:text-gray-500">
+                                      / {maxGb} GB
+                                    </span>
+                                  </div>
+                                  <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                    <div
+                                      className={cn(
+                                        'h-full rounded-full',
+                                        pct >= 90
+                                          ? 'bg-red-500'
+                                          : pct >= 75
+                                            ? 'bg-orange-500'
+                                            : 'bg-blue-500'
+                                      )}
+                                      style={{ width: `${pct}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              )
+                            })()}
+                          </td>
                           <td className="px-4 py-3">
                             <span
                               className={cn(
@@ -1335,7 +1421,7 @@ export function SystemSettingsPage() {
                           <td className="px-4 py-3 text-right">
                             <div className="flex items-center justify-end gap-2">
                               <button
-                                onClick={() => navigate(`/admin/organizations/${org.id}`)}
+                                onClick={() => setActiveTab('organizations')}
                                 className="p-1 text-gray-500 hover:text-purple-600"
                                 title="View Details"
                               >
@@ -1376,11 +1462,127 @@ export function SystemSettingsPage() {
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                   Platform Announcements
                 </h3>
-                <button className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                <button
+                  onClick={() => setShowAnnouncementForm((v) => !v)}
+                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                >
                   <Plus className="w-4 h-4" />
                   New Announcement
                 </button>
               </div>
+
+              {/* Inline create form */}
+              {showAnnouncementForm && (
+                <div className="bg-white dark:bg-gray-800 rounded-xl border border-purple-200 dark:border-purple-800 p-6 space-y-4">
+                  <h4 className="font-semibold text-gray-900 dark:text-white">
+                    Create Announcement
+                  </h4>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Title
+                    </label>
+                    <input
+                      type="text"
+                      value={newAnnouncement.title}
+                      onChange={(e) =>
+                        setNewAnnouncement((prev) => ({ ...prev, title: e.target.value }))
+                      }
+                      placeholder="Announcement title"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 dark:bg-gray-900 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Message
+                    </label>
+                    <textarea
+                      value={newAnnouncement.message}
+                      onChange={(e) =>
+                        setNewAnnouncement((prev) => ({ ...prev, message: e.target.value }))
+                      }
+                      rows={3}
+                      placeholder="Announcement message shown to users"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 dark:bg-gray-900 dark:text-white"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Severity
+                      </label>
+                      <select
+                        value={newAnnouncement.severity}
+                        onChange={(e) =>
+                          setNewAnnouncement((prev) => ({
+                            ...prev,
+                            severity: e.target.value as PlatformAnnouncement['severity'],
+                          }))
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 dark:bg-gray-900 dark:text-white"
+                      >
+                        <option value="info">Info</option>
+                        <option value="warning">Warning</option>
+                        <option value="critical">Critical</option>
+                        <option value="maintenance">Maintenance</option>
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-3 pt-6">
+                      <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={newAnnouncement.is_dismissible}
+                          onChange={(e) =>
+                            setNewAnnouncement((prev) => ({
+                              ...prev,
+                              is_dismissible: e.target.checked,
+                            }))
+                          }
+                          className="rounded"
+                        />
+                        Dismissible
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={newAnnouncement.is_active}
+                          onChange={(e) =>
+                            setNewAnnouncement((prev) => ({
+                              ...prev,
+                              is_active: e.target.checked,
+                            }))
+                          }
+                          className="rounded"
+                        />
+                        Active immediately
+                      </label>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button
+                      onClick={() => setShowAnnouncementForm(false)}
+                      className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleCreateAnnouncement}
+                      disabled={
+                        isCreatingAnnouncement ||
+                        !newAnnouncement.title.trim() ||
+                        !newAnnouncement.message.trim()
+                      }
+                      className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                    >
+                      {isCreatingAnnouncement ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Check className="w-4 h-4" />
+                      )}
+                      Create
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-4">
                 {!Array.isArray(announcements) || announcements.length === 0 ? (

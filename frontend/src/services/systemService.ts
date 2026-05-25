@@ -145,6 +145,7 @@ export interface OrganizationSummary {
   max_users: number
   current_user_count: number
   max_storage_gb: number
+  current_storage_gb: number
   is_active: boolean
   created_at: string
 }

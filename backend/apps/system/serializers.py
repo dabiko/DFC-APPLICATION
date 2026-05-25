@@ -189,6 +189,7 @@ class OrganizationListSerializer(serializers.Serializer):
     max_users = serializers.IntegerField()
     current_user_count = serializers.IntegerField()
     max_storage_gb = serializers.IntegerField()
+    current_storage_gb = serializers.FloatField()
     is_active = serializers.BooleanField()
     created_at = serializers.DateTimeField()
 
