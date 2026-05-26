@@ -128,7 +128,10 @@
       "WebFetch(domain:dfc-app.dabiko-software.tech)",
       "Bash(docker compose up *)",
       "Bash(/c/Users/dabik/IdeaProjects/DFC-APPLICATION/backend/venv/Scripts/python.exe *)",
-      "Bash(docker compose restart *)"
+      "Bash(docker compose restart *)",
+      "Bash(python3 *)",
+      "Bash(VITE_API_URL=https://dfc-app.dabiko-software.tech/api/v1 VITE_API_BASE_URL=https://dfc-app.dabiko-software.tech npx vite build)",
+      "Bash(VITE_API_URL=https://dfc-app.dabiko-software.tech/api/v1 npx vite build)"
     ],
     "deny": [],
     "ask": []
