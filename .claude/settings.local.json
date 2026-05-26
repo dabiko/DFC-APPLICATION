@@ -119,7 +119,13 @@
       "PowerShell(Get-Content \"C:\\\\Users\\\\dabik\\\\IdeaProjects\\\\DFC-APPLICATION\\\\frontend\\\\package.json\" | python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('scripts',{}\\), indent=2\\)\\)\")",
       "PowerShell(docker-compose *)",
       "PowerShell(Start-Process \"http://localhost:3000\")",
-      "Bash(Find-ChildItem C:\\\\Users\\\\dabik\\\\IdeaProjects\\\\DFC-APPLICATION\\\\frontend\\\\src\\\\services *)"
+      "Bash(Find-ChildItem C:\\\\Users\\\\dabik\\\\IdeaProjects\\\\DFC-APPLICATION\\\\frontend\\\\src\\\\services *)",
+      "Bash(VITE_API_URL='https://dfc-app.dabiko-software.tech/api/v1' npx vite build)",
+      "Bash(Remove-Item *)",
+      "Bash(rsync *)",
+      "Bash(scp *)",
+      "Bash(Select-Object Name, Mode)",
+      "WebFetch(domain:dfc-app.dabiko-software.tech)"
     ],
     "deny": [],
     "ask": []

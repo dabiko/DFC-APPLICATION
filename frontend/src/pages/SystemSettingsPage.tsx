@@ -506,22 +506,58 @@ export function SystemSettingsPage() {
                       Object Store (MinIO)
                     </h3>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Live bucket and disk capacity from the MinIO server
+                      Platform-wide document storage and disk capacity
                     </p>
                   </div>
                 </div>
 
+                {/* Platform storage used vs. allocated — same source as sidebar */}
+                {(() => {
+                  const usedBytes = stats.total_storage_used_gb * 1024 ** 3
+                  const allocatedBytes =
+                    organizations.reduce((sum, org) => sum + (org.max_storage_gb ?? 0), 0) *
+                    1024 ** 3
+                  const pct =
+                    allocatedBytes > 0
+                      ? Math.min(
+                          Math.max((usedBytes / allocatedBytes) * 100, usedBytes > 0 ? 0.5 : 0),
+                          100
+                        )
+                      : 0
+                  const label =
+                    allocatedBytes > 0
+                      ? `${formatBytes(usedBytes)} of ${formatBytes(allocatedBytes)} used`
+                      : `${formatBytes(usedBytes)} used`
+                  return (
+                    <div className="mb-5">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-sm text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                          <HardDrive className="w-4 h-4 text-gray-400" />
+                          Platform Storage
+                        </span>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">{label}</span>
+                      </div>
+                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                        <div
+                          className="bg-blue-600 dark:bg-blue-500 h-2 rounded-full transition-all"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  )
+                })()}
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
-                  {/* DFC bucket used */}
+                  {/* Platform documents used (matches sidebar source) */}
                   <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
                     <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
-                      DFC Bucket Used
+                      Storage Used
                     </p>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {formatBytes(stats.bucket_used_bytes ?? 0)}
+                      {formatBytes(stats.total_storage_used_gb * 1024 ** 3)}
                     </p>
                     <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                      Actual objects in dfc-documents
+                      Across all organizations
                     </p>
                   </div>
 
@@ -552,41 +588,41 @@ export function SystemSettingsPage() {
                   </div>
                 </div>
 
-                {/* Capacity bar */}
+                {/* Disk utilisation bar */}
                 {(stats.server_total_bytes ?? 0) > 0 &&
                   (() => {
                     const diskUsed =
                       (stats.server_total_bytes ?? 0) - (stats.server_available_bytes ?? 0)
                     const diskPct = Math.round((diskUsed / stats.server_total_bytes) * 100)
-                    const bucketPct = Math.max(
-                      (stats.bucket_used_bytes ?? 0) > 0 ? 0.2 : 0,
-                      ((stats.bucket_used_bytes ?? 0) / stats.server_total_bytes) * 100
+                    const docBytes = stats.total_storage_used_gb * 1024 ** 3
+                    const docPct = Math.max(
+                      docBytes > 0 ? 0.2 : 0,
+                      (docBytes / stats.server_total_bytes) * 100
                     )
                     return (
                       <div className="space-y-2">
                         <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
                           <span>Disk utilisation</span>
                           <span>
-                            {diskPct}% used &nbsp;|&nbsp; DFC bucket:{' '}
-                            {formatBytes(stats.bucket_used_bytes ?? 0)}
+                            {diskPct}% used &nbsp;|&nbsp; DFC documents: {formatBytes(docBytes)}
                           </span>
                         </div>
                         <div className="h-3 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden flex">
                           <div
                             className="h-full bg-blue-500 rounded-l-full transition-all duration-700"
-                            style={{ width: `${bucketPct}%` }}
-                            title={`DFC bucket: ${formatBytes(stats.bucket_used_bytes ?? 0)}`}
+                            style={{ width: `${docPct}%` }}
+                            title={`DFC documents: ${formatBytes(docBytes)}`}
                           />
                           <div
                             className="h-full bg-gray-400 dark:bg-gray-500 transition-all duration-700"
-                            style={{ width: `${Math.max(0, diskPct - bucketPct)}%` }}
+                            style={{ width: `${Math.max(0, diskPct - docPct)}%` }}
                             title="Other disk usage"
                           />
                         </div>
                         <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
                           <span className="flex items-center gap-1.5">
                             <span className="inline-block w-2.5 h-2.5 rounded-sm bg-blue-500" />
-                            DFC bucket
+                            DFC documents
                           </span>
                           <span className="flex items-center gap-1.5">
                             <span className="inline-block w-2.5 h-2.5 rounded-sm bg-gray-400 dark:bg-gray-500" />

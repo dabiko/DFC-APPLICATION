@@ -4910,9 +4910,13 @@ class DocumentDashboardStatsView(APIView):
         else:
             storage_used = docs_qs.aggregate(total=models.Sum('file_size'))['total'] or 0
 
-        # Storage limit: use the org's subscription quota so local and production
-        # always display the same limit instead of the physical MinIO disk size.
-        if org and org.max_storage_gb:
+        # Storage limit: use the actual physical MinIO disk capacity so the
+        # sidebar matches the System Settings Overview (server_total_bytes).
+        from apps.documents.utils import _get_minio_server_capacity
+        server_total, _ = _get_minio_server_capacity()
+        if server_total:
+            storage_limit = server_total
+        elif org and org.max_storage_gb:
             storage_limit = int(org.max_storage_gb * (1024 ** 3))
         else:
             storage_limit = 500 * 1024 * 1024 * 1024  # 500 GB fallback
