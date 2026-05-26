@@ -1,1 +1,1 @@
-cd frontend && npx lint-staged
+git diff --cached --quiet || (cd frontend && npx lint-staged)
