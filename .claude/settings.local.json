@@ -125,7 +125,10 @@
       "Bash(rsync *)",
       "Bash(scp *)",
       "Bash(Select-Object Name, Mode)",
-      "WebFetch(domain:dfc-app.dabiko-software.tech)"
+      "WebFetch(domain:dfc-app.dabiko-software.tech)",
+      "Bash(docker compose up *)",
+      "Bash(/c/Users/dabik/IdeaProjects/DFC-APPLICATION/backend/venv/Scripts/python.exe *)",
+      "Bash(docker compose restart *)"
     ],
     "deny": [],
     "ask": []
